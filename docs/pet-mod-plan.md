@@ -2,6 +2,20 @@
 
 > 2026-10-18 · 語系：繁體中文 + English · 目標平台：Windows（Steam）
 
+## 0. 目前進度（2026-10-18）
+
+照 Sims 4《貓狗成群》的玩法做的 **v0.1 寵物引擎已經完成並通過 62 項自動測試**，在不開遊戲的情況下用模擬環境驗證過。細節見 [`sims4-pet-system.md`](sims4-pet-system.md)。
+
+| 項目 | 狀態 |
+|---|---|
+| 寵物引擎（需求、個性、心情、成長與老死、親密度、訓練技能、照顧動作、忽略與離家、領養） | ✅ 完成，`mod/lua/pawhome/` |
+| 與遊戲的連接層（adapter） | ⏳ 只有模擬版（`adapters/mock.lua`）；真實版 `adapters/inzoi.lua` 全是待填空，要等第 0 階段探勘 |
+| 介面（寵物卡、領養、設定；繁中／英文；深色／淺色） | ✅ 完成，`mod/ui/`；目前在桌面預覽，遊戲內的傳輸層待第 0 階段 P8 |
+| 桌面預覽（不開遊戲就能玩玩看） | ✅ `python3 tools/preview_server.py` |
+| 遊戲內實測 | ❌ 還沒有，等你的電腦跑第 0 階段探勘 |
+
+> 和下面原計畫的差異：**資料表改用 Lua table 而不是 JSON**（不需要 JSON 解析器，在遊戲的 Lua 環境裡風險最低，社群一樣能直接改數值）。專案結構以實際目錄為準，見 `README.md`。
+
 ## 1. 為什麼值得做
 
 - **inZOI 到現在還沒有可以養的寵物。** 搶先體驗至今十次大更新都沒加，官方 2026 路線圖也沒列，12 月更新是名人系統。2025 年 AMA 時官方說過「高優先」，但沒有時程。
@@ -68,26 +82,32 @@ Lua 腳本模組 10/15 才剛推出，正式版只能用 115 個 Public 指令�
 | 9–12 | 5. 擴充（依回饋排序） | 可以養多隻、寵物相簿、獸醫看診（離開地塊型的事件）、寵物用品 BUILD 包（Blender）、**狗**（如果探勘確認可行） | 每兩週出一版小更新 |
 | 持續 | 維護 | 每次 inZOI 更新後：重新啟用模組 → 跑測試清單 → 修 `core/api.lua` → 改版本號 → 重新上傳 | 遊戲更新後 48 小時內出相容版 |
 
-## 5. 專案結構（第 1a 階段建立）
+## 5. 專案結構（已建立）
 
 ```
 mod/
-├─ lua/
-│  ├─ core/         api.lua（指令封裝）、scheduler.lua、storage.lua、log.lua、i18n.lua
-│  └─ pets/         adoption.lua、needs.lua、care.lua、personality.lua、runaway.lua
-├─ ui/              pet-card.html、settings.html、adopt-dialog.html（+ CSS/JS）
-├─ data/            personalities.json、needs.json、balance.json（可調數值）
-└─ localization/    zh-TW.json、en.json
+├─ lua/pawhome/
+│  ├─ core/        util, rng, serialize, log, i18n, api（唯一碰遊戲的地方）, storage（存檔＋版本遷移）
+│  ├─ data/        settings, needs, stages, traits, actions, habits, moods, training, names（全是可調的 Lua table）
+│  ├─ pets/        registry, needs, traits, moods, aging, bond, training, care, neglect, adoption, engine
+│  ├─ localization/ en.lua, zh_TW.lua（測試會檢查兩邊鍵值與佔位符一致）
+│  ├─ adapters/    mock.lua（測試與預覽用）、inzoi.lua（待第 0 階段填寫）
+│  ├─ app.lua      對 UI 與 adapter 的公開介面＋畫面資料（view model）
+│  └─ main.lua     進入點
+└─ ui/             index.html, style.css, app.js, bridge.js
+tests/             framework.lua, helpers.lua, test_core.lua, test_pets.lua, run.lua, run.py
+tools/             preview_server.py, preview_glue.lua
 docs/
 scripts/
 ```
 
 原則：
 
-1. 所有遊戲呼叫都集中在 `core/api.lua`。遊戲更新改了指令時，只修這一個檔案。
+1. 所有遊戲呼叫都集中在 `core/api.lua`，而且每個呼叫都包 `pcall`：遊戲端出錯不會讓寵物邏輯壞掉。
 2. 只用 Public 指令，玩家端才保證有效。
 3. 寵物資料由模組自己管，不碰原版的個性和自主行為系統（官方的界線）。
-4. 所有平衡數值都放在 JSON，不寫死在程式裡，方便調整，也方便玩家社群改。
+4. 所有平衡數值都放在 `data/`，不寫死在程式裡。
+5. 模擬用「補算」設計：不管 tick 隔多久（讀檔、快轉），結果都和每小時 tick 一樣，上限 12 小時，避免離開很久回來寵物全死。
 
 ## 6. 分工：我們怎麼合作
 
