@@ -1,6 +1,6 @@
-# 開發分工與規則（草案 v0.1）
+# 開發分工與規則（草案 v0.2）
 
-> 狀態：**草案，正與本機 session（ZoiPets）討論中**。定案後會升為 v1.0，並把精簡版寫進 `CLAUDE.md`。
+> 狀態：**草案 v0.2，討論第 2 輪**（第 1 輪本機 session 回覆已整合，見 §15 變更紀錄）。最多 3 輪，定案後升為 v1.0，並把精簡版寫進 `CLAUDE.md`。
 > 授權：使用者（Tim）2026-10-18 授權兩個 session「自己訂開發分工與規則，高自主開發」。
 
 ## 1. 角色（誰負責什麼）
@@ -20,14 +20,14 @@
 |---|---|
 | `mod/lua/pawhome/pets/`、`data/`、`localization/`、`core/`（api 契約除外）、`mod/ui/`、`tests/test_pets.lua`、`tests/test_core.lua`、`tools/` | 雲端 |
 | `mod/lua/pawhome/adapters/ue4ss.lua`、`mod/ue4ss/`、`scripts/`、`tests/test_ue4ss.lua`、`docs/qa/` | 本機 |
-| `core/api.lua`（adapter 契約）、`CLAUDE.md`、`docs/adr/` | **雙方都要同意**（契約變更＝兩邊都要 review） |
+| `core/api.lua`（adapter 契約）、`CLAUDE.md`、`docs/adr/` | **分兩級**：①新增「選用」函式＝adapter 方（本機）作者＋**通知**對方即可；②改「必要」函式或既有語意＝**雙方 review** |
 | `docs/` 其他 | 共用，誰改誰是作者、另一方審查 |
 
 ## 3. 分支與合併（trunk-based、短命分支）
 
 - 預設分支永遠可用（測試全綠）。**不直接 push 預設分支**，一律走分支 → 審查 → 合併。（目前 GitHub 不能強制，靠約定；之後建議使用者開啟 branch protection。）
-- 分支命名：`feat/<主題>`、`fix/<主題>`、`docs/<主題>`、`chore/<主題>`；一個分支只做一件事，存活不超過數天。
-- 合併方式：**squash merge**，一個 PR 一個 commit，訊息用 Conventional Commits（英文）：`feat(adapter): ...`、`fix(pets): ...`、`docs: ...`、`test: ...`、`chore(ci): ...`。
+- 分支命名：`feat/<主題>`、`fix/<主題>`、`docs/<主題>`、`chore/<主題>`（例：`feat/ue4ss-adapter`）；一個分支只做一件事，存活不超過數天。
+- 合併方式：**squash merge**，一個 PR 一個 commit，訊息用 Conventional Commits（**Paw Home repo 用英文**；ZoiPets 專案維持中文）：`feat(adapter): ...`、`fix(pets): ...`、`docs: ...`、`test: ...`、`chore(ci): ...`。
 - **誰合併**：審查方核准且 CI 綠 → **作者合併**（高自主）；合併後通知 PO。涉及「§8 要問 PO」的事，核准不等於同意，仍需 PO。
 - 不改寫別人分支的歷史；衝突時用 merge，不 rebase 別人的分支。
 
@@ -58,8 +58,9 @@
 | 層 | 內容 | 在哪跑 | 頻率 |
 |---|---|---|---|
 | 單元／行為 | 引擎（需求、個性、老化、收容所…）＋模擬 30 天 | CI（lupa）＋本機 | 每次 push |
-| Adapter 契約 | 用 fake UE4SS API 驗證 adapter 的行為與錯誤處理 | CI＋本機 | 每次 push |
-| 遊戲內冒煙 | 啟動遊戲 → 載入 mod → 讀寫存檔 → 生成／互動 → 關閉，**以 log 為證據** | 只有本機 | 每個遊戲 build、每個 release 前 |
+| Adapter 契約 | 用 fake UE4SS API 驗證 adapter：真檔案存讀、`.bak` 復原、分區、進入點（整點才 tick、錯誤被吞、按鍵有註冊）。**fake 的資料必須來自真實 log／探索輸出，並在 fixture 標註「觀測自哪個遊戲 build」**，避免測寂寞 | CI＋本機 | 每次 push |
+| 遊戲內冒煙（T1，**全自動**） | `steam://` 啟動 → 輪詢 `UE4SS.log` 出現 `[PawHome] loaded` ＋存檔寫出＋探索報告 → **只在主選單時**關閉（`CloseMainWindow` 失敗才用 `Stop-Process`，**有載入存檔時絕不強殺**）→ 自動寫結果檔 `docs/qa/results/<日期>-<exe FileVersion>.md`（附 log 摘錄） | 只有本機 | 每個遊戲 build、每個 release 前 |
+| 遊戲內（T2，半自動） | 使用者進存檔（桌面操控授權必須本人按），mod 偵測進入世界就自動跑探索／生成／印數值，使用者只需「點繼續、等 2 分鐘、關遊戲」 | 只有本機＋使用者 | 里程碑驗收 |
 | 回歸清單 | `docs/qa/smoke-checklist.md`，結果記在 `docs/qa/results/<日期>-<build>.md` | 本機 | 同上 |
 
 ## 8. 什麼事要問 PO（其餘兩個 session 自行決定）
@@ -77,9 +78,9 @@
 | 層級 | 內容 | 同意 |
 |---|---|---|
 | T0 | 讀檔、讀 log、跑離線測試、改程式 | 不需要 |
-| T1 | 啟動遊戲停在主選單、只做 V1/V6（注入、讀寫檔）、之後正常關閉 | **PO 一次性書面同意**（可涵蓋「同一個遊戲 build 的 T1」） |
-| T2 | 進存檔、生成／操作貓、改動存檔內容 | **PO 在場或明確同意**，並先備份存檔 |
-| T3 | 安裝／移除 UE4SS 或改遊戲資料夾 | **PO 明確同意**，且用安裝腳本（可還原） |
+| T1 | 安裝／更新**我們自己的** `ue4ss\Mods\PawHome`（腳本可還原、**不碰遊戲檔**、記錄安裝清單）；啟動遊戲**停在主選單**、只做注入與讀寫檔驗證、正常關閉。**不點「繼續」、不讀檔** | **PO 一次性書面同意**（可涵蓋「同一個遊戲 build」的 T1） |
+| T2 | 進存檔、生成／操作貓、改動存檔內容。**不在連線遊玩時進行** | **PO 在場或明確同意**，並先備份存檔 |
+| T3 | 安裝／移除／更新 **UE4SS 本體**，或動 `ue4ss\Mods` 以外的任何遊戲資料夾內容 | **PO 明確同意**，且用安裝腳本（可還原） |
 
 ## 10. 溝通協定
 
@@ -101,3 +102,27 @@
 | 注入被反作弊／ToS 處理 | PO 知情；不連線遊玩時測試；保留 ModKit 路線（雙 adapter）作為後路 |
 | 兩個 session 衝突 | 擁有權表、短命分支、一件事一分支 |
 | 存檔損毀 | T2 前備份；存檔讀失敗＝視為沒有寵物，絕不讓遊戲崩潰 |
+
+## 13. 工程要求（adapter 與 mod 必備）
+
+1. **Kill switch**：設定 `enabled=false` 可完全停用 mod；`caps` 即 feature flag，預設全 false。
+2. **啟動橫幅 log**：mod 版本＋遊戲 build（exe FileVersion）＋UE4SS 版本＋caps，方便回報問題。
+3. **未知 build 自動降級為安全模式**（只做虛擬寵物，不碰任何遊戲物件），直到該 build 通過 T1 冒煙並登錄在 `docs/compatibility.md`。
+4. **存檔多代備份輪替**（在 adapter 的檔案層實作，引擎不管）；讀失敗＝視為沒有寵物，絕不讓遊戲崩潰。
+5. **UE4SS 版本與 SHA256 釘在文件**（`docs/ue4ss-adapter.md`），升級要走 T3。
+6. **回復計畫**＝uninstall 腳本＋還原 `.bak`；每個 release 的說明都要寫怎麼完全移除。
+
+## 14. 第一個里程碑 M1「畫面上出現一隻貓，並知道牠能不能自己動」
+
+| # | 工作 | 負責 | 同意層級 | 完成條件 |
+|---|---|---|---|---|
+| M1-1 | T1 冒煙自動化＋結果檔＋`docs/compatibility.md` | 本機 | T1 | 在 v0.11.0 產生第一份結果檔 |
+| M1-2 | adapter 強化：橫幅、安全模式、kill switch、存檔輪替、`main.lua` 進入點測試（stub `LoopAsync`／`RegisterKeyBind`） | 本機 | T0 | CI 綠、DoD 全過 |
+| M1-3 | 進世界自動探索：找城市流浪貓、**生成貓並觀察是否會走動、有無 AI controller／行為樹**、取得遊戲時間與存檔 key | 本機＋PO | T2 | `docs/qa/results/` 有證據；結論寫成 ADR（方案 A／B／C） |
+| M1-4 | 把寫死的家庭／Zoi ID、除錯錢包換成真的 | 本機 | T2 | 領養能真的扣錢 |
+| M1-5 | CI、PR 範本、`docs/qa/smoke-checklist.md`、審查紀錄 | 雲端 | T0 | 每個 PR／分支都有審查記錄 |
+| M1-6 | 引擎對「實體貓」的需求盤點：引擎需要 adapter 提供什麼（位置／狀態／事件）才能讓行為提示有意義 | 雲端 | T0 | 提出契約新增草案給本機審查 |
+
+## 15. 變更紀錄
+- **v0.2（2026-10-18）**：整合本機 session 第 1 輪意見——契約變更分兩級（§2）、T1 全自動冒煙與「有存檔不強殺」（§7）、T1 納入安裝自己的 mod 與「不點繼續」、T2 補「不在連線遊玩」、T3 縮為 UE4SS 本體與 mod 以外（§9）、分支改名 `feat/ue4ss-adapter` 與 commit 語言（§3）、fixture 必須標註觀測 build（§7）、新增 §13 工程要求與 §14 里程碑 M1。
+
