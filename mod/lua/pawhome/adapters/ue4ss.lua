@@ -36,7 +36,8 @@ end
 --                The UE4SS entry point passes "<mod folder>/pawhome_".
 --   clock        function -> game minutes since day 0, or nil while unknown.
 --                Default: no clock (now() returns nil, the engine idles).
---   slot         function -> save-slot id string. Default: always "debug".
+--   slot         function -> save-slot id string, or nil while no save is loaded.
+--                Default (no function): always "debug".
 --   locale       "zh-TW" | "en". Default "zh-TW".
 --   print        function(text). Default: the global print (UE4SS routes it to UE4SS.log).
 --   debugFunds   number or nil. When set, funds/charge use an in-memory wallet so
@@ -58,9 +59,28 @@ function Ue4ss.new(opts)
         for k in pairs(a.caps) do a.caps[k] = opts.caps[k] == true end
     end
 
+    -- Without opts.slot every save goes to the constant slot "debug". With opts.slot,
+    -- nil means "no save is loaded / not known right now" (e.g. a loading screen):
+    -- reads return nothing and writes are refused, so we never fall back to another
+    -- slot's file.
+    local function currentSlot()
+        if not opts.slot then return "debug" end
+        return opts.slot()
+    end
+
     local function path(key)
-        local slot = opts.slot and opts.slot() or "debug"
+        local slot = currentSlot()
+        if slot == nil then return nil end
         return opts.pathPrefix .. sanitize(slot) .. "." .. sanitize(key) .. ".sav"
+    end
+
+    -- Savegame slot the player is in (contract: core/api.lua, added in a240f2f).
+    -- UNVERIFIED: the real slot id is not found yet (V3); the entry point passes no
+    -- slot function, so this is the constant "debug". subscribe() is not implemented:
+    -- no game event for "save loaded" is known, and the app polls slotId() anyway.
+    function a.slotId()
+        local slot = currentSlot()
+        return slot ~= nil and tostring(slot) or nil
     end
 
     -- UNVERIFIED for the real clock: the in-game time source is still unknown.
@@ -79,6 +99,7 @@ function Ue4ss.new(opts)
 
     function a.saveGet(key)
         local p = path(key)
+        if p == nil then return nil end -- no save loaded
         local data = readFile(p)
         if data == nil then
             -- the last write may have been interrupted between the renames
@@ -92,6 +113,7 @@ function Ue4ss.new(opts)
     -- Recovering an older generation is manual: rename .bakK back to the main file.
     function a.saveSet(key, value)
         local p = path(key)
+        if p == nil then error("no savegame slot is loaded; refusing to write " .. tostring(key)) end
         local tmp = p .. ".tmp"
         local f, err = io.open(tmp, "wb")
         if not f then error("cannot open " .. tmp .. ": " .. tostring(err)) end

@@ -140,6 +140,45 @@ T.test("ue4ss: save slots are kept apart and keys are sanitized", function()
     cleanup(p)
 end)
 
+T.test("ue4ss: slotId follows the slot function; nil slot never touches files", function()
+    local p = prefix()
+    T.eq(Ue4ss.new({ pathPrefix = p, print = silent }).slotId(), "debug", "default slot")
+    local slot = "slotA"
+    local a = Ue4ss.new({ pathPrefix = p, print = silent, slot = function() return slot end })
+    T.eq(a.slotId(), "slotA")
+    a.saveSet("k", "in A")
+    slot = nil -- loading screen
+    T.eq(a.slotId(), nil)
+    T.eq(a.saveGet("k"), nil, "no read while no save is loaded")
+    T.falsy(pcall(a.saveSet, "k", "ghost"), "write refused")
+    slot = "slotA"
+    T.eq(a.saveGet("k"), "in A", "slot A untouched")
+    cleanup(p)
+end)
+
+T.test("ue4ss: the app follows a savegame switch through slotId (real files)", function()
+    local p = prefix()
+    local slot, minutes = "slotA", 480
+    local a = Ue4ss.new({ pathPrefix = p, print = silent, debugFunds = 1000,
+        slot = function() return slot end, clock = function() return minutes end })
+    local app = assert(App.new(a, { seed = 7 }))
+    app:tick()
+    local offers = app:offers(1)
+    T.truthy(app:adoptOffer(1, 1, offers[1].id, "Mochi").ok)
+
+    slot = "slotB"
+    minutes = minutes + 60
+    app:tick()
+    T.eq(#app.ctx.state.pets, 0, "slot B starts empty")
+
+    slot = "slotA"
+    minutes = minutes + 60
+    app:tick()
+    T.eq(#app.ctx.state.pets, 1, "slot A pet is back")
+    T.eq(app.ctx.state.pets[1].name, "Mochi")
+    cleanup(p)
+end)
+
 T.test("ue4ss: without a clock the engine starts and idles", function()
     local p = prefix()
     local app = assert(App.new(Ue4ss.new({ pathPrefix = p, print = silent }), { seed = 7 }))
