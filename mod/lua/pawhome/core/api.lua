@@ -5,7 +5,8 @@
 --   required: now, saveGet, saveSet
 --   optional: notify, householdMembers, funds, charge, addBuff, listStrays,
 --             bringStray, spawnPet, entityExists, despawnPet,
---             playAnimation, locale, logSink
+--             playAnimation, locale, logSink,
+--             slotId, subscribe   (see below: the savegame slot the player is in)
 --   caps: { spawn = bool, moveStray = bool, animate = bool, buffs = bool }
 local Log = require("pawhome.core.log")
 
@@ -52,6 +53,22 @@ end
 
 function Api.saveSet(key, value)
     return (call("saveSet", key, value))
+end
+
+-- Optional. Identifier of the savegame slot that is loaded right now (any string/number).
+-- An adapter that keeps one data file per slot MUST implement this, otherwise the mod
+-- cannot notice that the player switched saves. nil = "the adapter has no slots".
+function Api.slotId()
+    local ok, v = call("slotId")
+    if ok and v ~= nil then return tostring(v) end
+    return nil
+end
+
+-- Optional. subscribe(event, fn): the game side calls fn() when `event` happens.
+-- Events defined so far: "slot_changed". The mod also polls slotId() on every call, so
+-- subscribing is only an optimisation (react at once instead of at the next tick).
+function Api.subscribe(event, fn)
+    return (call("subscribe", event, fn))
 end
 
 function Api.locale()

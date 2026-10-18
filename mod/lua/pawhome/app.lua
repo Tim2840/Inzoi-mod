@@ -51,16 +51,47 @@ function App.new(adapter, opts)
     applyLocale(ctx)
     if ctx.cfg.debug then Log.setLevel("debug") end
     Log.info("started (" .. how .. "), " .. #state.pets .. " pets")
-    return setmetatable({ ctx = ctx }, App)
+    local app = setmetatable({ ctx = ctx, slot = Api.slotId(), suspended = false }, App)
+    -- react at once when the game says the save changed; polling in sync() is the fallback
+    Api.subscribe("slot_changed", function() app:syncSlot() end)
+    return app
+end
+
+-- The adapter keeps one data file per savegame slot. If the player loaded another save,
+-- the state in memory belongs to the OLD slot, so it must be replaced - and must never be
+-- written, because the adapter would now put it into the NEW slot. (Every public call ends
+-- with a save, so nothing is lost by not saving here.)
+function App:syncSlot()
+    local slot = Api.slotId()
+    if slot == self.slot then return false end
+    Log.info("savegame slot changed: " .. tostring(self.slot) .. " -> " .. tostring(slot))
+    self.slot = slot
+    local state, how = Storage.load()
+    if not state then
+        -- e.g. the new slot was written by a newer version: touch nothing until the slot changes again
+        Log.error("cannot load the new slot (" .. tostring(how) .. "); the mod is paused for it")
+        self.suspended = true
+        return true
+    end
+    local ctx = self.ctx
+    ctx.state, ctx.cfg = state, state.settings
+    if state.rng then ctx.rng:setState(state.rng) end
+    ctx.events = {}
+    applyLocale(ctx)
+    self.suspended = false
+    return true
 end
 
 function App:save()
+    if self.suspended or Api.slotId() ~= self.slot then return false end
     self.ctx.state.rng = self.ctx.rng:getState()
     return Storage.save(self.ctx.state)
 end
 
 -- Call about once per game hour (or whenever the clock jumps).
 function App:tick()
+    self:syncSlot()
+    if self.suspended then return {} end
     local now = Api.now()
     if now == nil then return {} end
     local notes = Engine.tick(self.ctx, now)
@@ -69,6 +100,7 @@ function App:tick()
 end
 
 function App:sync()
+    self:syncSlot()
     self.ctx.now = Api.now() or self.ctx.now
 end
 
@@ -128,6 +160,7 @@ function App:redeem(householdId, zoiId, petId)
 end
 
 function App:rename(petId, name)
+    self:sync()
     local r = Adoption.rename(self.ctx, petId, name)
     self:save()
     return r
@@ -138,6 +171,7 @@ local SETTING_RANGES = {
 }
 
 function App:setSetting(key, value)
+    self:sync()
     local cfg = self.ctx.cfg
     if defaults[key] == nil then return false, "unknown setting" end
     if type(value) ~= type(defaults[key]) then return false, "wrong type" end
