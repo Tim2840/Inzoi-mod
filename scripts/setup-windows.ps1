@@ -165,7 +165,7 @@ Write-Host @"
  [ ] Epic：登入後把「inZOI ModKit」加入收藏庫，再從 Epic Games Launcher 安裝
  [ ] 開一個新的 PowerShell，執行 claude 並登入
  [ ] （選用）py tools\preview_server.py 開桌面預覽
- [ ] 照 docs\setup-windows.md 的「驗證」一節確認 MCP 連得上
+ [ ] 照 docs\setup-windows.md 的「步驟 6」確認 MCP 連得上
  [ ] 接著做 docs\phase0-probe.md 的可行性探勘
 ==============================================================
 "@ -ForegroundColor White
