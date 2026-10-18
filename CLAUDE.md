@@ -33,7 +33,7 @@ inZOI 目前沒有寵物系統。本模組用官方 ModKit 的 **Lua 腳本模�
 
 1. **絕對不要捏造探勘結果。** 指令名稱、Lua API、參數、行為，都要是從真的遊戲或 `mod-docs.playinzoi.com` 實際看到的。不確定就寫「未驗證」。
 2. **只有 `core/api.lua` 和 `adapters/*` 可以碰遊戲**，其他模組只能呼叫 `Api.*`。遊戲更新時應該只需要改 adapter。
-3. **只用 Public 指令**（CLI 目錄 318 個指令只有 115 個是 Public；UserCheat／ScriptCheat 在玩家端是 no-op）。
+3. **只用 Public 指令**（CLI 目錄 318 個指令只有 115 個是 Public；UserCheat／ScriptCheat 在玩家端是 no-op）。**本條只適用官方 ModKit／CLI 路線；UE4SS adapter 不受此限**（但仍須遵守規則 1、2、5）。
 4. **不要覆寫 Zoi 的個性、自主行為、情緒、動畫**，官方明說不開放給模組。只做宏觀層面（領養、需求、照顧）。
 5. `adapters/inzoi.lua` 的 `caps`（`spawn`、`moveStray`、`buffs`、`animate`）**只有在實測過之後才能設為 true**。
 6. 新增或修改邏輯時，在 `tests/` 補測試（用 `adapters/mock.lua`），並維持全綠：
@@ -42,7 +42,7 @@ inZOI 目前沒有寵物系統。本模組用官方 ModKit 的 **Lua 腳本模�
 7. 字串一律放 `mod/lua/pawhome/localization/`，**en 與 zh_TW 的鍵與 `{佔位符}` 必須一致**（測試會檢查）。UI 不放任何寫死的文字。
 8. 平衡數值放 `mod/lua/pawhome/data/`，不要寫死在程式裡。
 9. 存檔格式有版本號：改 `state` 結構要加 `core/storage.lua` 的 migration，不能讓舊存檔壞掉。
-10. 資料表用 Lua table，**不用 JSON**（遊戲的 Lua 環境不一定有 JSON 解析器）。
+10. 資料表用 Lua table，**不用 JSON**（官方 ModKit 的 Lua 環境不一定有 JSON 解析器）。**本條針對引擎與資料表；UE4SS adapter 自己的存檔／設定檔格式不受此限**（例如 ZoiPets 的 JSON 存檔）。
 11. 不要把 ModKit 的 Unreal 專案或大型二進位檔直接 commit；先討論要用 `.gitignore` 還是 Git LFS。
 12. 桌面預覽：`py tools\preview_server.py` → `http://127.0.0.1:8765/?preview=1`。改 Lua 之後要重啟它。
 
@@ -63,6 +63,17 @@ inZOI 目前沒有寵物系統。本模組用官方 ModKit 的 **Lua 腳本模�
   - **數量從嚴**：一次只開需要的，每個 session 只做一件小事（每個 session 都會消耗使用者的額度）。
 - 以下情況**一律先問使用者**，不可自行開 session 去做：需要遊戲／UE4SS／使用者電腦的事、會改規格或玩法或兩個專案合併方式的事、會動到別人正在改的檔案。
 - 同時有多個 session 改程式時，各用各的分支，合併前先讓使用者知道。
+
+## 開發流程摘要（完整版：`docs/engineering-workflow.md` v1.0；決定紀錄：`docs/adr/0003`）
+
+- **角色**：PO＝使用者；Dev＝本機 session（碰遊戲／UE4SS／安裝腳本）；Review/QA/Release＝雲端 session（引擎、CI、文件、ADR）。
+- **四眼原則**：合併進預設分支前必須有**非作者**審查通過；不直接 push 預設分支。目前未啟用 PR／Issue（需 PO 同意），審查流程＝推分支＋`send_message` 通知＋審查結果寫 `docs/reviews/`。
+- **分支與提交**：`feat/`、`fix/`、`docs/`、`chore/` 短命分支，squash merge，Conventional Commits（本 repo 用英文）。
+- **擁有權**：`pets/`、`data/`、`localization/`、`mod/ui/`、`tools/` → 雲端；`adapters/ue4ss.lua`、`mod/ue4ss/`、`scripts/`、`docs/qa/` → 本機。`core/api.lua`：新增「選用」函式＝adapter 方作者＋通知；改必要函式或既有語意＝雙方 review。
+- **完成標準**：CI 綠、有測試、en／zh-TW 一致、存檔結構變更有 migration、遊戲介接函式標明「已驗證（build 號＋日期＋依據）／未驗證」、文件與 CHANGELOG 更新。**沒有遊戲內證據就不是「已驗證」，`caps` 不得設 true。**
+- **遊戲操作同意層級**：T0 讀檔／離線測試／改程式（不需同意）；T1 安裝自己的 `ue4ss\Mods\PawHome`＋啟動遊戲停在主選單做注入與讀寫檔驗證（PO 一次性同意，不點「繼續」；**載入存檔時絕不強殺**）；T2 進存檔、生成／操作貓（PO 在場或明確同意、先備份、不在連線遊玩時）；T3 安裝／移除 UE4SS 本體或動 Mods 以外（PO 明確同意）。
+- **一律問 PO**：玩法與規格、啟動遊戲（依上述層級）、發佈到外部平台、改寫歷史／刪分支／改預設分支名／開啟 branch protection、一次開多個 session、合併兩個專案的最終方案。永遠不取得 AES 金鑰、不散佈 KRAFTON 資源。
+- **目前里程碑**：M1「畫面上出現一隻貓，並知道牠能不能自己動」（`docs/engineering-workflow.md` §14）。原「第 0 階段探勘」改以 M1 為準，`docs/phase0-probe.md` 保留作官方 ModKit 路線的參考。
 
 ## Session 之間的通知約定（使用者要求，2026-10-18）
 
