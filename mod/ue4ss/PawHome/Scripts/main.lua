@@ -18,7 +18,8 @@ local HOUSEHOLD, ZOI = 1, 1
 
 local scriptsDir = debug.getinfo(1, "S").source:match("^@(.*[\\/])") or "./"
 package.path = scriptsDir .. "?.lua;" .. package.path
-local modDir = scriptsDir:gsub("Scripts[\\/]$", "")
+-- tests/test_ue4ss_main.lua sets PAWHOME_MOD_DIR so save files land in a temp folder
+local modDir = rawget(_G, "PAWHOME_MOD_DIR") or scriptsDir:gsub("Scripts[\\/]$", "")
 
 local Ue4ss = require("pawhome.adapters.ue4ss")
 local Main = require("pawhome.main")

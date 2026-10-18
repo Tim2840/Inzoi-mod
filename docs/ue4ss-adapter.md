@@ -12,6 +12,7 @@ verified), instead of the official ModKit Lua runtime. Branch: `ue4ss-adapter`.
 | `mod/ue4ss/PawHome/enabled.txt` | Makes UE4SS load the mod |
 | `scripts/install-ue4ss.ps1` | Copies the entry point + engine into `ue4ss\Mods\PawHome` (`-Uninstall` to remove) |
 | `tests/test_ue4ss.lua` | 9 offline tests (storage, slots, wallet, virtual-pet adoption, discovery) |
+| `tests/test_ue4ss_main.lua` | 5 offline tests of the entry point with stubbed UE4SS globals (hourly tick, swallowed errors, debug keys) |
 
 ## Verification status
 
