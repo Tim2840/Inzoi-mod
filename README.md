@@ -29,6 +29,7 @@ python3 -I tests/run.py        # 62 passed, 0 failed
 |---|---|
 | [docs/sims4-pet-system.md](docs/sims4-pet-system.md) | Sims 4 寵物系統研究與本模組的對照表（做了什麼、沒做什麼） |
 | [docs/pet-mod-plan.md](docs/pet-mod-plan.md) | 玩法設計、專案結構與開發進程 |
+| [docs/handoff-local-session.md](docs/handoff-local-session.md) | **交接給本機 Claude Code session**（含第一則要貼的訊息） |
 | [docs/setup-windows.md](docs/setup-windows.md) | Windows 開發環境安裝（搭配 `scripts/setup-windows.ps1`） |
 | [docs/phase0-probe.md](docs/phase0-probe.md) | 第 0 階段可行性探勘清單（接上遊戲前必做） |
 | [docs/research-report.md](docs/research-report.md) | inZOI 模組製作方式與社群需求研究 |
