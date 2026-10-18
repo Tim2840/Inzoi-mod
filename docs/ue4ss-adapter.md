@@ -36,6 +36,31 @@ Evidence comes from the ZoiPets run on **inZOI v0.10.0** (build 20260915.15331,
 With every cap off the engine runs as the virtual pet (plan C): shelter adoption,
 needs, care, neglect and the shelter all work, but no cat appears in the world.
 
+## What is known about in-game cats (facts only)
+
+Source: ZoiPets discovery scan, **main menu only**, inZOI v0.10.0, 2026-09-25
+(two autoruns, same results). Nothing below was observed inside a save.
+
+| Item | Observed |
+|---|---|
+| Lobby cat actor | `BP_Pet_Customize_01_C` instance `BP_Pet_Customize_01_62` in `/Game/Map/LobbyLevel2` |
+| Class asset | `/Game/Characters/Pets/Operator/OP001/Mesh/BP_Pet_Customize_01.BP_Pet_Customize_01_C` |
+| Components | `SkeletalMesh` (SkeletalMeshComponent), `Capsule` (CapsuleComponent), two `AudioComponent`s |
+| Animation | anim instance `ABP_LobbyCat_C` on the SkeletalMesh |
+| Material | `MI_OP002_Body_001_Animated` (MaterialInstanceDynamic) |
+| Asset folder | `/Game/Characters/Pets/` exists (only the `Operator/OP001` path has been seen) |
+
+Not known yet (do not build on these):
+- Whether city stray cats use this class. `Operator` suggests the lobby cat belongs to the
+  "cat operator" presentation; strays were not loaded at the main menu.
+- Any property values, callable functions or anim-blueprint variables: the scan only
+  records object names, it never dumped properties or functions.
+- Whether a cat has an AI controller or behaviour tree. The scan would have listed
+  names like `AIC_Cat` (none appeared), but it does not search for AI classes in
+  general, so this is **no evidence either way**.
+- Whether spawning `BP_Pet_Customize_01_C` in a save works, moves, or gets written
+  into the game's own save file.
+
 ## Engine notes for the owner (no engine rules were changed)
 
 1. Adoption calls `Api.funds`, so without a money API in-game adoption only works
