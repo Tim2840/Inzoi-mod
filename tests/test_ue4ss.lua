@@ -229,6 +229,9 @@ T.test("ue4ss: log sink and notify go to the injected printer", function()
 end)
 
 T.test("ue4ss: discovery groups classes and level instances only", function()
+    -- Fixture: the first, second and fourth names were observed in-game on inZOI v0.10.0
+    -- (build 20260915.15331), main menu, 2026-09-25. The third (Default__ object) and
+    -- the fifth (Category) are synthetic negatives.
     local objects = {
         "BlueprintGeneratedClass /Game/Characters/Pets/Operator/OP001/Mesh/BP_Pet_Customize_01.BP_Pet_Customize_01_C",
         "BP_Pet_Customize_01_C /Game/Map/LobbyLevel2.LobbyLevel2:PersistentLevel.BP_Pet_Customize_01_62",

@@ -3,6 +3,9 @@
 #   ue4ss\Mods\PawHome\Scripts\pawhome\...   (the engine, from mod\lua\pawhome)
 # Requires UE4SS to be installed already (dwmapi.dll + ue4ss\ in Binaries\Win64).
 # Save files (pawhome_*.sav) in the mod folder are left untouched.
+# -Uninstall removes exactly what install adds: Scripts\ and enabled.txt. It keeps
+# saves and the operator's flag files (pawhome_debug.txt, pawhome_disabled.txt,
+# pawhome_verified_builds.txt).
 param(
     [string]$GameDir = 'C:\Program Files (x86)\Steam\steamapps\common\inZOI',
     [switch]$Uninstall

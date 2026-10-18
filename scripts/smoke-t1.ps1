@@ -1,17 +1,26 @@
 # T1 smoke test (docs/engineering-workflow.md §7, §9): install the PawHome UE4SS mod,
-# start inZOI, stay on the MAIN MENU, collect log evidence for V1 (injection + mod
-# load) and V6 (save file written), close the game, and write a result file:
-#   docs/qa/results/<date>-<FileVersion>.md
+# start inZOI, stay on the MAIN MENU, collect log evidence and write a result file:
+#   docs/qa/results/<date>-<FileVersion>[-runN].md
+#
+# Checks: V1 (UE4SS injected + PawHome loaded), V6 (save file written after start) and,
+# when a PawHome save already existed before the run, read-back ("started (loaded)")
+# and backup rotation (.bak1 now holds the previous save, byte for byte).
 #
 # Consent: T1 needs the PO's one-time consent for this game build. The script never
-# clicks "Continue" or loads a save. It force-closes only if the window does not close
-# within the grace period; pass -NoForceClose if a person may have loaded a save.
+# clicks "Continue" or loads a save, but it cannot prove nobody else did, so it never
+# kills the game by default: it asks every game window to close (like clicking X) and,
+# if the game is still running after the grace period, reports it. Pass -ForceClose
+# only when you are sure the game is on the main menu.
+#
+# Debug mode: the mod only has a clock (and therefore saves) in debug mode, so the
+# script creates <Mod>\pawhome_debug.txt for the run and removes it again if it was
+# not there before.
 param(
     [string]$GameDir = 'C:\Program Files (x86)\Steam\steamapps\common\inZOI',
     [int]$TimeoutSec = 240,
-    [int]$GraceSec = 30,
+    [int]$GraceSec = 45,
     [switch]$SkipInstall,
-    [switch]$NoForceClose
+    [switch]$ForceClose
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
@@ -21,6 +30,7 @@ $ue4ssDir = Join-Path $win64 'ue4ss'
 $modDir = Join-Path $ue4ssDir 'Mods\PawHome'
 $logPath = Join-Path $ue4ssDir 'UE4SS.log'
 $savePath = Join-Path $modDir 'pawhome_debug.pawhome.save.sav'
+$debugFlag = Join-Path $modDir 'pawhome_debug.txt'
 $processName = 'inZOI-Win64-Shipping'
 
 # ---------------------------------------------------------------- preconditions
@@ -38,9 +48,14 @@ Write-Host "Build $build ($fingerprint)"
 
 if (-not $SkipInstall) { & (Join-Path $PSScriptRoot 'install-ue4ss.ps1') -GameDir $GameDir }
 
+$createdDebugFlag = $false
+if (-not (Test-Path $debugFlag)) { New-Item -ItemType File $debugFlag | Out-Null; $createdDebugFlag = $true }
+
 # ---------------------------------------------------------------- run
+$hadSave = Test-Path $savePath
+$hashBefore = if ($hadSave) { (Get-FileHash $savePath).Hash } else { $null }
+$saveBefore = if ($hadSave) { (Get-Item $savePath).LastWriteTime } else { $null }
 $started = Get-Date
-$saveBefore = if (Test-Path $savePath) { (Get-Item $savePath).LastWriteTime } else { $null }
 Start-Process 'steam://rungameid/2456740'
 
 $deadline = $started.AddSeconds($TimeoutSec)
@@ -63,18 +78,52 @@ if ($loaded -and $saved -and -not $crashed) { Start-Sleep -Seconds 20 }
 $aliveAtEnd = [bool](Get-Process -Name $processName -ErrorAction SilentlyContinue)
 
 # ---------------------------------------------------------------- close
+Add-Type -Namespace PawHome -Name Win -MemberDefinition @'
+public delegate bool EnumProc(System.IntPtr hWnd, System.IntPtr lParam);
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, System.IntPtr lParam);
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(System.IntPtr hWnd, out uint pid);
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool IsWindowVisible(System.IntPtr hWnd);
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool PostMessage(System.IntPtr hWnd, uint msg, System.IntPtr w, System.IntPtr l);
+'@ -ErrorAction SilentlyContinue
+
+function Close-AllWindows([int]$procId) {
+    # WM_CLOSE to every visible top-level window of the process (game window and the
+    # UE4SS console): the same request as clicking each window's X button.
+    $sent = [System.Collections.Generic.List[IntPtr]]::new()
+    $cb = [PawHome.Win+EnumProc]({
+        param($h, $l)
+        $wpid = [uint32]0
+        [void][PawHome.Win]::GetWindowThreadProcessId($h, [ref]$wpid)
+        if ($wpid -eq $procId -and [PawHome.Win]::IsWindowVisible($h)) {
+            [void][PawHome.Win]::PostMessage($h, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
+            $sent.Add($h)
+        }
+        return $true
+    }.GetNewClosure())
+    [void][PawHome.Win]::EnumWindows($cb, [IntPtr]::Zero)
+    return $sent.Count
+}
+
 $closeHow = 'not running'
 $p = Get-Process -Name $processName -ErrorAction SilentlyContinue
 if ($p) {
     $null = $p.CloseMainWindow()
-    if ($p.WaitForExit($GraceSec * 1000)) {
-        $closeHow = 'closed normally'
-    } elseif ($NoForceClose) {
-        $closeHow = 'STILL RUNNING (force close disabled; close it by hand)'
+    if ($p.WaitForExit(15000)) {
+        $closeHow = 'closed normally (main window)'
     } else {
-        Stop-Process -Id $p.Id -Force
-        $closeHow = 'force-closed at the main menu (no save was loaded by this script)'
+        $null = Close-AllWindows $p.Id
+        if ($p.WaitForExit($GraceSec * 1000)) {
+            $closeHow = 'closed normally (WM_CLOSE to all windows)'
+        } elseif ($ForceClose) {
+            Stop-Process -Id $p.Id -Force
+            $closeHow = 'force-closed (-ForceClose given; operator confirmed main menu)'
+        } else {
+            $closeHow = 'STILL RUNNING - did not close on request; not killed (no -ForceClose). Close it by hand.'
+        }
     }
+}
+if ($createdDebugFlag -and -not (Get-Process -Name $processName -ErrorAction SilentlyContinue)) {
+    Remove-Item $debugFlag -ErrorAction SilentlyContinue
 }
 
 # ---------------------------------------------------------------- evidence
@@ -87,13 +136,23 @@ $banner = $pawLines | Where-Object { $_ -match '\[PawHome\] v' } | Select-Object
 
 $v1 = $loaded -and -not $crashed
 $v6 = $saved
-$pass = $v1 -and $v6 -and $aliveAtEnd -and -not $errLines
-function Mark($ok) { if ($ok) { 'PASS' } else { 'FAIL' } }
+# read-back and rotation can only be checked when a save existed before the run
+$readBack = $null; $rotated = $null
+if ($hadSave) {
+    $readBack = [bool]($pawLines | Where-Object { $_ -match 'started \(loaded\)' })
+    $bak1 = "$savePath.bak1"
+    $rotated = (Test-Path $bak1) -and ((Get-FileHash $bak1).Hash -eq $hashBefore)
+}
+$pass = $v1 -and $v6 -and $aliveAtEnd -and -not $errLines -and ($readBack -ne $false) -and ($rotated -ne $false)
+function Mark($ok) { if ($null -eq $ok) { 'n/a (no save before this run)' } elseif ($ok) { 'PASS' } else { 'FAIL' } }
 function Redact($s) { $s -replace [regex]::Escape($env:USERPROFILE), '%USERPROFILE%' }
 
 $resultsDir = Join-Path $repo 'docs\qa\results'
 New-Item -ItemType Directory -Force $resultsDir | Out-Null
-$result = Join-Path $resultsDir ("{0}-{1}.md" -f $started.ToString('yyyy-MM-dd'), $build)
+$base = "{0}-{1}" -f $started.ToString('yyyy-MM-dd'), $build
+$result = Join-Path $resultsDir "$base.md"
+$n = 2
+while (Test-Path $result) { $result = Join-Path $resultsDir "$base-run$n.md"; $n++ }
 $md = @"
 # T1 smoke – $build – $($started.ToString('yyyy-MM-dd HH:mm'))
 
@@ -102,12 +161,15 @@ $md = @"
 | Overall | **$(Mark $pass)** |
 | V1 UE4SS injected and PawHome loaded | $(Mark $v1) |
 | V6 save file written after start | $(Mark $v6) |
+| Read back an existing save (``started (loaded)``) | $(Mark $readBack) |
+| Backup rotation (``.bak1`` = previous save, same hash) | $(Mark $rotated) |
 | Game still running at the end of the window (no crash) | $(Mark $aliveAtEnd) |
 | No ``[PawHome]`` error lines | $(Mark (-not $errLines)) |
 
 - Build: ``$build``, fingerprint ``$fingerprint``
+- Save before the run: $(if ($hadSave) { 'yes' } else { 'no' })
 - Close: $closeHow
-- Script: ``scripts/smoke-t1.ps1`` (timeout ${TimeoutSec}s, main menu only, no save loaded)
+- Script: ``scripts/smoke-t1.ps1`` (timeout ${TimeoutSec}s, main menu only, no save loaded by the script)
 
 ## UE4SS header
 ``````
@@ -128,4 +190,5 @@ Banner: $(if ($banner) { '``' + (Redact $banner) + '``' } else { '(not found)' }
 "@
 [IO.File]::WriteAllText($result, $md, (New-Object System.Text.UTF8Encoding $false))
 Write-Host "Result: $(Mark $pass) -> $result"
+Write-Host "Close: $closeHow"
 if (-not $pass) { exit 1 }

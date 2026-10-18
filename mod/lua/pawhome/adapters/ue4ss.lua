@@ -10,8 +10,9 @@
 --   loaded a Lua mod via enabled.txt, print() reached UE4SS.log, LoopAsync /
 --   ExecuteWithDelay / ExecuteInGameThread / RegisterKeyBind ran, io.open wrote a
 --   file in the mod folder, ForEachUObject scanned 265,380 objects in 4.5 s.
--- inZOI v0.11.0 (build 20261013.16166) has NOT been re-tested: everything marked
--- VERIFIED below is "verified on v0.10.0" until someone re-runs V1/V6.
+-- inZOI v0.11.0 (build 20261013.16166) T1 smoke, 2026-10-19: PawHome loaded, banner and
+-- build fingerprint logged, first save written (no previous save existed). Reading an
+-- existing save and the .bak rotation have NOT run in-game yet (see docs/ue4ss-adapter.md).
 --
 -- Not implemented on purpose (Api returns "unsupported" and the engine falls back to
 -- the virtual-pet flow): householdMembers, addBuff, listStrays, bringStray,
@@ -91,8 +92,9 @@ function Ue4ss.new(opts)
         return opts.clock()
     end
 
-    -- File read/write in the mod folder: VERIFIED on v0.10.0 (ZoiPets wrote
-    -- zoipets_save.json through io.open from a UE4SS Lua mod).
+    -- First write (io.open + rename into place): VERIFIED on v0.10.0 (ZoiPets) and
+    -- v0.11.0 (PawHome T1). Reading an existing save, the .bak1 fallback read and the
+    -- .bakN rotation (os.rename / os.remove): UNVERIFIED in-game.
     -- Slot partitioning: UNVERIFIED, the save-slot id is not known yet (V3), so the
     -- default slot is the constant "debug".
     local backups = opts.backups or 3

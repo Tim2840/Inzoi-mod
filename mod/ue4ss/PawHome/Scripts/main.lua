@@ -10,10 +10,14 @@
 -- FindFirstOf (Shift+F7) has never been called in inZOI.
 
 local MOD_VERSION = "0.1.0-dev"
-local DEBUG = true
+-- Debug mode is OFF unless pawhome_debug.txt exists in the mod folder (same mechanism
+-- as the kill switch). Off = no clock (the engine idles), no wallet, no debug keys.
 -- Until the real game clock is found (probe V3) the debug clock runs
--- 1 real second = 1 game minute, so 1 real minute = 1 game hour.
+-- 1 real second = 1 game minute, so 1 real minute = 1 game hour. It counts from a
+-- fixed epoch so it keeps going up across restarts (real time while the game was
+-- closed also counts; the engine caps catch-up at catchupCapHours).
 local DEBUG_MINUTES_PER_SECOND = 1
+local DEBUG_EPOCH = 1767225600 -- 2026-01-01 00:00:00 UTC
 local DEBUG_FUNDS = 1000
 -- Household / Zoi ids are unknown until the in-save probes; constants for now.
 local HOUSEHOLD, ZOI = 1, 1
@@ -30,14 +34,20 @@ local exePath = rawget(_G, "PAWHOME_EXE") or (modDir .. "..\\..\\..\\inZOI-Win64
 
 local function log(msg) print("[PawHome] " .. msg .. "\n") end
 
+local function exists(path)
+    local f = io.open(path, "r")
+    if f then f:close() end
+    return f ~= nil
+end
+
 -- Kill switch: create pawhome_disabled.txt in the mod folder to stop the mod
 -- without uninstalling it (no loop, no keys, saves untouched).
-local kill = io.open(modDir .. "pawhome_disabled.txt", "r")
-if kill then
-    kill:close()
+if exists(modDir .. "pawhome_disabled.txt") then
     log("disabled by kill switch (pawhome_disabled.txt); nothing started")
     return
 end
+
+local DEBUG = exists(modDir .. "pawhome_debug.txt")
 
 local Ue4ss = require("pawhome.adapters.ue4ss")
 local Main = require("pawhome.main")
@@ -46,10 +56,9 @@ local Main = require("pawhome.main")
 local fingerprint = Ue4ss.buildFingerprint(exePath)
 local knownBuild = Ue4ss.isKnownBuild(fingerprint, modDir .. "pawhome_verified_builds.txt")
 
-local started = os.time()
 local adapter = Ue4ss.new({
     pathPrefix = modDir .. "pawhome_",
-    clock = DEBUG and function() return (os.time() - started) * DEBUG_MINUTES_PER_SECOND end or nil,
+    clock = DEBUG and function() return (os.time() - DEBUG_EPOCH) * DEBUG_MINUTES_PER_SECOND end or nil,
     debugFunds = DEBUG and DEBUG_FUNDS or nil,
     caps = REQUESTED_CAPS,
     safeMode = not knownBuild,
