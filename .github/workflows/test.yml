@@ -1,0 +1,36 @@
+name: tests
+on:
+  push:
+  pull_request:
+jobs:
+  lua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install lupa
+      - name: Lua syntax of every file
+        run: |
+          python -I - <<'PY'
+          import pathlib, sys
+          import lupa.lua54 as lupa
+          lua = lupa.LuaRuntime()
+          bad = 0
+          for f in sorted(pathlib.Path(".").rglob("*.lua")):
+              ok, err = lua.eval("function(p) local f, e = loadfile(p) return f ~= nil, e end")(f.as_posix())
+              if not ok:
+                  print("SYNTAX ERROR", f, err); bad += 1
+          sys.exit(1 if bad else 0)
+          PY
+      - name: Tests
+        run: python -I tests/run.py
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --check mod/ui/app.js && node --check mod/ui/bridge.js
