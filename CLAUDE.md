@@ -33,7 +33,7 @@ inZOI 目前沒有寵物系統。本模組用官方 ModKit 的 **Lua 腳本模�
 
 1. **絕對不要捏造探勘結果。** 指令名稱、Lua API、參數、行為，都要是從真的遊戲或 `mod-docs.playinzoi.com` 實際看到的。不確定就寫「未驗證」。
 2. **只有 `core/api.lua` 和 `adapters/*` 可以碰遊戲**，其他模組只能呼叫 `Api.*`。遊戲更新時應該只需要改 adapter。
-3. **只用 Public 指令**（CLI 目錄 318 個指令只有 115 個是 Public；UserCheat／ScriptCheat 在玩家端是 no-op）。
+3. **只用 Public 指令**（CLI 目錄 318 個指令只有 115 個是 Public；UserCheat／ScriptCheat 在玩家端是 no-op）。**本條只適用官方 ModKit／CLI 路線；UE4SS adapter 不受此限**（但仍須遵守規則 1、2、5）。
 4. **不要覆寫 Zoi 的個性、自主行為、情緒、動畫**，官方明說不開放給模組。只做宏觀層面（領養、需求、照顧）。
 5. `adapters/inzoi.lua` 的 `caps`（`spawn`、`moveStray`、`buffs`、`animate`）**只有在實測過之後才能設為 true**。
 6. 新增或修改邏輯時，在 `tests/` 補測試（用 `adapters/mock.lua`），並維持全綠：
@@ -42,7 +42,7 @@ inZOI 目前沒有寵物系統。本模組用官方 ModKit 的 **Lua 腳本模�
 7. 字串一律放 `mod/lua/pawhome/localization/`，**en 與 zh_TW 的鍵與 `{佔位符}` 必須一致**（測試會檢查）。UI 不放任何寫死的文字。
 8. 平衡數值放 `mod/lua/pawhome/data/`，不要寫死在程式裡。
 9. 存檔格式有版本號：改 `state` 結構要加 `core/storage.lua` 的 migration，不能讓舊存檔壞掉。
-10. 資料表用 Lua table，**不用 JSON**（遊戲的 Lua 環境不一定有 JSON 解析器）。
+10. 資料表用 Lua table，**不用 JSON**（官方 ModKit 的 Lua 環境不一定有 JSON 解析器）。**本條針對引擎與資料表；UE4SS adapter 自己的存檔／設定檔格式不受此限**（例如 ZoiPets 的 JSON 存檔）。
 11. 不要把 ModKit 的 Unreal 專案或大型二進位檔直接 commit；先討論要用 `.gitignore` 還是 Git LFS。
 12. 桌面預覽：`py tools\preview_server.py` → `http://127.0.0.1:8765/?preview=1`。改 Lua 之後要重啟它。
 
