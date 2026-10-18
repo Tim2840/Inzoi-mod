@@ -228,7 +228,8 @@
       class: "tab", role: "tab", "aria-selected": state.tab === id,
       onclick: () => { state.tab = id; render(); },
     }, label);
-    const body = state.tab === "pets" ? renderPets(view) : state.tab === "adopt" ? renderAdopt(view) : renderSettings(view);
+    const body = view.noSave && state.tab !== "settings" ? h("div", { class: "card empty" }, u.no_save)
+      : state.tab === "pets" ? renderPets(view) : state.tab === "adopt" ? renderAdopt(view) : renderSettings(view);
     root.replaceChildren(
       h("header", { class: "top" },
         h("h1", {}, "🐾 " + view.title),

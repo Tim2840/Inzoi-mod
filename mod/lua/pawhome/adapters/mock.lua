@@ -18,16 +18,28 @@ function Mock.new(opts)
         spawned = 0,
         failSpawn = false,
         localeName = opts.locale or "en",
-        slot = opts.slot or "slot1",
+        slot = (not opts.noSave) and (opts.slot or "slot1") or nil,   -- noSave: start on the loading screen
         slotted = opts.slotted or false,        -- true: one data file per savegame slot (like the UE4SS adapter)
         listeners = {},
         caps = opts.caps or { spawn = true, moveStray = true, buffs = true, animate = true },
     }
 
     function m.now() return m.clock end
-    local function k(key) return m.slotted and (m.slot .. "|" .. key) or key end
-    function m.saveGet(key) return m.store[k(key)] end
-    function m.saveSet(key, value) m.store[k(key)] = value end
+    m.rejectedWrites = 0
+    local function k(key)
+        if not m.slotted then return key end
+        if m.slot == nil then return nil end      -- no save loaded: reads are empty, writes are rejected
+        return m.slot .. "|" .. key
+    end
+    function m.saveGet(key)
+        local name = k(key)
+        return name and m.store[name] or nil
+    end
+    function m.saveSet(key, value)
+        local name = k(key)
+        if not name then m.rejectedWrites = m.rejectedWrites + 1 return end
+        m.store[name] = value
+    end
     if opts.slotted then
         function m.slotId() return m.slot end
         -- the "player" loads another save

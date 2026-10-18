@@ -55,9 +55,17 @@ function Api.saveSet(key, value)
     return (call("saveSet", key, value))
 end
 
--- Optional. Identifier of the savegame slot that is loaded right now (any string/number).
--- An adapter that keeps one data file per slot MUST implement this, otherwise the mod
--- cannot notice that the player switched saves. nil = "the adapter has no slots".
+-- Optional. slotId() = identifier of the savegame slot that is loaded right now.
+-- An adapter that keeps one data file per slot MUST implement it, otherwise the mod cannot
+-- notice that the player switched saves. Two different situations, do not mix them up:
+--   * the adapter has NO slot concept  -> it does not define slotId at all (Api.hasSlots() = false)
+--   * the adapter has slots but NO save is loaded right now (loading screen, main menu)
+--     -> slotId() returns nil. The mod then pauses: it reads and writes nothing.
+-- If slotId() raises an error the mod treats it as "no save loaded" (the safe choice).
+function Api.hasSlots()
+    return Api.adapter ~= nil and type(Api.adapter.slotId) == "function"
+end
+
 function Api.slotId()
     local ok, v = call("slotId")
     if ok and v ~= nil then return tostring(v) end

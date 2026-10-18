@@ -99,3 +99,60 @@ T.test("slots: a second app on the same slotted store sees the saved data", func
     mock.switchSlot("slot1")
     T.eq(petNames(again), "Alpha")
 end)
+
+T.test("slots: a loading screen (no save loaded) pauses the mod - no ghost state, no writes, no charges", function()
+    local app, mock = H.new({ slotted = true, money = 5000 })
+    adoptNamed(app, "Alpha")
+    local moneyBefore = mock.money[1]
+    mock.switchSlot(nil)                       -- loading screen
+    mock.clock = mock.clock + 60
+    T.eq(#app:tick(), 0)
+    local view = app:view(1, 101)
+    T.eq(view.noSave, true); T.eq(#view.pets, 0)
+    T.eq(view.ui.no_save, "Load a savegame to see your pets.")
+    T.eq(#app:offers(1), 0); T.eq(#app:strays(1), 0)
+    local r = app:adoptOffer(1, 101, 1, "Ghost")
+    T.falsy(r.ok); T.eq(r.reason, "no_save"); T.eq(r.message, "No savegame is loaded yet.")
+    T.eq(app:perform(1, 101, "feed").reason, "no_save")
+    T.eq(app:redeem(1, 101, 1).reason, "no_save")
+    T.eq(app:rename(1, "X").reason, "no_save")
+    local ok, why = app:setSetting("lifeScale", 2)
+    T.falsy(ok); T.eq(why, "no_save")
+    T.eq(mock.money[1], moneyBefore, "nothing may be charged while paused")
+    T.eq(mock.rejectedWrites, 0, "the mod must not even try to write")
+    mock.switchSlot("slot1")                   -- the save finishes loading
+    T.eq(petNames(app), "Alpha", "the mod recovers with the real data")
+    T.eq(app:view(1, 101).noSave, false)
+end)
+
+T.test("slots: starting while no save is loaded stays paused until one is", function()
+    local mock = Mock.new({ slotted = true, noSave = true, money = 5000 })
+    local app = assert(App.new(mock, { seed = 7 }))
+    T.eq(app.suspended, true)
+    T.eq(#app:tick(), 0)
+    T.eq(mock.rejectedWrites, 0)
+    mock.switchSlot("slot1")
+    mock.clock = mock.clock + 60
+    app:tick()
+    adoptNamed(app, "Fresh")
+    T.eq(petNames(app), "Fresh")
+    T.eq(mock.rejectedWrites, 0)
+end)
+
+T.test("slots: an adapter whose slotId() raises is treated as 'no save loaded' (safe side)", function()
+    local app, mock = H.new({ slotted = true, money = 5000 })
+    adoptNamed(app, "Alpha")
+    mock.slotId = function() error("boom") end
+    T.eq(#app:tick(), 0)
+    T.eq(app:view(1, 101).noSave, true)
+    T.eq(app:adoptOffer(1, 101, 1, "X").reason, "no_save")
+end)
+
+T.test("slots: the random state of the previous save is not carried over", function()
+    local app, mock = H.new({ slotted = true, money = 5000, seed = 99 })
+    adoptNamed(app, "Alpha")
+    local before = app.ctx.rng:getState()
+    mock.switchSlot("slot2")
+    app:view(1, 101)                          -- no subscribe in this mock: the next call notices the change
+    T.truthy(app.ctx.rng:getState() ~= before, "slot2 must start from its own random state")
+end)

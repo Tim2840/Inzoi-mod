@@ -51,7 +51,14 @@ function App.new(adapter, opts)
     applyLocale(ctx)
     if ctx.cfg.debug then Log.setLevel("debug") end
     Log.info("started (" .. how .. "), " .. #state.pets .. " pets")
-    local app = setmetatable({ ctx = ctx, slot = Api.slotId(), suspended = false }, App)
+    local slotAware = Api.hasSlots()
+    local slot = slotAware and Api.slotId() or nil
+    local app = setmetatable({
+        ctx = ctx, slotAware = slotAware, slot = slot, seed = opts and opts.seed,
+        -- a slot-aware adapter with no save loaded (loading screen / main menu): stay paused
+        suspended = slotAware and slot == nil,
+    }, App)
+    if app.suspended then Log.info("no savegame is loaded yet; the mod is paused") end
     -- react at once when the game says the save changed; polling in sync() is the fallback
     Api.subscribe("slot_changed", function() app:syncSlot() end)
     return app
@@ -61,11 +68,20 @@ end
 -- the state in memory belongs to the OLD slot, so it must be replaced - and must never be
 -- written, because the adapter would now put it into the NEW slot. (Every public call ends
 -- with a save, so nothing is lost by not saving here.)
+--
+-- The game runs Lua on one thread and a public call never yields, so the slot cannot change
+-- between the sync at the start of a call and the save at its end.
 function App:syncSlot()
+    if not self.slotAware then return false end
     local slot = Api.slotId()
     if slot == self.slot then return false end
     Log.info("savegame slot changed: " .. tostring(self.slot) .. " -> " .. tostring(slot))
     self.slot = slot
+    if slot == nil then
+        -- no save loaded (loading screen): nothing may be read or written until one is
+        self.suspended = true
+        return true
+    end
     local state, how = Storage.load()
     if not state then
         -- e.g. the new slot was written by a newer version: touch nothing until the slot changes again
@@ -75,7 +91,7 @@ function App:syncSlot()
     end
     local ctx = self.ctx
     ctx.state, ctx.cfg = state, state.settings
-    if state.rng then ctx.rng:setState(state.rng) end
+    ctx.rng = Rng.new(state.rng or self.seed)   -- never carry the previous save's random state over
     ctx.events = {}
     applyLocale(ctx)
     self.suspended = false
@@ -83,7 +99,7 @@ function App:syncSlot()
 end
 
 function App:save()
-    if self.suspended or Api.slotId() ~= self.slot then return false end
+    if self.suspended or (self.slotAware and Api.slotId() ~= self.slot) then return false end
     self.ctx.state.rng = self.ctx.rng:getState()
     return Storage.save(self.ctx.state)
 end
@@ -104,8 +120,14 @@ function App:sync()
     self.ctx.now = Api.now() or self.ctx.now
 end
 
+-- Result for calls made while no savegame is loaded.
+function App:noSave()
+    return { ok = false, reason = "no_save", message = I18n.t("fail.no_save"), notifications = {} }
+end
+
 function App:perform(petId, zoiId, actionId)
     self:sync()
+    if self.suspended then return self:noSave() end
     local result = Care.perform(self.ctx, petId, zoiId, actionId)
     local notes = Engine.flush(self.ctx)
     result.notifications = notes
@@ -115,6 +137,7 @@ end
 
 function App:offers(householdId, refresh)
     self:sync()
+    if self.suspended then return {} end
     local list = Adoption.offers(self.ctx, householdId, refresh)
     local out = {}
     for _, o in ipairs(list) do
@@ -132,6 +155,8 @@ function App:offers(householdId, refresh)
 end
 
 function App:strays(householdId)
+    self:sync()
+    if self.suspended then return {} end
     return Api.listStrays(householdId)
 end
 
@@ -143,16 +168,19 @@ end
 
 function App:adoptOffer(householdId, zoiId, offerId, name)
     self:sync()
+    if self.suspended then return self:noSave() end
     return finishAdoption(self, Adoption.adoptOffer(self.ctx, householdId, zoiId, offerId, name))
 end
 
 function App:adoptStray(householdId, zoiId, strayId, name)
     self:sync()
+    if self.suspended then return self:noSave() end
     return finishAdoption(self, Adoption.adoptStray(self.ctx, householdId, zoiId, strayId, name))
 end
 
 function App:redeem(householdId, zoiId, petId)
     self:sync()
+    if self.suspended then return self:noSave() end
     local result = Shelter.redeem(self.ctx, householdId, zoiId, petId)
     result.notifications = Engine.flush(self.ctx)
     self:save()
@@ -161,6 +189,7 @@ end
 
 function App:rename(petId, name)
     self:sync()
+    if self.suspended then return self:noSave() end
     local r = Adoption.rename(self.ctx, petId, name)
     self:save()
     return r
@@ -172,6 +201,7 @@ local SETTING_RANGES = {
 
 function App:setSetting(key, value)
     self:sync()
+    if self.suspended then return false, "no_save" end
     local cfg = self.ctx.cfg
     if defaults[key] == nil then return false, "unknown setting" end
     if type(value) ~= type(defaults[key]) then return false, "wrong type" end
@@ -235,10 +265,12 @@ function App:view(householdId, zoiId)
     self:sync()
     local ctx = self.ctx
     local pets = {}
-    for _, pet in ipairs(Registry.list(ctx, householdId)) do
-        pets[#pets + 1] = petView(ctx, pet, zoiId)
+    if not self.suspended then
+        for _, pet in ipairs(Registry.list(ctx, householdId)) do
+            pets[#pets + 1] = petView(ctx, pet, zoiId)
+        end
     end
-    local level = zoiId and Training.level(ctx, zoiId) or 0
+    local level = (zoiId and not self.suspended) and Training.level(ctx, zoiId) or 0
     -- UI strings travel with the view so the HTML never needs its own translations
     local ui = {}
     for _, key in ipairs(I18n.keys(ctx.locale)) do
@@ -250,6 +282,7 @@ function App:view(householdId, zoiId)
         locale = ctx.locale,
         title = I18n.t("ui.title"),
         pets = pets,
+        noSave = self.suspended,
         training = { level = level, label = I18n.t("ui.training", { level = level }) },
         settings = Util.copy(ctx.cfg),
     }
