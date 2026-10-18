@@ -8,7 +8,7 @@ function T.has(pet, id)
     return Util.contains(pet.traits, id)
 end
 
--- Product of a scalar field (bondGain, runaway, ...) over the pet's traits.
+-- Product of a scalar field (bondGain, strayRisk, ...) over the pet's traits.
 function T.scalar(pet, field)
     local v = 1
     for _, id in ipairs(pet.traits) do

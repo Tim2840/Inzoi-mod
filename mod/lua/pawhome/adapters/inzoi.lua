@@ -37,7 +37,6 @@ function Adapter.bringStray(strayRef, householdId) error("TODO(P3)") end
 function Adapter.spawnPet(householdId, spec) error("TODO(P4)") end
 function Adapter.entityExists(ref) error("TODO(P5)") end
 function Adapter.despawnPet(ref) error("TODO(P4)") end
-function Adapter.releaseStray(ref, spec) error("TODO(P4)") end
 -- P6: play a cat animation / interaction.
 function Adapter.playAnimation(ref, animationId) error("TODO(P6)") end
 

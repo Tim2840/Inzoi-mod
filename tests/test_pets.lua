@@ -328,75 +328,160 @@ T.test("aging: lifeScale stretches the lifespan", function()
     T.near(Aging.lifeEnd(app.ctx, pet), base * 2, 1e-6)
 end)
 
----------------------------------------------------------------- neglect
+---------------------------------------------------------------- neglect / animal control / shelter
 
-T.test("neglect: warning first, then the pet runs away, never before", function()
+local function impound(app, mock, pet)
+    -- neglect the pet until animal control takes it
+    for _ = 1, 6 * 24 do
+        H.advance(app, mock, 60)
+        if pet.status == "impounded" then return end
+    end
+    error("pet was never impounded")
+end
+
+T.test("neglect: soft penalty, then a warning visit, then animal control - never before", function()
     local app, mock = H.new()
+    app:setSetting("agingEnabled", false)
     local pet = H.adopt(app, 1, { "free_spirit" }, "adult")
-    pet.lifeMul = 5 -- not the thing under test
-    local warnedAt, awayAt
+    local bondAtStart = pet.bond["101"]
+    local warnedAt, impoundedAt, bondAtWarning
     for hour = 1, 6 * 24 do
         H.advance(app, mock, 60)
-        if pet.flags.warned and not warnedAt then warnedAt = hour end
-        if pet.status == "away" and not awayAt then awayAt = hour break end
+        if pet.flags.warned and not warnedAt then warnedAt = hour; bondAtWarning = pet.bond["101"] end
+        if pet.status == "impounded" then impoundedAt = hour break end
     end
     T.truthy(warnedAt, "never warned")
-    T.truthy(awayAt, "never ran away")
-    T.lt(warnedAt, awayAt)
-    T.gt(awayAt, 12, "ran away unreasonably fast")
-    T.eq(pet.entity, nil)
+    T.truthy(impoundedAt, "never taken")
+    T.lt(warnedAt, impoundedAt)
+    T.gt(impoundedAt, 12, "taken unreasonably fast")
+    T.lt(bondAtWarning, bondAtStart, "the bond should drop while the pet is neglected")
+    T.eq(pet.entity, nil, "the cat should leave the world")
+    T.truthy(pet.impoundedAt ~= nil)
 end)
 
-T.test("neglect: a bonded, cared-for pet is much slower to leave", function()
+T.test("neglect: the warning and the pick-up are announced", function()
+    local app, mock = H.new()
+    app:setSetting("agingEnabled", false)
+    local pet = H.adopt(app, 1)
+    local seen = {}
+    for _ = 1, 6 * 24 do
+        for _, n in ipairs(H.advance(app, mock, 60)) do seen[n.kind] = n.text end
+        if pet.status == "impounded" then break end
+    end
+    T.truthy(seen.neglect_warning and seen.neglect_warning:find("Animal control"))
+    T.truthy(seen.impounded and seen.impounded:find("shelter"))
+end)
+
+T.test("neglect: a bonded pet is tolerated much longer, wandering personalities less", function()
     local app = H.new()
     local a = H.adopt(app, 1, {}, "adult")
-    local b = H.adopt(app, 2, {}, "adult")
-    b.bond["101"] = 100
+    local b = H.adopt(app, 1, {}, "adult")   -- adopted cats leave the shelter, so always index 1
+    local c = H.adopt(app, 1, { "free_spirit" }, "adult")
+    a.bond = { ["101"] = 30 }; b.bond = { ["101"] = 100 }; c.bond = { ["101"] = 30 }
     local Neglect = require("pawhome.pets.neglect")
-    T.gt(Neglect.runawayMinutes(b), Neglect.runawayMinutes(a) * 1.4)
+    T.gt(Neglect.impoundMinutes(b), Neglect.impoundMinutes(a) * 1.4)
+    T.lt(Neglect.impoundMinutes(c), Neglect.impoundMinutes(a))
 end)
 
-T.test("neglect: turning runaway off keeps the pet home", function()
+T.test("neglect: turning animal control off keeps the pet home", function()
     local app, mock = H.new()
-    app:setSetting("neglectRunaway", false)
+    app:setSetting("animalControl", false)
     app:setSetting("agingEnabled", false)
     local pet = H.adopt(app, 1, {}, "adult")
     H.advance(app, mock, 10 * 24 * 60)
     T.eq(pet.status, "home")
 end)
 
-T.test("neglect: a runaway comes back or becomes a stray within a week", function()
-    local app, mock = H.new({ seed = 11 })
+T.test("shelter: an impounded pet cannot be cared for and still uses a slot", function()
+    local app, mock = H.new({ money = 10000 })
     app:setSetting("agingEnabled", false)
-    local pet = H.adopt(app, 1, {}, "adult")
-    pet.bond["101"] = 50
-    pet.status = "away"; pet.awaySince = mock.clock; pet.entity = nil
-    local cameBack = false
-    for _ = 1, 8 * 24 do
-        local notes = H.advance(app, mock, 60)
-        for _, n in ipairs(notes) do if n.kind == "came_back" then cameBack = true end end
-        if pet.status ~= "away" then break end
-    end
-    T.truthy(pet.status == "home" or pet.status == "lost")
-    if pet.status == "home" then
-        T.truthy(cameBack); T.truthy(pet.entity ~= nil, "should be back in the world")
-        T.eq(pet.neglect, 0)
-    else
-        T.eq(#app:view(1, 101).pets, 0)
-        T.truthy(#mock.strays >= 1, "should be released as a stray")
-    end
+    app:setSetting("maxPetsPerHousehold", 1)
+    local pet = H.adopt(app, 1)
+    impound(app, mock, pet)
+    local r = app:perform(pet.id, 101, "feed")
+    T.falsy(r.ok); T.eq(r.reason, "not_home")
+    local o = app:offers(1, true)
+    T.eq(app:adoptOffer(1, 101, o[1].id, "Another").reason, "max_pets")
+    local v = app:view(1, 101).pets[1]
+    T.eq(v.status, "impounded"); T.eq(v.statusLabel, "At the animal shelter")
+    T.truthy(v.redeem and v.redeem.fee == 200 and v.redeem.ready == false)
 end)
 
-T.test("neglect: never comes back in the first two days", function()
-    for seed = 1, 20 do
-        local app, mock = H.new({ seed = seed })
-        app:setSetting("agingEnabled", false)
-        local pet = H.adopt(app, 1, {}, "adult")
-        pet.bond["101"] = 100
-        pet.status = "away"; pet.awaySince = mock.clock; pet.entity = nil
-        H.advance(app, mock, 47 * 60)
-        T.eq(pet.status, "away", "seed " .. seed)
+T.test("shelter: redeeming needs the waiting period, then costs the fee and halves the bond", function()
+    local app, mock = H.new({ money = 1000 })
+    app:setSetting("agingEnabled", false)
+    local pet = H.adopt(app, 1)
+    pet.bond["101"] = 80
+    impound(app, mock, pet)
+    local bondBefore = pet.bond["101"]
+    local moneyBefore = mock.money[1]
+
+    local early = app:redeem(1, 101, pet.id)
+    T.falsy(early.ok); T.eq(early.reason, "redeem_wait"); T.eq(mock.money[1], moneyBefore)
+
+    local notes = H.advance(app, mock, 24 * 60)
+    local redeemable = false
+    for _, n in ipairs(notes) do if n.kind == "redeemable" then redeemable = true end end
+    T.truthy(redeemable, "should announce that the pet can be redeemed")
+
+    local r = app:redeem(1, 101, pet.id)
+    T.truthy(r.ok, r.message)
+    T.eq(mock.money[1], moneyBefore - 200)
+    T.eq(pet.status, "home")
+    T.truthy(pet.entity ~= nil and mock.entities[pet.entity] ~= nil, "the cat should be back in the world")
+    T.near(pet.bond["101"], bondBefore * 0.5, 0.01)
+    T.eq(pet.neglect, 0); T.eq(pet.flags.warned, nil)
+    T.gt(pet.needs.hunger, 50)
+    T.eq(r.notifications[1].kind, "redeemed")
+    T.falsy(app:redeem(1, 101, pet.id).ok, "cannot redeem a pet that is already home")
+end)
+
+T.test("shelter: redeeming fails cleanly without money or when the world refuses", function()
+    local app, mock = H.new({ money = 1000 })
+    app:setSetting("agingEnabled", false)
+    local pet = H.adopt(app, 1)
+    impound(app, mock, pet)
+    H.advance(app, mock, 24 * 60)
+
+    mock.money[1] = 50
+    local poor = app:redeem(1, 101, pet.id)
+    T.falsy(poor.ok); T.eq(poor.reason, "no_funds"); T.eq(mock.money[1], 50); T.eq(pet.status, "impounded")
+
+    mock.money[1] = 1000
+    mock.failSpawn = true
+    local stuck = app:redeem(1, 101, pet.id)
+    T.falsy(stuck.ok); T.eq(stuck.reason, "spawn_failed"); T.eq(mock.money[1], 1000); T.eq(pet.status, "impounded")
+
+    mock.failSpawn = false
+    T.eq(app:redeem(2, 101, pet.id).reason, "no_pet", "another household cannot redeem it")
+    T.truthy(app:redeem(1, 101, pet.id).ok)
+end)
+
+T.test("shelter: nobody redeems it in time and the pet is rehomed, freeing the slot", function()
+    local app, mock = H.new()
+    app:setSetting("agingEnabled", false)
+    app:setSetting("maxPetsPerHousehold", 1)
+    local pet = H.adopt(app, 1)
+    impound(app, mock, pet)
+    local rehomed = false
+    for _, n in ipairs(H.advance(app, mock, 11 * 24 * 60)) do
+        if n.kind == "rehomed" then rehomed = true end
     end
+    T.truthy(rehomed)
+    T.eq(pet.status, "lost")
+    T.eq(#app:view(1, 101).pets, 0)
+    local o = app:offers(1, true)
+    T.truthy(app:adoptOffer(1, 101, o[1].id, "Fresh Start").ok, "the slot should be free again")
+end)
+
+T.test("shelter: the view is localised for Chinese", function()
+    local app, mock = H.new({ locale = "zh-TW" })
+    app:setSetting("agingEnabled", false)
+    local pet = H.adopt(app, 1)
+    impound(app, mock, pet)
+    local v = app:view(1, 101)
+    T.eq(v.pets[1].statusLabel, "在動物收容所")
+    T.eq(v.ui.redeem, "領回")
 end)
 
 ---------------------------------------------------------------- adoption
@@ -602,23 +687,23 @@ T.test("simulation: 30 days of normal care keeps a cat healthy and happy", funct
         local app, mock = H.new({ seed = seed })
         app:setSetting("agingEnabled", false)
         local pet = H.adopt(app, 1)
-        local happyHours, total, runaways = 0, 0, 0
+        local happyHours, total, impounded = 0, 0, 0
         for _ = 1, 30 * 24 do
             H.advance(app, mock, 60)
             careBot(app, mock, pet)
             total = total + 1
             local m = Moods.compute(pet, Needs.sleeping(pet, mock.clock))
             if m == "happy" or m == "playful" or m == "energized" or m == "content" or m == "asleep" then happyHours = happyHours + 1 end
-            if pet.status == "away" then runaways = runaways + 1 end
+            if pet.status == "impounded" then impounded = impounded + 1 end
         end
         T.eq(pet.status, "home", "seed " .. seed)
-        T.eq(runaways, 0)
+        T.eq(impounded, 0)
         T.gt(happyHours / total, 0.8, "cat was unhappy too often (seed " .. seed .. ")")
         T.gt(pet.bond["101"], 40, "bond should grow with care")
     end
 end)
 
-T.test("simulation: 30 days of total neglect makes the cat leave", function()
+T.test("simulation: 30 days of total neglect gets the cat taken to the shelter", function()
     for _, seed in ipairs({ 1, 2, 3 }) do
         local app, mock = H.new({ seed = seed })
         app:setSetting("agingEnabled", false)

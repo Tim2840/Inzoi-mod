@@ -62,18 +62,29 @@
   }
 
   // ------------------------------------------------------------ views
+  function renderShelter(pet, u) {
+    const r = pet.redeem;
+    return h("div", { class: "shelter" },
+      h("div", { class: "sub" }, fmt(u.shelter_days_left, { days: r.daysLeft })),
+      h("div", { class: "fee" }, fmt(u.redeem_fee, { fee: r.fee })),
+      h("button", {
+        class: "btn", disabled: !r.ready, style: "margin-top:10px;width:100%",
+        onclick: async () => { await call("redeem", { petId: pet.id }); render(); },
+      }, r.ready ? u.redeem : fmt(u.redeem_wait, { hours: r.waitHours })));
+  }
+
   function renderPet(pet, view) {
     const u = view.ui;
     return h("section", { class: "card", "aria-label": pet.name },
       h("div", { class: "pet-head" },
-        h("div", { class: "avatar", "aria-hidden": "true" }, pet.status === "away" ? "🚪" : MOOD_FACE[pet.mood] || STAGE_FACE[pet.stage]),
+        h("div", { class: "avatar", "aria-hidden": "true" }, pet.status === "impounded" ? "🚐" : MOOD_FACE[pet.mood] || STAGE_FACE[pet.stage]),
         h("div", {},
           h("h2", { text: pet.name }),
           h("div", { class: "sub" }, `${pet.stageLabel} · ${pet.ageLabel}`),
-          pet.status === "away"
+          pet.status === "impounded"
             ? h("div", { class: "away" }, pet.statusLabel)
             : h("span", { class: "mood" }, pet.moodLabel))),
-      pet.status === "away" ? null : h("div", { class: "needs" }, pet.needs.map((n) =>
+      pet.status === "impounded" ? renderShelter(pet, u) : h("div", { class: "needs" }, pet.needs.map((n) =>
         h("div", { class: "need", "data-state": n.state },
           h("span", {}, n.label),
           h("div", { class: "bar", role: "progressbar", "aria-label": n.label, "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": n.value },
@@ -86,7 +97,7 @@
       h("div", { class: "chips" }, pet.traits.map((t) =>
         h("span", { class: "chip" + (t.known ? "" : " unknown"), title: t.desc || "" }, t.label))),
       h("div", { class: "section-title" }, view.training.label),
-      pet.status === "away" ? null : h("div", { class: "actions" }, pet.actions.map((a) =>
+      pet.status === "impounded" ? null : h("div", { class: "actions" }, pet.actions.map((a) =>
         h("button", {
           class: "act", title: a.desc, disabled: !a.ready,
           onclick: async () => { await call("perform", { petId: pet.id, action: a.id }); render(); },
@@ -181,7 +192,7 @@
       h("div", { class: "setting" }, h("span", {}, u.language), lang),
       toggle(u.aging, "agingEnabled", s),
       toggle(u.misbehavior, "misbehaviorEnabled", s),
-      toggle(u.runaway, "neglectRunaway", s),
+      toggle(u.animal_control, "animalControl", s),
       slider(u.decay, "needDecayScale", 0.25, 2, 0.25, s),
       slider(u.lifescale, "lifeScale", 0.5, 4, 0.5, s));
   }

@@ -6,7 +6,7 @@ local Util = require("pawhome.core.util")
 local Log = require("pawhome.core.log")
 local defaults = require("pawhome.data.settings")
 
-local Storage = { KEY = "pawhome.save", VERSION = 1 }
+local Storage = { KEY = "pawhome.save", VERSION = 2 }
 
 function Storage.default()
     return {
@@ -23,6 +23,25 @@ end
 
 -- migrations[n] upgrades a version n save to n + 1.
 local migrations = {}
+
+-- v1 -> v2: "running away" became "taken to the shelter by animal control".
+migrations[1] = function(state)
+    local settings = state.settings or {}
+    if settings.neglectRunaway ~= nil then
+        settings.animalControl = settings.neglectRunaway
+        settings.neglectRunaway = nil
+    end
+    state.settings = settings
+    for _, pet in ipairs(state.pets or {}) do
+        if pet.status == "away" then
+            pet.status = "impounded"
+            pet.impoundedAt = pet.awaySince or state.lastTick or 0
+            pet.awaySince = nil
+            pet.entity = nil
+        end
+    end
+    return state
+end
 
 local function migrate(state)
     while state.version < Storage.VERSION do

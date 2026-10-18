@@ -167,6 +167,28 @@ T.test("storage: settings added in newer releases are filled in", function()
     T.eq(state.settings.agingEnabled, true)
 end)
 
+T.test("storage: a v1 save (run-away pets) is migrated to the shelter model", function()
+    local mock = Mock.new()
+    Api.use(mock)
+    mock.store[Storage.KEY] = Serialize.encode({
+        version = 1, nextPetId = 3, lastTick = 500,
+        settings = { neglectRunaway = false, lifeScale = 2 },
+        pets = {
+            { id = 1, name = "Gone", status = "away", awaySince = 100, entity = 7, bond = {}, flags = {} },
+            { id = 2, name = "Home", status = "home", bond = {}, flags = {} },
+        },
+    })
+    local state, how = Storage.load()
+    T.eq(how, "loaded"); T.eq(state.version, 2)
+    T.eq(state.settings.animalControl, false, "the old toggle should carry over")
+    T.eq(state.settings.neglectRunaway, nil)
+    T.eq(state.settings.lifeScale, 2)
+    T.eq(state.settings.redeemFee, 200, "new settings get defaults")
+    T.eq(state.pets[1].status, "impounded"); T.eq(state.pets[1].impoundedAt, 100)
+    T.eq(state.pets[1].awaySince, nil); T.eq(state.pets[1].entity, nil)
+    T.eq(state.pets[2].status, "home")
+end)
+
 T.test("api: a failing adapter call never escapes", function()
     local mock = Mock.new()
     mock.notify = function() error("boom") end

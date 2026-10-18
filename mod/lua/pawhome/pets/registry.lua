@@ -26,7 +26,7 @@ function R.create(ctx, spec)
         bond = {},
         habits = {},
         neglect = 0,
-        status = "home",          -- home | away | lost | dead
+        status = "home",          -- home | impounded | lost (rehomed) | dead
         entity = spec.entity,
         appearance = spec.appearance,
         cooldowns = {},
@@ -52,12 +52,12 @@ function R.get(ctx, id)
     return nil
 end
 
--- Pets that still belong to the household (at home or away).
+-- Pets that still belong to the household (at home or in the shelter).
 function R.list(ctx, householdId)
     local out = {}
     for _, pet in ipairs(ctx.state.pets) do
         local belongs = householdId == nil or pet.household == householdId
-        if belongs and (pet.status == "home" or pet.status == "away") then
+        if belongs and (pet.status == "home" or pet.status == "impounded") then
             out[#out + 1] = pet
         end
     end

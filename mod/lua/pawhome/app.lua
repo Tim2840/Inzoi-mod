@@ -10,6 +10,7 @@ local Registry = require("pawhome.pets.registry")
 local Engine = require("pawhome.pets.engine")
 local Care = require("pawhome.pets.care")
 local Adoption = require("pawhome.pets.adoption")
+local Shelter = require("pawhome.pets.shelter")
 local Needs = require("pawhome.pets.needs")
 local Moods = require("pawhome.pets.moods")
 local Bond = require("pawhome.pets.bond")
@@ -118,6 +119,14 @@ function App:adoptStray(householdId, zoiId, strayId, name)
     return finishAdoption(self, Adoption.adoptStray(self.ctx, householdId, zoiId, strayId, name))
 end
 
+function App:redeem(householdId, zoiId, petId)
+    self:sync()
+    local result = Shelter.redeem(self.ctx, householdId, zoiId, petId)
+    result.notifications = Engine.flush(self.ctx)
+    self:save()
+    return result
+end
+
 function App:rename(petId, name)
     local r = Adoption.rename(self.ctx, petId, name)
     self:save()
@@ -125,7 +134,7 @@ function App:rename(petId, name)
 end
 
 local SETTING_RANGES = {
-    lifeScale = { 0.5, 4 }, needDecayScale = { 0.25, 2 }, maxPetsPerHousehold = { 1, 8 },
+    lifeScale = { 0.5, 4 }, needDecayScale = { 0.25, 2 }, maxPetsPerHousehold = { 1, 8 }, redeemFee = { 0, 5000 },
 }
 
 function App:setSetting(key, value)
@@ -147,7 +156,7 @@ end
 
 local function petView(ctx, pet, zoiId)
     local sleeping = pet.status == "home" and Needs.sleeping(pet, ctx.now)
-    local mood = pet.status == "home" and Moods.compute(pet, sleeping) or "content"
+    local mood = pet.status == "home" and Moods.compute(pet, sleeping) or "sad"
     local needs = {}
     for _, id in ipairs(needsData.order) do
         needs[#needs + 1] = {
@@ -177,7 +186,8 @@ local function petView(ctx, pet, zoiId)
     end
     return {
         id = pet.id, name = pet.name, status = pet.status,
-        statusLabel = pet.status == "away" and I18n.t("ui.away") or "",
+        statusLabel = pet.status == "impounded" and I18n.t("ui.impounded") or "",
+        redeem = pet.status == "impounded" and Shelter.info(ctx, pet) or nil,
         stage = pet.stage, stageLabel = I18n.t("stages." .. pet.stage),
         ageDays = Aging.ageDays(pet), ageLabel = I18n.t("ui.age", { days = Aging.ageDays(pet) }),
         mood = mood, moodLabel = I18n.t("moods." .. mood),

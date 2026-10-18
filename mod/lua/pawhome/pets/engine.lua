@@ -6,6 +6,7 @@ local Registry = require("pawhome.pets.registry")
 local Needs = require("pawhome.pets.needs")
 local Aging = require("pawhome.pets.aging")
 local Neglect = require("pawhome.pets.neglect")
+local Shelter = require("pawhome.pets.shelter")
 local Moods = require("pawhome.pets.moods")
 local Bond = require("pawhome.pets.bond")
 local Traits = require("pawhome.pets.traits")
@@ -21,7 +22,7 @@ local CHUNK = 60  -- minutes
 -- These are always shown; everything else is rate-limited per pet.
 local IMPORTANT = {
     adopted = true, grew_up = true, died = true, neglect_warning = true,
-    ran_away = true, came_back = true, lost_for_good = true, skill_up = true,
+    impounded = true, redeemable = true, redeemed = true, rehomed = true, skill_up = true,
 }
 
 local function stageLabel(ctx, pet) return ctx.t("stages." .. pet.stage) end
@@ -62,8 +63,8 @@ local function needAlerts(ctx, pet, sleeping)
 end
 
 local function simulateChunk(ctx, pet, minutes)
-    if pet.status == "away" then
-        Neglect.stepAway(ctx, pet, minutes)
+    if pet.status == "impounded" then
+        Shelter.step(ctx, pet)
         return
     end
     if pet.status ~= "home" then return end

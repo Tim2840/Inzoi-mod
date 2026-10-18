@@ -53,6 +53,10 @@ function handlers.adoptOffer(a)
     return snapshot({ result = P.app:adoptOffer(P.HOUSEHOLD, P.ZOI, a.offerId, a.name) })
 end
 
+function handlers.redeem(a)
+    return snapshot({ result = P.app:redeem(P.HOUSEHOLD, P.ZOI, a.petId) })
+end
+
 function handlers.adoptStray(a)
     return snapshot({ result = P.app:adoptStray(P.HOUSEHOLD, P.ZOI, a.strayId, a.name) })
 end

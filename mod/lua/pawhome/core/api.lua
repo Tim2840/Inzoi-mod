@@ -4,7 +4,7 @@
 -- An adapter is a table of functions (see adapters/mock.lua for the reference one):
 --   required: now, saveGet, saveSet
 --   optional: notify, householdMembers, funds, charge, addBuff, listStrays,
---             bringStray, spawnPet, entityExists, despawnPet, releaseStray,
+--             bringStray, spawnPet, entityExists, despawnPet,
 --             playAnimation, locale, logSink
 --   caps: { spawn = bool, moveStray = bool, animate = bool, buffs = bool }
 local Log = require("pawhome.core.log")
@@ -111,11 +111,6 @@ end
 function Api.despawnPet(ref)
     if ref == nil then return false end
     return (call("despawnPet", ref))
-end
-
--- A pet that ran away and never came back becomes a street cat again.
-function Api.releaseStray(ref, spec)
-    return (call("releaseStray", ref, spec))
 end
 
 function Api.playAnimation(ref, animationId)

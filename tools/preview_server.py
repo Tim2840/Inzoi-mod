@@ -4,7 +4,7 @@
     python3 tools/preview_server.py            # then open http://127.0.0.1:8765/?preview=1
 
 The page's "Preview tools" bar can fast-forward the game clock so you can watch needs
-drop, pets grow up, run away, and so on.
+drop, pets grow up, animal control takes neglected pets, and so on.
 """
 import json
 import sys

@@ -21,7 +21,7 @@ end
 
 function C.perform(ctx, petId, zoiId, actionId)
     local pet = Registry.get(ctx, petId)
-    if not pet or (pet.status ~= "home" and pet.status ~= "away") then return fail(ctx, "no_pet") end
+    if not pet or (pet.status ~= "home" and pet.status ~= "impounded") then return fail(ctx, "no_pet") end
     if pet.status ~= "home" then return fail(ctx, "not_home", { name = pet.name }) end
     local def = actions[actionId]
     if not def or type(def) ~= "table" or actionId == "order" then return fail(ctx, "unknown_action") end
