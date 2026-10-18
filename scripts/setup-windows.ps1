@@ -6,12 +6,12 @@
     powershell -ExecutionPolicy Bypass -File .\scripts\setup-windows.ps1
 
   參數：
-    -SkipOptional   不安裝選用工具（Blender）
+    -SkipOptional   不安裝選用工具（Blender、Python 與桌面預覽用的 lupa）
     -SkipClone      不 clone 專案 repo（已經在 repo 裡執行時會自動略過）
     -RepoDir <路徑>  repo 要 clone 到哪裡（預設：文件\Inzoi-mod）
 
   這支腳本會：
-    1. 用 winget 安裝 Git、VS Code、Steam、Epic Games Launcher、（選用）Blender
+    1. 用 winget 安裝 Git、VS Code、Steam、Epic Games Launcher、（選用）Blender、Python
     2. 安裝 Claude Code（官方安裝程式）
     3. clone 這個 repo 並切到開發分支
     4. 把 inZOI 的兩個 MCP 伺服器註冊到 Claude Code
@@ -73,6 +73,8 @@ $packages = @(
 if (-not $SkipOptional) {
     # 之後做寵物用品（床、玩具）的 3D 模型會用到
     $packages += @{ Id = 'BlenderFoundation.Blender'; Name = 'Blender（選用）' }
+    # 桌面預覽和單元測試要用（pip install lupa）
+    $packages += @{ Id = 'Python.Python.3.12'; Name = 'Python 3.12（選用）' }
 }
 foreach ($p in $packages) { Install-WingetPackage $p.Id $p.Name }
 Update-SessionPath
@@ -95,6 +97,17 @@ if (Get-Command claude -ErrorAction SilentlyContinue) {
         Write-Ok 'Claude Code 安裝完成（第一次執行 claude 時需要登入）'
     } else {
         Write-Warn '安裝後還找不到 claude 指令，請重開 PowerShell 再執行一次這支腳本'
+    }
+}
+
+# ---------------------------------------------------------------- 2b. 桌面預覽用的 lupa
+if (-not $SkipOptional) {
+    Write-Step '安裝 lupa（讓你不開遊戲也能預覽和跑測試）'
+    if (Get-Command py -ErrorAction SilentlyContinue) {
+        py -m pip install --quiet --upgrade lupa
+        if ($LASTEXITCODE -eq 0) { Write-Ok 'lupa 安裝完成' } else { Write-Warn 'lupa 安裝失敗（不影響遊戲內開發，之後再手動 py -m pip install lupa）' }
+    } else {
+        Write-Warn '找不到 py 指令，Python 可能剛裝好。重開 PowerShell 後再執行一次這支腳本就會補上'
     }
 }
 
@@ -151,6 +164,7 @@ Write-Host @"
  [ ] Steam：登入後安裝 inZOI（約 40-60 GB）
  [ ] Epic：登入後把「inZOI ModKit」加入收藏庫，再從 Epic Games Launcher 安裝
  [ ] 開一個新的 PowerShell，執行 claude 並登入
+ [ ] （選用）py tools\preview_server.py 開桌面預覽
  [ ] 照 docs\setup-windows.md 的「驗證」一節確認 MCP 連得上
  [ ] 接著做 docs\phase0-probe.md 的可行性探勘
 ==============================================================
