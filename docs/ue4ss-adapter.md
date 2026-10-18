@@ -40,7 +40,8 @@ Evidence comes from the ZoiPets run on **inZOI v0.10.0** (build 20260915.15331,
 | `logSink` (print -> UE4SS.log) | Verified on v0.10.0 | `[ZoiPets] loaded` lines in UE4SS.log |
 | `discover` (ForEachUObject scan) | Verified on v0.10.0 (main menu) | found `BP_Pet_Customize_01_C`, `B1TimeManager` |
 | `now` (game clock) | **Unverified** | debug clock only; candidate `B1TimeManager` needs an in-save probe (V3) |
-| save slot id | **Unverified** | constant `"debug"`; needs V3 |
+| `slotId` (save slot id) | **Unverified** | constant `"debug"`; needs V3. `nil` from a slot function = no save loaded → no reads, writes refused |
+| `subscribe` | Not implemented | no game event known; the app polls `slotId()` |
 | `locale` | **Unverified** | constant `zh-TW` |
 | `notify` | Log only | no in-game toast API found |
 | `funds` / `charge` | Debug wallet only | real money API not found |
@@ -84,13 +85,13 @@ Not known yet (do not build on these):
    through the debug wallet (`DEBUG_FUNDS` in `main.lua`).
 2. `householdId` / `zoiId` are constants (1 / 1) in the entry point until the
    in-save probes find the real ids.
-3. **Known limitation – save-slot switch.** The adapter stores files per slot, but
-   `App` reads the state once in `App.new`. If the player loads a different save
-   while the game keeps running, the engine keeps the old state and writes it into
-   the new slot. Today the slot is the constant `"debug"`, so this cannot trigger
-   yet; it must be fixed before a real slot id is wired in. Proposed fix (needs the
-   contract owner): an optional game→engine event such as `slot_changed` that makes
-   `App` reload (raised as a major in the review of `docs/proposals/adapter-contract-physical-cat.md`).
+3. **Save-slot switch – handled.** `App` now polls `Api.slotId()` and reloads the
+   state when the slot changes (engine fix a240f2f). The adapter implements
+   `slotId()`; `subscribe()` is not implemented (no "save loaded" game event is
+   known, polling covers it). When a slot function is given and it returns `nil`
+   (no save loaded, e.g. a loading screen), the adapter reads nothing and refuses
+   writes instead of falling back to another slot's file. The real slot id is still
+   **unverified** (V3); the entry point uses the constant `"debug"`.
 
 ## Tests
 
