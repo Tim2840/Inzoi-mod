@@ -2,6 +2,7 @@
 -- clock moves (about once per game hour is plenty). Time is integrated in chunks
 -- so a long gap (loading a save, fast-forward) behaves the same as many short ticks.
 local Api = require("pawhome.core.api")
+local Log = require("pawhome.core.log")
 local Registry = require("pawhome.pets.registry")
 local Needs = require("pawhome.pets.needs")
 local Aging = require("pawhome.pets.aging")
@@ -125,9 +126,36 @@ function E.flush(ctx)
     return out
 end
 
+-- The mod's data lives outside the game's own savegame, so the game clock can jump
+-- BACKWARDS relative to what we stored (the player loads an older save, or an adapter's
+-- debug clock restarts). Every absolute timestamp we keep (cooldowns, when a pet was
+-- taken to the shelter, notification and buff times, ...) would then point into the
+-- "future" and make waits last far too long. So shift them all by the same amount: the
+-- time *remaining* on every timer stays exactly as it was.
+local function shiftTimes(tbl, delta)
+    for k, v in pairs(tbl) do
+        if type(v) == "number" then tbl[k] = v + delta end
+    end
+end
+
+function E.rebase(ctx, delta)
+    for _, pet in ipairs(ctx.state.pets) do
+        shiftTimes(pet.cooldowns, delta)
+        shiftTimes(pet.notified, delta)
+        if pet.impoundedAt then pet.impoundedAt = pet.impoundedAt + delta end
+        if pet.diedAt then pet.diedAt = pet.diedAt + delta end
+        if pet.adoptedAt then pet.adoptedAt = pet.adoptedAt + delta end
+        if pet.lastMisbehavior then pet.lastMisbehavior.at = pet.lastMisbehavior.at + delta end
+    end
+end
+
 function E.tick(ctx, now)
     ctx.now = now
     local last = ctx.state.lastTick
+    if last ~= nil and now < last then
+        Log.info(("game clock went back by %d minutes; timers were shifted to match"):format(last - now))
+        E.rebase(ctx, now - last)
+    end
     ctx.state.lastTick = now
     if last == nil or now <= last then
         return {}
