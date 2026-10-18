@@ -16,6 +16,14 @@ inZOI 目前沒有寵物系統。本模組用官方 ModKit 的 **Lua 腳本模�
 | UI 在遊戲內與 Lua 溝通的傳輸層 `mod/ui/bridge.js` | ❌ 遊戲內分支還會丟錯（待 P8） |
 | 遊戲內實測 | ❌ **一次都沒有做過** |
 
+## 平行專案：ZoiPets（UE4SS 路線）
+
+使用者另有一個本機專案 `C:\Users\user\Desktop\inzoi-pet-mod`（ZoiPets），走 **UE4SS Lua ＋ pak 替換**，已在 inZOI v0.10.0 驗證 UE4SS 可注入、可讀寫檔、找到主選單的貓 actor `BP_Pet_Customize_01_C`。以上是從該 session 的紀錄讀到的，**本 repo 的 session 沒有親自驗證**。兩個專案的關係、差異與建議的處理順序見 [`docs/handoff-ue4ss-session.md`](docs/handoff-ue4ss-session.md)。
+
+- 本 repo 的程式（官方 ModKit 路線）**仍然沒有在遊戲內跑過**。
+- 官方 ModKit 路線做不到真正的動物 AI；UE4SS 路線可能做得到，但**尚未驗證**。
+- 兩邊如何合併由使用者決定，不要自行刪除或覆寫另一邊。
+
 ## 第一優先：第 0 階段探勘
 
 照 `docs/phase0-probe.md` 在真的遊戲上做，把結果填到 `docs/phase0-results.md`。這份探勘決定走方案 A（真領養）、B（在家生成）、C（虛擬寵物）。
