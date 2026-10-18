@@ -64,6 +64,17 @@ inZOI 目前沒有寵物系統。本模組用官方 ModKit 的 **Lua 腳本模�
 - 以下情況**一律先問使用者**，不可自行開 session 去做：需要遊戲／UE4SS／使用者電腦的事、會改規格或玩法或兩個專案合併方式的事、會動到別人正在改的檔案。
 - 同時有多個 session 改程式時，各用各的分支，合併前先讓使用者知道。
 
+## 開發流程摘要（完整版：`docs/engineering-workflow.md` v1.0；決定紀錄：`docs/adr/0003`）
+
+- **角色**：PO＝使用者；Dev＝本機 session（碰遊戲／UE4SS／安裝腳本）；Review/QA/Release＝雲端 session（引擎、CI、文件、ADR）。
+- **四眼原則**：合併進預設分支前必須有**非作者**審查通過；不直接 push 預設分支。目前未啟用 PR／Issue（需 PO 同意），審查流程＝推分支＋`send_message` 通知＋審查結果寫 `docs/reviews/`。
+- **分支與提交**：`feat/`、`fix/`、`docs/`、`chore/` 短命分支，squash merge，Conventional Commits（本 repo 用英文）。
+- **擁有權**：`pets/`、`data/`、`localization/`、`mod/ui/`、`tools/` → 雲端；`adapters/ue4ss.lua`、`mod/ue4ss/`、`scripts/`、`docs/qa/` → 本機。`core/api.lua`：新增「選用」函式＝adapter 方作者＋通知；改必要函式或既有語意＝雙方 review。
+- **完成標準**：CI 綠、有測試、en／zh-TW 一致、存檔結構變更有 migration、遊戲介接函式標明「已驗證（build 號＋日期＋依據）／未驗證」、文件與 CHANGELOG 更新。**沒有遊戲內證據就不是「已驗證」，`caps` 不得設 true。**
+- **遊戲操作同意層級**：T0 讀檔／離線測試／改程式（不需同意）；T1 安裝自己的 `ue4ss\Mods\PawHome`＋啟動遊戲停在主選單做注入與讀寫檔驗證（PO 一次性同意，不點「繼續」；**載入存檔時絕不強殺**）；T2 進存檔、生成／操作貓（PO 在場或明確同意、先備份、不在連線遊玩時）；T3 安裝／移除 UE4SS 本體或動 Mods 以外（PO 明確同意）。
+- **一律問 PO**：玩法與規格、啟動遊戲（依上述層級）、發佈到外部平台、改寫歷史／刪分支／改預設分支名／開啟 branch protection、一次開多個 session、合併兩個專案的最終方案。永遠不取得 AES 金鑰、不散佈 KRAFTON 資源。
+- **目前里程碑**：M1「畫面上出現一隻貓，並知道牠能不能自己動」（`docs/engineering-workflow.md` §14）。原「第 0 階段探勘」改以 M1 為準，`docs/phase0-probe.md` 保留作官方 ModKit 路線的參考。
+
 ## Session 之間的通知約定（使用者要求，2026-10-18）
 
 - 本機 session 在以下情況要用 `send_message` 對雲端 session（`session_011JM8yBsFxnGHQKyQyyQsV5`）傳 3 行以內的短訊息，**不必等整件事做完**：①完成交付物（commit、推送、測試結果）②**卡在等使用者同意或在電腦前**，並寫明他要做什麼 ③發現需要使用者決定的事。格式：狀態（完成／卡住／需決定）→ 重點 → 下一步。
