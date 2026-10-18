@@ -50,7 +50,6 @@ function App.new(adapter, opts)
     end
     applyLocale(ctx)
     if ctx.cfg.debug then Log.setLevel("debug") end
-    Log.info("started (" .. how .. "), " .. #state.pets .. " pets")
     local slotAware = Api.hasSlots()
     local slot = slotAware and Api.slotId() or nil
     local app = setmetatable({
@@ -58,7 +57,11 @@ function App.new(adapter, opts)
         -- a slot-aware adapter with no save loaded (loading screen / main menu): stay paused
         suspended = slotAware and slot == nil,
     }, App)
-    if app.suspended then Log.info("no savegame is loaded yet; the mod is paused") end
+    if app.suspended then
+        Log.info("no savegame is loaded yet; the mod is paused")
+    else
+        Log.info("started (" .. how .. "), " .. #state.pets .. " pets")
+    end
     -- react at once when the game says the save changed; polling in sync() is the fallback
     Api.subscribe("slot_changed", function() app:syncSlot() end)
     return app
