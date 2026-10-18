@@ -14,12 +14,22 @@ local function load(opts)
         LoopAsync = rawget(_G, "LoopAsync"), RegisterKeyBind = rawget(_G, "RegisterKeyBind"),
         Key = rawget(_G, "Key"), ModifierKey = rawget(_G, "ModifierKey"),
         ExecuteInGameThread = rawget(_G, "ExecuteInGameThread"), ForEachUObject = rawget(_G, "ForEachUObject"),
-        PAWHOME_MOD_DIR = rawget(_G, "PAWHOME_MOD_DIR"), print = print, time = os.time,
+        PAWHOME_MOD_DIR = rawget(_G, "PAWHOME_MOD_DIR"), PAWHOME_EXE = rawget(_G, "PAWHOME_EXE"),
+        FindFirstOf = rawget(_G, "FindFirstOf"), print = print, time = os.time,
     }
     env.dir = os.tmpname() .. "_"
     _G.PAWHOME_MOD_DIR = env.dir
+    _G.PAWHOME_EXE = env.dir .. "fake.exe"
+    local exe = assert(io.open(_G.PAWHOME_EXE, "wb")); exe:write(string.rep("x", 4321)); exe:close()
+    if opts.verified then
+        local f = assert(io.open(env.dir .. "pawhome_verified_builds.txt", "w")); f:write("size:4321 test\n"); f:close()
+    end
+    if opts.killed then
+        local f = assert(io.open(env.dir .. "pawhome_disabled.txt", "w")); f:close()
+    end
+    _G.FindFirstOf = opts.findFirstOf or function() return nil end
     _G.LoopAsync = function(ms, fn) env.loops[#env.loops + 1] = { ms = ms, fn = fn } end
-    _G.Key = { F8 = "F8", F9 = "F9", F10 = "F10" }
+    _G.Key = { F7 = "F7", F8 = "F8", F9 = "F9", F10 = "F10" }
     _G.ModifierKey = { SHIFT = "SHIFT" }
     _G.RegisterKeyBind = function(key, mods, fn) env.keys[key .. "+" .. tostring(mods[1])] = fn end
     _G.ExecuteInGameThread = function(fn) fn() end
@@ -37,8 +47,10 @@ local function load(opts)
         for k, v in pairs(saved) do
             if k == "print" then _G.print = v elseif k == "time" then os.time = v else _G[k] = v end
         end
-        for _, f in ipairs({ "pawhome_debug.pawhome.save.sav", "pawhome_discovery.txt" }) do
-            os.remove(env.dir .. f); os.remove(env.dir .. f .. ".bak"); os.remove(env.dir .. f .. ".tmp")
+        for _, f in ipairs({ "pawhome_debug.pawhome.save.sav", "pawhome_discovery.txt", "pawhome_dump.txt",
+                             "pawhome_disabled.txt", "pawhome_verified_builds.txt", "fake.exe" }) do
+            os.remove(env.dir .. f); os.remove(env.dir .. f .. ".tmp")
+            for i = 1, 3 do os.remove(env.dir .. f .. ".bak" .. i) end
         end
     end
     if not ok then env.restore(); error(err, 2) end
@@ -47,12 +59,54 @@ local function load(opts)
     return env
 end
 
-T.test("ue4ss main: registers one loop and three Shift debug keys", function()
+T.test("ue4ss main: registers one loop and four Shift debug keys", function()
     local env = load()
     T.eq(#env.loops, 1)
     T.eq(env.loops[1].ms, 1000)
-    T.truthy(env.keys["F8+SHIFT"] and env.keys["F9+SHIFT"] and env.keys["F10+SHIFT"], "debug keys")
+    T.truthy(env.keys["F7+SHIFT"] and env.keys["F8+SHIFT"] and env.keys["F9+SHIFT"] and env.keys["F10+SHIFT"], "debug keys")
     T.truthy(env.printedText():find("[PawHome] loaded", 1, true))
+    env.restore()
+end)
+
+T.test("ue4ss main: unknown build -> banner says SAFE MODE, caps off", function()
+    local env = load()
+    local text = env.printedText()
+    T.truthy(text:find("build size:4321 (SAFE MODE)", 1, true), "banner names the build and mode")
+    T.truthy(text:find("caps spawn=false", 1, true))
+    env.restore()
+end)
+
+T.test("ue4ss main: listed build -> banner says verified", function()
+    local env = load({ verified = true })
+    T.truthy(env.printedText():find("build size:4321 (verified)", 1, true))
+    env.restore()
+end)
+
+T.test("ue4ss main: kill switch stops everything before it starts", function()
+    local env = load({ killed = true })
+    T.eq(#env.loops, 0, "no loop")
+    T.eq(next(env.keys), nil, "no keys")
+    T.truthy(env.printedText():find("disabled by kill switch", 1, true))
+    env.restore()
+end)
+
+T.test("ue4ss main: Shift+F7 dumps the first instance, or says none is loaded", function()
+    local none = load()
+    none.keys["F7+SHIFT"]()
+    T.truthy(none.printedText():find("no instance loaded", 1, true))
+    none.restore()
+
+    local cls = { GetFullName = function() return "BlueprintGeneratedClass /Game/X.BP_Pet_Customize_01_C" end,
+                  ForEachProperty = function() end, ForEachFunction = function() end,
+                  GetSuperStruct = function() return nil end }
+    local cat = { IsValid = function() return true end, GetClass = function() return cls end,
+                  GetFullName = function() return "BP_Pet_Customize_01_C /Game/Map/LobbyLevel2.LobbyLevel2:PersistentLevel.BP_Pet_Customize_01_62" end }
+    local env = load({ findFirstOf = function(name) return name == "BP_Pet_Customize_01_C" and cat or nil end })
+    env.keys["F7+SHIFT"]()
+    local f = io.open(env.dir .. "pawhome_dump.txt", "rb")
+    T.truthy(f, "dump written")
+    local text = f:read("a"); f:close()
+    T.truthy(text:find("BP_Pet_Customize_01_62", 1, true))
     env.restore()
 end)
 

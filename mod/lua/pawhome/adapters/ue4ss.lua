@@ -41,13 +41,22 @@ end
 --   print        function(text). Default: the global print (UE4SS routes it to UE4SS.log).
 --   debugFunds   number or nil. When set, funds/charge use an in-memory wallet so
 --                adoption can be exercised before the real money API is found.
+--   backups      number of save generations kept as .bak1 .. .bakN. Default 3.
+--   caps         table of capability flags to enable. Ignored in safe mode.
+--   safeMode     true forces every cap off (unknown game build, see main.lua).
 function Ue4ss.new(opts)
     assert(type(opts) == "table" and type(opts.pathPrefix) == "string", "ue4ss adapter: pathPrefix is required")
     local out = opts.print or print
     local a = {
         caps = { spawn = false, moveStray = false, buffs = false, animate = false },
         wallet = opts.debugFunds,
+        safeMode = opts.safeMode == true,
     }
+    -- caps may only be turned on with in-game evidence for this build (see docs);
+    -- safe mode keeps them all off no matter what was requested.
+    if opts.caps and not a.safeMode then
+        for k in pairs(a.caps) do a.caps[k] = opts.caps[k] == true end
+    end
 
     local function path(key)
         local slot = opts.slot and opts.slot() or "debug"
@@ -66,30 +75,36 @@ function Ue4ss.new(opts)
     -- zoipets_save.json through io.open from a UE4SS Lua mod).
     -- Slot partitioning: UNVERIFIED, the save-slot id is not known yet (V3), so the
     -- default slot is the constant "debug".
+    local backups = opts.backups or 3
+
     function a.saveGet(key)
         local p = path(key)
         local data = readFile(p)
         if data == nil then
-            -- the last write may have been interrupted between the two renames
-            data = readFile(p .. ".bak")
+            -- the last write may have been interrupted between the renames
+            data = readFile(p .. ".bak1")
         end
         return data
     end
 
-    -- Writes a temp file, keeps the previous version as .bak, then swaps.
+    -- Writes a temp file, rotates .bak1 .. .bakN (newest first), then swaps.
     -- os.rename cannot overwrite on Windows, hence the remove/rename dance.
+    -- Recovering an older generation is manual: rename .bakK back to the main file.
     function a.saveSet(key, value)
         local p = path(key)
-        local tmp, bak = p .. ".tmp", p .. ".bak"
+        local tmp = p .. ".tmp"
         local f, err = io.open(tmp, "wb")
         if not f then error("cannot open " .. tmp .. ": " .. tostring(err)) end
         f:write(value)
         f:close()
-        os.remove(bak)
-        os.rename(p, bak) -- fails harmlessly when there is no previous save
+        os.remove(p .. ".bak" .. backups)
+        for i = backups - 1, 1, -1 do
+            os.rename(p .. ".bak" .. i, p .. ".bak" .. (i + 1)) -- missing generations fail harmlessly
+        end
+        os.rename(p, p .. ".bak1")
         local ok, rerr = os.rename(tmp, p)
         if not ok then
-            os.rename(bak, p)
+            os.rename(p .. ".bak1", p)
             error("cannot replace " .. p .. ": " .. tostring(rerr))
         end
         return true
@@ -117,6 +132,98 @@ function Ue4ss.new(opts)
     end
 
     return a
+end
+
+---------------------------------------------------------------- build check
+
+-- A cheap fingerprint of the game build that needs no process execution: the size
+-- of the shipping exe. scripts/smoke-t1.ps1 prints it next to the FileVersion.
+-- UNVERIFIED in-game (plain io.open/seek, same as the verified save I/O).
+function Ue4ss.buildFingerprint(exePath)
+    local f = io.open(exePath, "rb")
+    if not f then return nil end
+    local size = f:seek("end")
+    f:close()
+    return size and ("size:" .. size) or nil
+end
+
+-- listPath holds one "<fingerprint> <free-form note>" per line. A build is "known"
+-- only after its caps were proven in-game (M1-3b); everything else runs in safe mode.
+function Ue4ss.isKnownBuild(fingerprint, listPath)
+    if not fingerprint then return false end
+    local f = io.open(listPath, "r")
+    if not f then return false end
+    for line in f:lines() do
+        if line:match("^%s*([^%s#]+)") == fingerprint then f:close(); return true end
+    end
+    f:close()
+    return false
+end
+
+---------------------------------------------------------------- object dump
+
+-- Writes an object's class chain, properties (with simple values) and functions.
+-- Read-only. UNVERIFIED in inZOI: uses UE4SS UStruct:ForEachProperty /
+-- ForEachFunction / GetSuperStruct, which ZoiPets never called. Run it on the
+-- game thread. Every engine call is pcall-wrapped so a missing API only drops lines.
+local SIMPLE = { BoolProperty = true, ByteProperty = true, IntProperty = true, Int64Property = true,
+                 FloatProperty = true, DoubleProperty = true, StrProperty = true, NameProperty = true,
+                 TextProperty = true, EnumProperty = true }
+
+local function try(fn, ...)
+    local ok, v = pcall(fn, ...)
+    if ok then return v end
+    return nil
+end
+
+local function str(v)
+    if v == nil then return "nil" end
+    local t = type(v)
+    if t == "number" or t == "boolean" or t == "string" then return tostring(v) end
+    -- FName / FString / FText userdata expose ToString in UE4SS
+    return try(function() return v:ToString() end) or try(function() return v:GetFullName() end) or t
+end
+
+function Ue4ss.dumpObject(obj, reportPath, label, maxLines)
+    maxLines = maxLines or 3000
+    local lines = {}
+    local function add(s) if #lines < maxLines then lines[#lines + 1] = s end end
+
+    add(("===== %s | %s ====="):format(os.date("%Y-%m-%d %H:%M:%S"), label or ""))
+    add("object: " .. tostring(try(function() return obj:GetFullName() end)))
+    local struct = try(function() return obj:GetClass() end)
+    local depth = 0
+    while struct and depth < 12 do
+        depth = depth + 1
+        add(("\n## class %s"):format(tostring(try(function() return struct:GetFullName() end))))
+        try(function()
+            struct:ForEachProperty(function(prop)
+                local name = try(function() return prop:GetFName():ToString() end) or "?"
+                local kind = try(function() return prop:GetClass():GetFName():ToString() end) or "?"
+                local value = ""
+                if SIMPLE[kind] then
+                    value = " = " .. str(try(function() return obj[name] end))
+                elseif kind == "ObjectProperty" or kind == "ClassProperty" then
+                    value = " -> " .. str(try(function() return obj[name] end))
+                end
+                add(("  prop %s : %s%s"):format(name, kind, value))
+            end)
+        end)
+        try(function()
+            struct:ForEachFunction(function(fn)
+                add("  func " .. tostring(try(function() return fn:GetFName():ToString() end)))
+            end)
+        end)
+        local super = try(function() return struct:GetSuperStruct() end)
+        if super == nil or try(function() return super:IsValid() end) == false then break end
+        struct = super
+    end
+
+    local f = io.open(reportPath, "a")
+    if not f then return false end
+    f:write(table.concat(lines, "\n"), "\n\n")
+    f:close()
+    return true, #lines
 end
 
 ---------------------------------------------------------------- discovery

@@ -16,7 +16,8 @@ local function cleanup(p)
     for _, slot in ipairs({ "debug", "slotA", "slotB" }) do
         for _, key in ipairs({ "pawhome.save", "k", "a_b_c" }) do
             local f = p .. slot .. "." .. key .. ".sav"
-            os.remove(f); os.remove(f .. ".bak"); os.remove(f .. ".tmp")
+            os.remove(f); os.remove(f .. ".tmp")
+            for i = 1, 5 do os.remove(f .. ".bak" .. i) end
         end
     end
 end
@@ -28,19 +29,94 @@ T.test("ue4ss: saveGet is nil before anything is saved", function()
     T.eq(a.saveGet("k"), nil)
 end)
 
-T.test("ue4ss: save round-trip keeps the previous version as .bak", function()
+local function readAll(path)
+    local f = io.open(path, "rb")
+    if not f then return nil end
+    local s = f:read("a")
+    f:close()
+    return s
+end
+
+T.test("ue4ss: save round-trip keeps the previous version as .bak1", function()
     local p = prefix()
     local a = Ue4ss.new({ pathPrefix = p, print = silent })
     a.saveSet("k", "first")
     a.saveSet("k", "second")
     T.eq(a.saveGet("k"), "second")
-    local f = assert(io.open(p .. "debug.k.sav.bak", "rb"))
-    T.eq(f:read("a"), "first")
-    f:close()
+    T.eq(readAll(p .. "debug.k.sav.bak1"), "first")
     cleanup(p)
 end)
 
-T.test("ue4ss: falls back to .bak when the main file is missing", function()
+T.test("ue4ss: keeps exactly N backup generations, newest first", function()
+    local p = prefix()
+    local a = Ue4ss.new({ pathPrefix = p, print = silent, backups = 3 })
+    for i = 1, 5 do a.saveSet("k", "v" .. i) end
+    T.eq(readAll(p .. "debug.k.sav"), "v5")
+    T.eq(readAll(p .. "debug.k.sav.bak1"), "v4")
+    T.eq(readAll(p .. "debug.k.sav.bak2"), "v3")
+    T.eq(readAll(p .. "debug.k.sav.bak3"), "v2")
+    T.eq(readAll(p .. "debug.k.sav.bak4"), nil, "oldest generation dropped")
+    cleanup(p)
+end)
+
+T.test("ue4ss: caps stay off in safe mode and follow the request otherwise", function()
+    local p = prefix()
+    local want = { spawn = true, animate = true }
+    local safe = Ue4ss.new({ pathPrefix = p, print = silent, caps = want, safeMode = true })
+    T.falsy(safe.caps.spawn); T.falsy(safe.caps.animate)
+    local open = Ue4ss.new({ pathPrefix = p, print = silent, caps = want })
+    T.truthy(open.caps.spawn); T.truthy(open.caps.animate); T.falsy(open.caps.moveStray)
+    local default = Ue4ss.new({ pathPrefix = p, print = silent })
+    for _, v in pairs(default.caps) do T.falsy(v, "all caps default to false") end
+end)
+
+T.test("ue4ss: build fingerprint and verified-build list", function()
+    local p = prefix()
+    local exe, list = p .. "fake.exe", p .. "verified.txt"
+    local f = assert(io.open(exe, "wb")); f:write(string.rep("x", 1234)); f:close()
+    T.eq(Ue4ss.buildFingerprint(exe), "size:1234")
+    T.eq(Ue4ss.buildFingerprint(p .. "missing.exe"), nil)
+    T.falsy(Ue4ss.isKnownBuild("size:1234", list), "no list file")
+    f = assert(io.open(list, "w")); f:write("# comment\nsize:999 old build\nsize:1234 v0.11.0 verified 2026-10-20\n"); f:close()
+    T.truthy(Ue4ss.isKnownBuild("size:1234", list))
+    T.falsy(Ue4ss.isKnownBuild("size:12", list), "no prefix match")
+    T.falsy(Ue4ss.isKnownBuild(nil, list))
+    os.remove(exe); os.remove(list)
+end)
+
+T.test("ue4ss: dumpObject walks the class chain and survives missing APIs", function()
+    local function fname(s) return { ToString = function() return s end } end
+    local function prop(name, kind) return { GetFName = function() return fname(name) end,
+        GetClass = function() return { GetFName = function() return fname(kind) end } end } end
+    local base = {
+        GetFullName = function() return "Class /Script/Engine.Actor" end,
+        ForEachProperty = function(_, cb) cb(prop("bHidden", "BoolProperty")) end,
+        -- no ForEachFunction: must not break the dump
+        GetSuperStruct = function() return nil end,
+    }
+    local cls = {
+        GetFullName = function() return "BlueprintGeneratedClass /Game/X.BP_Cat_C" end,
+        ForEachProperty = function(_, cb) cb(prop("Speed", "FloatProperty")); cb(prop("Controller", "ObjectProperty")) end,
+        ForEachFunction = function(_, cb) cb({ GetFName = function() return fname("Meow") end }) end,
+        GetSuperStruct = function() return base end,
+    }
+    local obj = { Speed = 1.5, bHidden = false,
+        Controller = { GetFullName = function() return "AIController /Game/X.AIC_1" end },
+        GetFullName = function() return "BP_Cat_C /Game/Map.Map:PersistentLevel.BP_Cat_1" end,
+        GetClass = function() return cls end }
+    base.IsValid = function() return true end
+    local report = prefix() .. "dump.txt"
+    local ok = Ue4ss.dumpObject(obj, report, "test")
+    T.truthy(ok)
+    local text = readAll(report)
+    os.remove(report)
+    T.truthy(text:find("prop Speed : FloatProperty = 1.5", 1, true), "simple value")
+    T.truthy(text:find("prop Controller : ObjectProperty -> AIController", 1, true), "object reference")
+    T.truthy(text:find("func Meow", 1, true), "function listed")
+    T.truthy(text:find("prop bHidden : BoolProperty = false", 1, true), "super class walked")
+end)
+
+T.test("ue4ss: falls back to .bak1 when the main file is missing", function()
     local p = prefix()
     local a = Ue4ss.new({ pathPrefix = p, print = silent })
     a.saveSet("k", "old")

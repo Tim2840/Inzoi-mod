@@ -6,8 +6,10 @@
 -- it up, drives the hourly tick and registers debug keys.
 -- UE4SS globals used here (print, LoopAsync, ExecuteInGameThread, RegisterKeyBind,
 -- Key, ModifierKey) were VERIFIED to load on inZOI v0.10.0 via the ZoiPets mod;
--- the Shift+F-key bindings themselves have NOT been pressed in-game yet.
+-- the Shift+F-key bindings themselves have NOT been pressed in-game yet, and
+-- FindFirstOf (Shift+F7) has never been called in inZOI.
 
+local MOD_VERSION = "0.1.0-dev"
 local DEBUG = true
 -- Until the real game clock is found (probe V3) the debug clock runs
 -- 1 real second = 1 game minute, so 1 real minute = 1 game hour.
@@ -15,23 +17,52 @@ local DEBUG_MINUTES_PER_SECOND = 1
 local DEBUG_FUNDS = 1000
 -- Household / Zoi ids are unknown until the in-save probes; constants for now.
 local HOUSEHOLD, ZOI = 1, 1
+-- Caps to enable on a verified build. All off: nothing has in-game evidence yet.
+local REQUESTED_CAPS = {}
+-- Classes Shift+F7 dumps (first instance found). Only the lobby cat is known so far.
+local DUMP_CLASSES = { "BP_Pet_Customize_01_C" }
 
 local scriptsDir = debug.getinfo(1, "S").source:match("^@(.*[\\/])") or "./"
 package.path = scriptsDir .. "?.lua;" .. package.path
--- tests/test_ue4ss_main.lua sets PAWHOME_MOD_DIR so save files land in a temp folder
+-- tests/test_ue4ss_main.lua sets PAWHOME_MOD_DIR / PAWHOME_EXE to temp paths
 local modDir = rawget(_G, "PAWHOME_MOD_DIR") or scriptsDir:gsub("Scripts[\\/]$", "")
+local exePath = rawget(_G, "PAWHOME_EXE") or (modDir .. "..\\..\\..\\inZOI-Win64-Shipping.exe")
+
+local function log(msg) print("[PawHome] " .. msg .. "\n") end
+
+-- Kill switch: create pawhome_disabled.txt in the mod folder to stop the mod
+-- without uninstalling it (no loop, no keys, saves untouched).
+local kill = io.open(modDir .. "pawhome_disabled.txt", "r")
+if kill then
+    kill:close()
+    log("disabled by kill switch (pawhome_disabled.txt); nothing started")
+    return
+end
 
 local Ue4ss = require("pawhome.adapters.ue4ss")
 local Main = require("pawhome.main")
+
+-- Safe mode: caps stay off unless this exact build is listed as verified.
+local fingerprint = Ue4ss.buildFingerprint(exePath)
+local knownBuild = Ue4ss.isKnownBuild(fingerprint, modDir .. "pawhome_verified_builds.txt")
 
 local started = os.time()
 local adapter = Ue4ss.new({
     pathPrefix = modDir .. "pawhome_",
     clock = DEBUG and function() return (os.time() - started) * DEBUG_MINUTES_PER_SECOND end or nil,
     debugFunds = DEBUG and DEBUG_FUNDS or nil,
+    caps = REQUESTED_CAPS,
+    safeMode = not knownBuild,
 })
 
-local function log(msg) print("[PawHome] " .. msg .. "\n") end
+-- Startup banner: everything a bug report needs in one line.
+local capList = {}
+for _, k in ipairs({ "spawn", "moveStray", "buffs", "animate" }) do
+    capList[#capList + 1] = k .. "=" .. tostring(adapter.caps[k])
+end
+log(("v%s | %s | build %s (%s) | caps %s | debug=%s"):format(
+    MOD_VERSION, _VERSION, fingerprint or "unknown",
+    knownBuild and "verified" or "SAFE MODE", table.concat(capList, ","), tostring(DEBUG)))
 
 local app = Main.start(adapter)
 if not app then
@@ -63,6 +94,23 @@ if DEBUG then
             if not ok then log("debug key error: " .. tostring(err)) end
         end
     end
+
+    -- Shift+F7: dump properties / functions of the first instance of DUMP_CLASSES
+    RegisterKeyBind(Key.F7, { ModifierKey.SHIFT }, function()
+        ExecuteInGameThread(safe(function()
+            local report = modDir .. "pawhome_dump.txt"
+            for _, cls in ipairs(DUMP_CLASSES) do
+                local obj = FindFirstOf(cls)
+                local valid = obj ~= nil and obj:IsValid()
+                if valid then
+                    local _, n = Ue4ss.dumpObject(obj, report, "Shift+F7 " .. cls)
+                    log(("dump %s: %s lines -> %s"):format(cls, tostring(n), report))
+                else
+                    log("dump " .. cls .. ": no instance loaded")
+                end
+            end
+        end))
+    end)
 
     -- Shift+F8: discovery report (read-only scan of loaded objects)
     RegisterKeyBind(Key.F8, { ModifierKey.SHIFT }, function()
