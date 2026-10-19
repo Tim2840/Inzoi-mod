@@ -163,6 +163,22 @@ if ($hadSave) {
     # checked as soon as the first new save appeared (see the header)
     $rotated = $null -ne $rotatedGen
 }
+# How strong is the rotation evidence? A hash match proves the .bak files exist and that
+# os.rename / os.remove work in-game. It cannot prove "this is the previous save" when
+# consecutive saves are byte-identical (e.g. 0 pets and a fixed debug clock start), so
+# count the distinct contents among the main file and its generations.
+$hashes = @()
+foreach ($f in @($savePath) + @(1..3 | ForEach-Object { "$savePath.bak$_" })) {
+    if (Test-Path $f) { $hashes += (Get-FileHash $f).Hash }
+}
+$fileCount = $hashes.Count
+$distinctCount = @($hashes | Select-Object -Unique).Count
+# os.rename keeps the last-write time, so the times should fall with the generation number
+$genTimes = (@($savePath) + @(1..3 | ForEach-Object { "$savePath.bak$_" }) | Where-Object { Test-Path $_ } |
+    ForEach-Object { '{0} {1}' -f (Split-Path $_ -Leaf).Replace('pawhome_debug.pawhome.save.sav', 'main'), (Get-Item $_).LastWriteTime.ToString('MM-dd HH:mm:ss') }) -join '; '
+$orderNote = if ($fileCount -le 1) { 'no generations to compare' }
+             elseif ($distinctCount -le 1) { 'all files identical: the order of generations is NOT verified' }
+             else { 'contents differ: generation order is partly verifiable' }
 $pass = $v1 -and $v6 -and $aliveAtEnd -and -not $errLines -and ($readBack -ne $false) -and ($rotated -ne $false)
 function Mark($ok) { if ($null -eq $ok) { 'n/a (no save before this run)' } elseif ($ok) { 'PASS' } else { 'FAIL' } }
 function Redact($s) { $s -replace [regex]::Escape($env:USERPROFILE), '%USERPROFILE%' }
@@ -182,12 +198,14 @@ $md = @"
 | V1 UE4SS injected and PawHome loaded | $(Mark $v1) |
 | V6 save file written after start | $(Mark $v6) |
 | Read back an existing save (``started (loaded)``) | $(Mark $readBack) |
-| Backup rotation (previous save kept as ``.bak1``–``.bak3``, same hash) | $(Mark $rotated) |
+| Backup rotation (a ``.bak1``–``.bak3`` file has the pre-run save's content; creation and rename/remove work) | $(Mark $rotated) |
 | Game still running at the end of the window (no crash) | $(Mark $aliveAtEnd) |
 | No ``[PawHome]`` error lines | $(Mark (-not $errLines)) |
 
 - Build: ``$build``, fingerprint ``$fingerprint``
 - Save before the run: $(if ($hadSave) { 'yes' } else { 'no' })$(if ($rotatedGen) { " (found as .bak$rotatedGen right after the first new save)" })
+- Rotation evidence strength: $fileCount files compared (main + generations), $distinctCount distinct contents - $orderNote
+- Last-write times (should fall with the generation number): $genTimes
 - Close: $closeHow
 - Script: ``scripts/smoke-t1.ps1`` (timeout ${TimeoutSec}s, main menu only, no save loaded by the script)
 

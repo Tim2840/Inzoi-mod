@@ -9,7 +9,7 @@ verified), instead of the official ModKit Lua runtime. Branch: `feat/ue4ss-adapt
 |---|---|
 | Startup banner | First `[PawHome]` line in `UE4SS.log`: mod version, Lua version, build fingerprint, `verified` / `SAFE MODE`, caps, debug flag |
 | Debug mode | **Off by default.** Create `pawhome_debug.txt` in `ue4ss\Mods\PawHome\` to turn it on: debug clock, 1000 debug wallet, Shift+F6–F10 keys. Off = no clock, so the engine idles and saves nothing |
-| Auto-explore (M1-3a) | Debug mode **and** `pawhome_autoexplore.txt`: 60 s after each map load (max 3 per session) run the discovery scan and dump every distinct animal actor class found in the level plus `DUMP_CLASSES` |
+| Auto-explore (M1-3a) | Debug mode **and** `pawhome_autoexplore.txt`: 60 s after a map load run the discovery scan and dump every distinct animal actor class found in the level plus `DUMP_CLASSES`. `ClientRestart` can fire several times per load, so only one scan is scheduled at a time (extra triggers are logged and ignored) and the budget of 3 scans counts scans that actually ran. The log gives each scan's duration (`explore (...) took N s`), the first real measurement of the full object scan |
 | Spawn class (M1-3b) | First line of `pawhome_spawn_class.txt` = full object path Shift+F6 spawns; default the lobby cat `BP_Pet_Customize_01_C` |
 | Kill switch | Create `pawhome_disabled.txt` in `ue4ss\Mods\PawHome\` → nothing starts (no loop, no keys, saves untouched). Delete it to re-enable |
 | Safe mode | Build fingerprint = size of `inZOI-Win64-Shipping.exe`. Unless that fingerprint is listed in `pawhome_verified_builds.txt` (one `size:<n> <note>` per line), every cap is forced off. Add a line **only after** M1-3b evidence for that build |
@@ -50,7 +50,7 @@ generations; the game closed normally.
 |---|---|---|
 | `saveSet` first write (`io.open` + rename into place) | Verified on v0.10.0 and v0.11.0 | ZoiPets save file; PawHome T1 save file |
 | `saveGet` reading an existing save | Verified on v0.11.0 | second T1: `started (loaded)` |
-| `.bak1`–`.bak3` rotation (`os.rename` / `os.remove`) | Verified on v0.11.0 | second T1: the pre-run save was found byte for byte as `.bak1` right after the first new save |
+| `.bak1`–`.bak3` rotation (`os.rename` / `os.remove`) | Verified on v0.11.0 | second T1: `.bak` files are created and one has the pre-run save's content (found as `.bak1` right after the first new save). In that run the four files had four distinct contents and last-write times falling with the generation number, so the match identifies the pre-run save (addendum in the result file). A hash match alone would not prove order if saves were byte-identical; the smoke result now records the number of distinct contents and the times, and the order is only treated as verified when they differ |
 | `.bak1` fallback read (main file missing) | **Unverified** | same `io.open` read as `saveGet`, but the fallback branch never ran in-game |
 | `saveGetBackup(key, n)` (reads `.bakN`, 1 ≤ n ≤ 3) | **Unverified** | engine uses it only when the current save cannot be parsed (`core/storage.lua`); offline end-to-end test recovers a pet from `.bak1` |
 | `logSink` (print -> UE4SS.log) | Verified on v0.10.0 and v0.11.0 | `[PawHome]` lines in the T1 result |

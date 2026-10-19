@@ -65,12 +65,21 @@ removes it (b4). Default class: the lobby cat `BP_Pet_Customize_01_C`. To try a 
 class found by M1-3a, the agent writes its full object path (e.g.
 `/Game/.../BP_X.BP_X_C`) as the first line of `<Mod>\pawhome_spawn_class.txt`.
 
+**Risk the PO must be told before agreeing (put it in the T2 consent):** the spawned cat
+is *not* removed automatically (b4 needs it to stay for the stability check). If the game
+is saved, or the world is left, while it is still alive, the actor might be written into the
+game's own save. That is why the experiment runs only on a **throwaway copy** of a save and
+only after the backup in step 0.
+
 PO steps:
 1. Backup saves (step 0). Load a **throwaway** save (a copy, not the main one).
 2. Press **Shift+F6** once; do not interact with the cat.
-3. Wait 60 seconds without moving the camera far away.
-4. Press **Shift+F6** again (remove). Wait 5 minutes in game (normal speed).
-5. Save the game, quit to the main menu, load the same save again, then quit.
+3. Wait 60 seconds without moving the camera far away. When sampling ends the UE4SS
+   console prints `WARNING: actor still alive - press Shift+F6 to remove it BEFORE saving
+   or leaving the world`.
+4. Press **Shift+F6** again (remove). **Do not save or leave the world before this.**
+   Wait 5 minutes in game (normal speed).
+5. Only now save the game, quit to the main menu, load the same save again, then quit.
 
 The five pieces of evidence (workflow §14, M1-3b):
 
