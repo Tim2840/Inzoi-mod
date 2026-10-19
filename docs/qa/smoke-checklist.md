@@ -31,11 +31,21 @@ by the PO in person, so in practice the PO drives the game and the agent reads f
 2. T1 for this build must be PASS (`docs/compatibility.md`).
 3. Note the build fingerprint from the T1 result (`size:<n>`).
 
-### M1-3a – in-world discovery (tools exist; written, not run in-game)
+### M1-3a – in-world discovery (ran once on 2026-10-20: `docs/qa/results/2026-10-20-t2-m1-3a-20261013.16166.W-334313.md`)
 
 Agent prepares (T0): create `<Mod>\pawhome_debug.txt` and `<Mod>\pawhome_autoexplore.txt`.
 With auto-explore armed, the mod runs the discovery scan and the animal dumps by itself
-60 s after each map load (at most 3 times per session), so the PO does not need keys.
+60 s after a map load (one scan at a time, at most 3 scans per session), so the PO does not
+need keys. Since the first run it also does the **b0 observation** right after each scan:
+the existing city cat `Void_Cat1_C` is found with `FindFirstOf`, its controller and
+`BrainComponent` are logged, the controller is dumped, and its position is sampled every 5 s
+for 60 s. This spawns and removes nothing and cannot touch the save. Evidence b0 (in
+`UE4SS.log` and `pawhome_dump.txt`): `observe Void_Cat1_C: <full name> (existing game actor, will not be
+removed)`, `controller: ...`, `BrainComponent: <name or nil>`, `controller dump written`, 13 lines
+`pos t=...`, and `movement: ... -> MOVED|STATIONARY`. For a meaningful answer the PO should
+stay in the city for at least 3 minutes after it appears and **keep that cat near the camera
+and not interact with it** during the 60 s (if the cat is not in the loaded area the log says
+`no instance loaded`). Shift+F5 repeats the observation on demand.
 
 PO steps (about 5 minutes):
 1. Start the game, load any save (City Decoration → Animals: cats **on**).
@@ -61,9 +71,14 @@ cats") with the build number, and the result into `docs/qa/results/`.
 
 Tool: **Shift+F6** (debug mode only). First press spawns the class 150 units in front of
 the player, logs b1/b2 and samples the position every 5 s for 60 s (b3); second press
-removes it (b4). Default class: the lobby cat `BP_Pet_Customize_01_C`. To try a stray
-class found by M1-3a, the agent writes its full object path (e.g.
-`/Game/.../BP_X.BP_X_C`) as the first line of `<Mod>\pawhome_spawn_class.txt`.
+removes it (b4). Default class: the city cat Character `/Game/Characters/Void/Void_Cat/Void_Cat1.Void_Cat1_C`
+(found by M1-3a). To try another class, the agent writes its full object path as the first
+line of `<Mod>\pawhome_spawn_class.txt`. A placed `Void_Cat1_C` has an `AIController`, but by
+Unreal convention a runtime spawn may get none (`AutoPossessAI = 1`); `controller: nil`
+after the spawn is then **not** evidence that the game has no AI for it. Create
+`<Mod>\pawhome_possess.txt` to make the tool call `SpawnDefaultController()` when the pawn
+has no controller (b2 is then logged before and after). Do M1-3b only after the b0
+observation has answered whether the existing cat moves by itself.
 
 **Risk the PO must be told before agreeing (put it in the T2 consent):** the spawned cat
 is *not* removed automatically (the PO removes it with a second Shift+F6; the 5-minute

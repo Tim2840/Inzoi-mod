@@ -6,10 +6,12 @@
 -- it up, drives the hourly tick and registers debug keys.
 -- UE4SS globals used here (print, LoopAsync, ExecuteInGameThread, RegisterKeyBind,
 -- Key, ModifierKey) were VERIFIED to load on inZOI v0.10.0 via the ZoiPets mod;
--- the Shift+F-key bindings themselves have NOT been pressed in-game yet, and
--- FindFirstOf (Shift+F7), the spawn probe (Shift+F6: StaticFindObject, LoadAsset,
--- World:SpawnActor, K2_GetActorLocation, K2_DestroyActor) and our ClientRestart hook
--- callback (auto-explore) have never run in inZOI.
+-- the Shift+F-key bindings themselves have NOT been pressed in-game yet.
+-- Verified in-game on v0.11.0 (T2 / M1-3a, 2026-10-20): our ClientRestart hook callback,
+-- ExecuteWithDelay, ExecuteInGameThread, FindFirstOf and the object dump.
+-- Never run in inZOI: the observation sampling (K2_GetActorLocation on a game actor), the
+-- spawn probe (Shift+F6: StaticFindObject, LoadAsset, World:SpawnActor, K2_DestroyActor,
+-- optional SpawnDefaultController) and the Shift+F5 key itself.
 
 local MOD_VERSION = "0.1.0-dev"
 -- Debug mode is OFF unless pawhome_debug.txt exists in the mod folder (same mechanism
@@ -29,8 +31,13 @@ local REQUESTED_CAPS = {}
 -- B1TimeManager is the game-clock candidate from the v0.10.0 main-menu scan (V3).
 local DUMP_CLASSES = { "BP_Pet_Customize_01_C", "B1TimeManager" }
 -- M1-3b: class Shift+F6 spawns. Override with the first line of pawhome_spawn_class.txt
--- (e.g. a stray-cat class found by M1-3a) without editing code.
-local DEFAULT_SPAWN_CLASS = "/Game/Characters/Pets/Operator/OP001/Mesh/BP_Pet_Customize_01.BP_Pet_Customize_01_C"
+-- without editing code. Default: the city cat Character found by M1-3a (a Pawn with an
+-- AIController when placed; the lobby cat BP_Pet_Customize_01_C only exists at the main menu).
+local DEFAULT_SPAWN_CLASS = "/Game/Characters/Void/Void_Cat/Void_Cat1.Void_Cat1_C"
+-- M1-3 "b0": an existing game actor to observe (no spawning): its controller is dumped and
+-- its position sampled for OBSERVE_SAMPLE_SEC. Runs after each auto-explore scan and on Shift+F5.
+local OBSERVE_CLASS = "Void_Cat1_C"
+local OBSERVE_SAMPLE_SEC = 60
 -- M1-3a: with pawhome_autoexplore.txt present, run discovery + dumps this long after
 -- each PlayerController restart (map load), at most AUTO_EXPLORE_MAX times per session.
 local AUTO_EXPLORE_DELAY_MS = 60000
@@ -163,6 +170,7 @@ if DEBUG then
     -- ClientRestart can fire several times for one load (main menu, loading screen, world),
     -- so: (1) only one scan may be scheduled at a time (`pending`), later triggers are
     -- ignored and logged; (2) the run counter only advances when a scan actually executes.
+    local observeCat -- assigned below, once the probe exists
     if exists(modDir .. "pawhome_autoexplore.txt") then
         local runs, pending, triggers = 0, false, 0
         local ok, err = pcall(RegisterHook, "/Script/Engine.PlayerController:ClientRestart", function()
@@ -182,6 +190,7 @@ if DEBUG then
                     pending = false
                     runs = runs + 1
                     explore(("auto #%d"):format(runs))
+                    if observeCat then observeCat() end
                 end))
             end)
         end)
@@ -205,7 +214,19 @@ if DEBUG then
             return playerController():GetWorld()
         end,
         LoopAsync = LoopAsync,
+        FindFirstOf = FindFirstOf,
+        dumpObject = function(obj, label) return Ue4ss.dumpObject(obj, dumpReport, label) end,
+        -- pawhome_possess.txt: after a spawn, call SpawnDefaultController() if the pawn has none
+        autoPossess = exists(modDir .. "pawhome_possess.txt"),
     }, log)
+    observeCat = function()
+        ExecuteInGameThread(safe(function()
+            if probe:observe(OBSERVE_CLASS) then probe:sample(OBSERVE_SAMPLE_SEC, 5) end
+        end))
+    end
+    -- Shift+F5: observe the first existing OBSERVE_CLASS actor (b0): dump its controller and
+    -- sample its position for 60 s. Spawns nothing and never removes anything.
+    RegisterKeyBind(Key.F5, { ModifierKey.SHIFT }, observeCat)
     local function spawnClass()
         local f = io.open(modDir .. "pawhome_spawn_class.txt", "r")
         if not f then return DEFAULT_SPAWN_CLASS end

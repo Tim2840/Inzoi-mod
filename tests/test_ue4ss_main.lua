@@ -47,7 +47,7 @@ local function load(opts)
     _G.LoadAsset = function() end
     _G.FindFirstOf = opts.findFirstOf or function() return nil end
     _G.LoopAsync = function(ms, fn) env.loops[#env.loops + 1] = { ms = ms, fn = fn } end
-    _G.Key = { F6 = "F6", F7 = "F7", F8 = "F8", F9 = "F9", F10 = "F10" }
+    _G.Key = { F5 = "F5", F6 = "F6", F7 = "F7", F8 = "F8", F9 = "F9", F10 = "F10" }
     _G.ModifierKey = { SHIFT = "SHIFT" }
     _G.RegisterKeyBind = function(key, mods, fn) env.keys[key .. "+" .. tostring(mods[1])] = fn end
     _G.ExecuteInGameThread = function(fn) fn() end
@@ -93,11 +93,11 @@ local function test(name, fn)
     end)
 end
 
-test("ue4ss main: registers one loop and five Shift debug keys", function()
+test("ue4ss main: registers one loop and six Shift debug keys", function()
     local env = load()
     T.eq(#env.loops, 1)
     T.eq(env.loops[1].ms, 1000)
-    for _, k in ipairs({ "F6", "F7", "F8", "F9", "F10" }) do T.truthy(env.keys[k .. "+SHIFT"], k) end
+    for _, k in ipairs({ "F5", "F6", "F7", "F8", "F9", "F10" }) do T.truthy(env.keys[k .. "+SHIFT"], k) end
     T.truthy(env.printedText():find("[PawHome] loaded", 1, true))
     T.eq(next(env.hooks), nil, "no auto-explore hook without pawhome_autoexplore.txt")
     env.restore()
@@ -304,4 +304,54 @@ test("ue4ss main: Shift+F8 writes a discovery report", function()
     local text = f:read("a"); f:close()
     T.truthy(text:find("B1TimeManager", 1, true))
     env.restore()
+end)
+
+-- A fake existing city cat: a Pawn with an AIController that has a brain component.
+local function fakeCityCat()
+    local ctrl = { IsValid = function() return true end,
+        GetFullName = function() return "AIController /Game/Map/City.City:PersistentLevel.AIController_7" end,
+        BrainComponent = { IsValid = function() return true end,
+            GetFullName = function() return "BehaviorTreeComponent /Game/Map/City.City:PersistentLevel.AIController_7.BTComp" end } }
+    local cat = { alive = true, Controller = ctrl, destroyed = false }
+    function cat:IsValid() return self.alive end
+    function cat:GetFullName() return "Void_Cat1_C /Game/Map/City.City:PersistentLevel.Void_Cat1_C_1" end
+    function cat:K2_GetActorLocation() return { X = 1, Y = 2, Z = 3 } end
+    function cat:K2_DestroyActor() self.destroyed = true; self.alive = false end
+    return cat
+end
+
+test("ue4ss main: Shift+F5 observes the existing city cat: controller dump + 60 s of samples, spawns and removes nothing", function()
+    local cat = fakeCityCat()
+    local env = load({ findFirstOf = function(name) return name == "Void_Cat1_C" and cat or nil end })
+    env.keys["F5+SHIFT"]()
+    local text = env.printedText()
+    T.truthy(text:find("observe Void_Cat1_C: Void_Cat1_C", 1, true), "found by FindFirstOf")
+    T.truthy(text:find("BrainComponent: BehaviorTreeComponent", 1, true), "brain logged")
+    T.truthy(text:find("controller dump written", 1, true))
+    local f = io.open(env.dir .. "pawhome_dump.txt", "rb")
+    T.truthy(f and f:read("a"):find("controller of Void_Cat1_C", 1, true), "controller dump in pawhome_dump.txt")
+    if f then f:close() end
+    T.eq(env.loops[#env.loops].ms, 5000, "position sampling started")
+    T.falsy(cat.destroyed, "nothing was removed")
+end)
+
+test("ue4ss main: Shift+F5 with no city cat loaded says so", function()
+    local env = load()
+    env.keys["F5+SHIFT"]()
+    T.truthy(env.printedText():find("observe Void_Cat1_C: no instance loaded", 1, true))
+    T.eq(#env.loops, 1, "no sampling loop beyond the tick loop")
+end)
+
+test("ue4ss main: auto-explore ends with the b0 observation of the city cat", function()
+    local cat = fakeCityCat()
+    local env = load({ autoExplore = true, findFirstOf = function(name) return name == "Void_Cat1_C" and cat or nil end })
+    _G.ForEachUObject = function() end
+    env.hooks["/Script/Engine.PlayerController:ClientRestart"]()
+    env.delayed[1].fn()
+    local text = env.printedText()
+    local scan = text:find("explore (auto #1) took", 1, true)
+    local obs = text:find("observe Void_Cat1_C: Void_Cat1_C", 1, true)
+    T.truthy(scan and obs and obs > scan, "observation comes after the scan")
+    T.eq(env.loops[#env.loops].ms, 5000, "sampling started without any key press")
+    T.falsy(cat.destroyed)
 end)

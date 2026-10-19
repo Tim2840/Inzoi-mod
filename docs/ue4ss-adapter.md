@@ -10,13 +10,16 @@ verified), instead of the official ModKit Lua runtime. Branch: `feat/ue4ss-adapt
 | Startup banner | First `[PawHome]` line in `UE4SS.log`: mod version, Lua version, build fingerprint, `verified` / `SAFE MODE`, caps, debug flag |
 | Debug mode | **Off by default.** Create `pawhome_debug.txt` in `ue4ss\Mods\PawHome\` to turn it on: debug clock, 1000 debug wallet, Shift+F6–F10 keys. Off = no clock, so the engine idles and saves nothing |
 | Auto-explore (M1-3a) | Debug mode **and** `pawhome_autoexplore.txt`: 60 s after a map load run the discovery scan and dump every distinct animal actor class found in the level plus `DUMP_CLASSES`. `ClientRestart` can fire several times per load, so only one scan is scheduled at a time (extra triggers are logged and ignored) and the budget of 3 scans counts scans that actually ran. The log gives each scan's duration (`explore (...) took N s`), the first real measurement of the full object scan |
-| Spawn class (M1-3b) | First line of `pawhome_spawn_class.txt` = full object path Shift+F6 spawns; default the lobby cat `BP_Pet_Customize_01_C` |
+| Spawn class (M1-3b) | First line of `pawhome_spawn_class.txt` = full object path Shift+F6 spawns; default the city cat Character `/Game/Characters/Void/Void_Cat/Void_Cat1.Void_Cat1_C` |
+| Observe, don't spawn (b0) | After each auto-explore scan, and on **Shift+F5**: `FindFirstOf("Void_Cat1_C")`, log its `Controller`, `AIControllerClass` and `BrainComponent`, write a full dump of the controller to `pawhome_dump.txt`, sample the cat's position for 60 s. Spawns nothing, removes nothing (an observed game actor is never destroyed), no save risk |
+| Possess after spawn (optional) | `pawhome_possess.txt` present: after a Shift+F6 spawn, if the pawn has no controller, call `SpawnDefaultController()` and log before/after. Off by default; unverified |
 | Kill switch | Create `pawhome_disabled.txt` in `ue4ss\Mods\PawHome\` → nothing starts (no loop, no keys, saves untouched). Delete it to re-enable |
 | Safe mode | Build fingerprint = size of `inZOI-Win64-Shipping.exe`. Unless that fingerprint is listed in `pawhome_verified_builds.txt` (one `size:<n> <note>` per line), every cap is forced off. Add a line **only after** M1-3b evidence for that build |
 | Save backups | Each save keeps `.bak1` (newest) … `.bak3`. Recovery: close the game, rename the wanted `.bakN` to the `.sav` name |
 | Rollback | `scripts\install-ue4ss.ps1 -Uninstall` removes the scripts and keeps saves; restore a `.bakN` if a save is bad |
 
-Debug keys (only with `pawhome_debug.txt`): Shift+F6 spawn experiment (first press:
+Debug keys (only with `pawhome_debug.txt`): Shift+F5 observe the existing city cat (b0,
+no spawning); Shift+F6 spawn experiment (first press:
 spawn + 60 s of position samples; second press: remove); Shift+F7 dump the first
 instance of `DUMP_CLASSES` (`BP_Pet_Customize_01_C`, `B1TimeManager`) →
 `pawhome_dump.txt`; Shift+F8 discovery scan + animal dumps → `pawhome_discovery.txt` /
@@ -65,6 +68,8 @@ generations; the game closed normally.
 | `caps` | all `false` | nothing spawn/move/animate-related has been tested |
 | Debug keys Shift+F6/F7/F8/F9/F10 | **Unverified** | registered the same way as ZoiPets' keys, never pressed in-game |
 | Spawn probe (`StaticFindObject`, `LoadAsset`, `World:SpawnActor`, `K2_GetActorLocation`, `K2_DestroyActor`, UEHelpers) | **Unverified** | call shapes copied from mods bundled with UE4SS v3.0.1 (BPModLoaderMod, ConsoleCommandsMod); never run by us |
+| Observation sampling (`K2_GetActorLocation` on an existing game actor), controller dump, Shift+F5 | **Unverified** | written after the T2 / M1-3a dumps; offline tests only. `FindFirstOf` itself and the object dump are verified |
+| `Pawn:SpawnDefaultController()` (optional, `pawhome_possess.txt`) | **Unverified** | listed in the `Void_Cat1_C` dump, never called |
 | Auto-explore (`RegisterHook` on `PlayerController:ClientRestart`, `ExecuteWithDelay`, `ExecuteInGameThread`) | Verified on v0.11.0 | T2 2026-10-20: our callback fired at the main menu and again later; pending flag ignored a trigger 7 s after the first; scans ran 60 s after a trigger |
 | `dumpObject` (ForEachProperty / ForEachFunction / GetSuperStruct, property reads), `FindFirstOf` | Verified on v0.11.0 | T2 2026-10-20: dumps of 239, 291, 381 and 11 lines, including `ObjectProperty` references and enum/bool values |
 | `buildFingerprint` / safe mode | Verified on v0.11.0 | banner showed `build size:289803704 (SAFE MODE)`; matches the exe size |

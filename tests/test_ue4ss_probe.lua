@@ -34,12 +34,21 @@ local function fakeUe(opts)
                 if opts.spawnFails then return { IsValid = function() return false end } end
                 local a = fakeActor("BP_Cat_C /Game/Map.Map:PersistentLevel.BP_Cat_C_1", { X = loc.X, Y = loc.Y, Z = loc.Z })
                 a.Controller = opts.controller
+                function a:SpawnDefaultController()
+                    if opts.possessFails then error("SpawnDefaultController failed") end
+                    ue.possessCalls = (ue.possessCalls or 0) + 1
+                    self.Controller = opts.newController
+                end
                 ue.spawned[#ue.spawned + 1] = { class = c, loc = loc, rot = rot, actor = a }
                 return a
             end,
         }
     end
     ue.LoopAsync = function(ms, fn) ue.loops[#ue.loops + 1] = { ms = ms, fn = fn } end
+    ue.autoPossess = opts.autoPossess
+    ue.dumps = {}
+    ue.dumpObject = function(obj, label) ue.dumps[#ue.dumps + 1] = { obj = obj, label = label } end
+    ue.FindFirstOf = function(name) return opts.existing and opts.existing[name] or nil end
     return ue
 end
 
@@ -162,4 +171,100 @@ T.test("probe: b4 removes the actor and forgets stale references", function()
     p.actor.alive = false -- destroyed by the game
     T.falsy(p:despawn())
     T.eq(p.actor, nil, "stale reference cleared, a new spawn is possible")
+end)
+
+-- ------------------------------------------------------------------ b0: observe an existing actor
+
+local function fakeController(name, brain)
+    local c = { IsValid = function() return true end, GetFullName = function() return name end }
+    if brain then c.BrainComponent = { IsValid = function() return true end, GetFullName = function() return brain end } end
+    return c
+end
+
+T.test("probe b0: observe logs the controller, its brain and dumps it; spawns nothing", function()
+    local ctrl = fakeController("AIController /Game/Map/X.X:PersistentLevel.AIController_1", "BehaviorTreeComponent /Game/Map/X.X:PersistentLevel.AIController_1.BTComp")
+    local existing = fakeActor("Void_Cat1_C /Game/Map/X.X:PersistentLevel.Void_Cat1_C_1", { X = 0, Y = 0, Z = 0 })
+    existing.Controller = ctrl
+    local ue = fakeUe({ existing = { Void_Cat1_C = existing } })
+    local lines, log = collect()
+    local p = Probe.new(ue, log)
+    T.eq(p:observe("Void_Cat1_C"), existing)
+    T.truthy(has(lines, "observe Void_Cat1_C: Void_Cat1_C /Game/Map/X.X:PersistentLevel.Void_Cat1_C_1 (existing game actor, will not be removed)"))
+    T.truthy(has(lines, "controller: AIController /Game/Map/X.X:PersistentLevel.AIController_1"))
+    T.truthy(has(lines, "BrainComponent: BehaviorTreeComponent"))
+    T.eq(#ue.dumps, 1, "controller dumped once")
+    T.eq(ue.dumps[1].obj, ctrl)
+    T.truthy(ue.dumps[1].label:find("controller of Void_Cat1_C", 1, true))
+    T.eq(#ue.spawned, 0, "nothing spawned")
+end)
+
+T.test("probe b0: no instance, or no FindFirstOf, is a log line", function()
+    local lines, log = collect()
+    T.eq(Probe.new(fakeUe(), log):observe("Void_Cat1_C"), nil)
+    T.truthy(has(lines, "observe Void_Cat1_C: no instance loaded"))
+    local lines2, log2 = collect()
+    local ue = fakeUe(); ue.FindFirstOf = nil
+    T.eq(Probe.new(ue, log2):observe("Void_Cat1_C"), nil)
+    T.truthy(has(lines2, "FindFirstOf is not available"))
+end)
+
+T.test("probe b0: an observed actor is sampled, never warned about and never removed", function()
+    local existing = fakeActor("Void_Cat1_C /Game/Map/X.X:PersistentLevel.Void_Cat1_C_1", { X = 10, Y = 0, Z = 0 })
+    local ue = fakeUe({ existing = { Void_Cat1_C = existing } })
+    local lines, log = collect()
+    local p = Probe.new(ue, log)
+    p:observe("Void_Cat1_C")
+    T.truthy(p:sample(10, 5))
+    local fn = ue.loops[1].fn
+    fn()
+    existing.pos = { X = 400, Y = 0, Z = 0 }
+    fn(); fn()
+    T.truthy(has(lines, "-> MOVED"))
+    T.falsy(has(lines, "WARNING"), "no 'press Shift+F6 to remove' warning for a game actor")
+    T.falsy(p:despawn(), "despawn only handles spawned actors")
+    T.truthy(existing.alive, "the game actor was not destroyed")
+    T.truthy(has(lines, "never removed"))
+end)
+
+T.test("probe b0: a second sampling run is refused while one is active", function()
+    local existing = fakeActor("Void_Cat1_C /Game/X.X:PersistentLevel.Void_Cat1_C_1", { X = 0, Y = 0, Z = 0 })
+    local ue = fakeUe({ existing = { Void_Cat1_C = existing } })
+    local lines, log = collect()
+    local p = Probe.new(ue, log)
+    p:observe("Void_Cat1_C")
+    T.truthy(p:sample(60, 5))
+    T.falsy(p:sample(60, 5))
+    T.eq(#ue.loops, 1, "no second loop")
+    T.truthy(has(lines, "a sampling run is already active"))
+end)
+
+-- ------------------------------------------------------------------ optional possess
+
+T.test("probe possess: with autoPossess a controller-less spawned pawn gets SpawnDefaultController", function()
+    local ue = fakeUe({ autoPossess = true,
+        newController = fakeController("AIController /Game/Map/X.X:PersistentLevel.AIController_9") })
+    local lines, log = collect()
+    local p = Probe.new(ue, log)
+    p:spawn("/Game/X.BP_Cat_C")
+    T.eq(ue.possessCalls, 1)
+    T.truthy(has(lines, "controller: nil"), "the pre-possess state is logged first")
+    T.truthy(has(lines, "possess: SpawnDefaultController called"))
+    T.truthy(has(lines, "controller: AIController /Game/Map/X.X:PersistentLevel.AIController_9"), "and the result")
+end)
+
+T.test("probe possess: not called without autoPossess, or when a controller exists, failure is a log line", function()
+    local ue = fakeUe()
+    local p = Probe.new(ue, function() end)
+    p:spawn("/Game/X.BP_Cat_C")
+    T.eq(ue.possessCalls, nil, "off by default")
+
+    local ue2 = fakeUe({ autoPossess = true, controller = fakeController("AIController /X") })
+    local lines2, log2 = collect()
+    Probe.new(ue2, log2):spawn("/Game/X.BP_Cat_C")
+    T.eq(ue2.possessCalls, nil, "already has a controller")
+
+    local ue3 = fakeUe({ autoPossess = true, possessFails = true })
+    local lines3, log3 = collect()
+    T.truthy(Probe.new(ue3, log3):spawn("/Game/X.BP_Cat_C"), "the spawn itself still succeeds")
+    T.truthy(has(lines3, "possess: SpawnDefaultController failed"))
 end)
