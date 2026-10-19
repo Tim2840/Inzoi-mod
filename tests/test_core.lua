@@ -189,6 +189,54 @@ T.test("storage: a v1 save (run-away pets) is migrated to the shelter model", fu
     T.eq(state.pets[2].status, "home")
 end)
 
+T.test("storage: a damaged current save falls back to the newest readable older generation", function()
+    local mock = Mock.new()
+    Api.use(mock)
+    for n = 5, 8 do
+        local st = Storage.default(); st.nextPetId = n
+        Storage.save(st)
+    end                                                  -- main = 8, generations: 7, 6, 5
+    T.eq(Storage.load().nextPetId, 8)
+    mock.store[Storage.KEY] = "garbage {{{"
+    local state, how = Storage.load()
+    T.eq(how, "restored"); T.eq(state.nextPetId, 7)
+    -- the newest generation is damaged too: take the next one
+    mock.generations[Storage.KEY][1] = "also garbage"
+    state, how = Storage.load()
+    T.eq(how, "restored"); T.eq(state.nextPetId, 6)
+end)
+
+T.test("storage: damaged save and no readable backup starts fresh (and says so)", function()
+    local mock = Mock.new()
+    Api.use(mock)
+    mock.store[Storage.KEY] = "garbage {{{"
+    local state, how = Storage.load()
+    T.eq(how, "corrupt"); T.eq(state.nextPetId, 1)
+    for n = 1, 3 do mock.generations[Storage.KEY] = { "bad", "worse", "worst" } end
+    state, how = Storage.load()
+    T.eq(how, "corrupt")
+end)
+
+T.test("storage: an adapter without saveGetBackup behaves exactly as before", function()
+    local mock = Mock.new()
+    mock.saveGetBackup = nil
+    Api.use(mock)
+    mock.store[Storage.KEY] = "garbage {{{"
+    local _, how = Storage.load()
+    T.eq(how, "corrupt")
+end)
+
+T.test("storage: the app keeps its pets when the main save is damaged", function()
+    local H = require("helpers")
+    local App = require("pawhome.app")
+    local app, m = H.new({ money = 5000 })
+    H.adopt(app, 1)
+    H.advance(app, m, 3 * 60)                            -- several saves, so older generations exist
+    m.store[Storage.KEY] = "garbage {{{"
+    local again = assert(App.new(m))
+    T.eq(#again.ctx.state.pets, 1, "restored from a backup generation")
+end)
+
 T.test("api: a failing adapter call never escapes", function()
     local mock = Mock.new()
     mock.notify = function() error("boom") end

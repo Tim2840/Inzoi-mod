@@ -16,6 +16,9 @@ function Mock.new(opts)
         entities = {},
         nextEntity = 1,
         spawned = 0,
+        spawnCalls = 0,
+        hidden = {},            -- entities that exist but are not reported (like an unloaded level)
+        generations = {},       -- older saves per key, newest first (like the .bak files)
         failSpawn = false,
         localeName = opts.locale or "en",
         slot = (not opts.noSave) and (opts.slot or "slot1") or nil,   -- noSave: start on the loading screen
@@ -38,7 +41,19 @@ function Mock.new(opts)
     function m.saveSet(key, value)
         local name = k(key)
         if not name then m.rejectedWrites = m.rejectedWrites + 1 return end
+        local old = m.store[name]
+        if old ~= nil and old ~= value then
+            local gens = m.generations[name] or {}
+            table.insert(gens, 1, old)
+            while #gens > 3 do table.remove(gens) end
+            m.generations[name] = gens
+        end
         m.store[name] = value
+    end
+    function m.saveGetBackup(key, n)
+        local name = k(key)
+        local gens = name and m.generations[name]
+        return gens and gens[n] or nil
     end
     if opts.slotted then
         function m.slotId() return m.slot end
@@ -74,13 +89,14 @@ function Mock.new(opts)
         return id
     end
     function m.spawnPet(hid, spec)
+        m.spawnCalls = m.spawnCalls + 1
         if m.failSpawn then return nil end
         local id = m.nextEntity; m.nextEntity = id + 1
         m.entities[id] = { household = hid, spec = spec }
         m.spawned = m.spawned + 1
         return id
     end
-    function m.entityExists(ref) return m.entities[ref] ~= nil end
+    function m.entityExists(ref) return m.entities[ref] ~= nil and not m.hidden[ref] end
     function m.despawnPet(ref) m.entities[ref] = nil end
     function m.playAnimation(ref, anim) m.animations[#m.animations + 1] = { ref = ref, anim = anim } end
 

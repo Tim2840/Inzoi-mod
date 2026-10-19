@@ -16,6 +16,7 @@ local needsData = require("pawhome.data.needs")
 local habits = require("pawhome.data.habits")
 local moodData = require("pawhome.data.moods")
 local stagesData = require("pawhome.data.stages")
+local presenceData = require("pawhome.data.presence")
 
 local E = {}
 
@@ -85,10 +86,37 @@ local function simulateChunk(ctx, pet, minutes)
 end
 
 -- Keep the in-game cat in sync with the saved pet (plan A/B only).
+-- Rules: a missing cat is replaced at most once per presence.retryMinutes; after
+-- presence.maxFailures failures in a row the pet is left alone until the next game day;
+-- and the old reference is despawned first, so a cat the game merely hid (not
+-- destroyed) cannot end up duplicated.
 local function ensurePresent(ctx, pet)
     if pet.status ~= "home" or not Api.caps().spawn then return end
-    if pet.entity ~= nil and Api.entityExists(pet.entity) then return end
-    pet.entity = Api.spawnPet(pet.household, { appearance = pet.appearance, stage = pet.stage })
+    local p = pet.presence
+    if pet.entity ~= nil and Api.entityExists(pet.entity) then
+        if p then pet.presence = nil end
+        return
+    end
+    p = p or { fails = 0, lastTry = -math.huge, day = math.floor(ctx.now / Util.MINUTES_PER_DAY) }
+    pet.presence = p
+    local today = math.floor(ctx.now / Util.MINUTES_PER_DAY)
+    if p.fails >= presenceData.maxFailures then
+        if today == p.day then return end   -- paused for the rest of this game day
+        p.fails, p.day = 0, today
+    end
+    if ctx.now - p.lastTry < presenceData.retryMinutes then return end
+    p.lastTry = ctx.now
+    if pet.entity ~= nil then Api.despawnPet(pet.entity) end
+    local ref = Api.spawnPet(pet.household, { appearance = pet.appearance, stage = pet.stage })
+    pet.entity = ref
+    if ref ~= nil then
+        pet.presence = nil
+    else
+        p.fails, p.day = p.fails + 1, today
+        if p.fails == presenceData.maxFailures then
+            Log.warn(("could not place %s in the world %d times; pausing until tomorrow"):format(pet.name, p.fails))
+        end
+    end
 end
 
 -- Pets that are in a good or bad mood affect the Zoi who are bonded with them.
@@ -146,6 +174,10 @@ function E.rebase(ctx, delta)
         if pet.diedAt then pet.diedAt = pet.diedAt + delta end
         if pet.adoptedAt then pet.adoptedAt = pet.adoptedAt + delta end
         if pet.lastMisbehavior then pet.lastMisbehavior.at = pet.lastMisbehavior.at + delta end
+        if pet.presence then
+            pet.presence.lastTry = pet.presence.lastTry + delta
+            pet.presence.day = math.floor((pet.presence.day * Util.MINUTES_PER_DAY + delta) / Util.MINUTES_PER_DAY)
+        end
     end
 end
 

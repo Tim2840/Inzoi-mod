@@ -6,7 +6,8 @@
 --   optional: notify, householdMembers, funds, charge, addBuff, listStrays,
 --             bringStray, spawnPet, entityExists, despawnPet,
 --             playAnimation, locale, logSink,
---             slotId, subscribe   (see below: the savegame slot the player is in)
+--             slotId, subscribe   (see below: the savegame slot the player is in),
+--             saveGetBackup       (older generations of a save, see below)
 --   caps: { spawn = bool, moveStray = bool, animate = bool, buffs = bool }
 local Log = require("pawhome.core.log")
 
@@ -48,6 +49,13 @@ end
 
 function Api.saveGet(key)
     local ok, v = call("saveGet", key)
+    return ok and v or nil
+end
+
+-- Optional. saveGetBackup(key, n): the n-th older generation of a save (1 = the one right
+-- before the current), or nil. The mod uses it only when the current save cannot be read.
+function Api.saveGetBackup(key, n)
+    local ok, v = call("saveGetBackup", key, n)
     return ok and v or nil
 end
 

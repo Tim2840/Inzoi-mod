@@ -179,7 +179,7 @@ cd C:\Dev\Inzoi-mod
 py -I tests\run.py
 ```
 
-看到 **`67 passed, 0 failed`** 就代表引擎在你的電腦上也運作正常。接著：
+看到 **`120 passed, 0 failed`** 就代表引擎在你的電腦上也運作正常。接著：
 
 ```powershell
 py tools\preview_server.py

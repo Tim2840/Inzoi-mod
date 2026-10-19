@@ -46,7 +46,7 @@
 |---|---|---|
 | F1 | 引擎處理「時鐘倒退」：重載舊存檔或重啟時，`now < lastTick` 就把所有絕對時間戳（冷卻、`impoundedAt`、`notified`、`lastMisbehavior`、`adoptedAt`、`diedAt`）整體平移，並補測試 | **跨專案的設計風險**：mod 資料在遊戲存檔之外，玩家讀取較舊的遊戲存檔時，遊戲時間會比 mod 記錄的 `lastTick` 早；目前引擎會讓冷卻、收容所等待與「10 天後被領養」錯亂 |
 | F2 | CI 加 `windows-latest` | M2③ |
-| F3 | 評估選用函式 `saveGetBackup(key, n)`：引擎在 `corrupt` 時往較舊的世代讀 | nit 2；新增選用函式＝作者＋通知 |
+| F3 | 選用函式 `saveGetBackup(key, n)`：引擎在主檔損毀時往較舊的世代讀 | nit 2；新增選用函式＝作者＋通知。**引擎端已完成**（`core/storage.lua`，4 項測試）。**adapter 端（本機）待做**：在 `adapters/ue4ss.lua` 加 `function a.saveGetBackup(key, n) local p = path(key); if p == nil then return nil end; return readFile(p .. ".bak" .. n) end`（`.bakN` 命名與現有輪替一致），並在 `docs/ue4ss-adapter.md` 標「未驗證」。沒實作也不影響運作 |
 
 ## 下一步
 - 作者處理 M1–M3（nit 自行裁量），在 `feat/ue4ss-adapter` 追加 commit；我只審差異。

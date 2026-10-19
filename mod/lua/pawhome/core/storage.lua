@@ -6,7 +6,7 @@ local Util = require("pawhome.core.util")
 local Log = require("pawhome.core.log")
 local defaults = require("pawhome.data.settings")
 
-local Storage = { KEY = "pawhome.save", VERSION = 2 }
+local Storage = { KEY = "pawhome.save", VERSION = 2, BACKUP_GENERATIONS = 3 }
 
 function Storage.default()
     return {
@@ -53,12 +53,31 @@ local function migrate(state)
     return state
 end
 
+local function parse(raw)
+    local state, err = Serialize.decode(raw)
+    if type(state) == "table" and type(state.version) == "number" then return state end
+    return nil, err
+end
+
 function Storage.load()
     local raw = Api.saveGet(Storage.KEY)
     if raw == nil or raw == "" then return Storage.default(), "new" end
-    local state, err = Serialize.decode(raw)
-    if type(state) ~= "table" or type(state.version) ~= "number" then
-        Log.error("save is unreadable (" .. tostring(err) .. "), starting fresh")
+    local state, err = parse(raw)
+    local how = "loaded"
+    if not state then
+        -- the current file is damaged: fall back to the newest older generation that reads
+        for n = 1, Storage.BACKUP_GENERATIONS do
+            local older = Api.saveGetBackup(Storage.KEY, n)
+            local candidate = older and parse(older)
+            if candidate then
+                Log.warn("save is unreadable (" .. tostring(err) .. "); restored backup generation " .. n)
+                state, how = candidate, "restored"
+                break
+            end
+        end
+    end
+    if not state then
+        Log.error("save is unreadable (" .. tostring(err) .. ") and no backup could be read, starting fresh")
         return Storage.default(), "corrupt"
     end
     if state.version > Storage.VERSION then
@@ -78,7 +97,7 @@ function Storage.load()
     migrated.pets = migrated.pets or {}
     migrated.zoi = migrated.zoi or {}
     migrated.offers = migrated.offers or {}
-    return migrated, "loaded"
+    return migrated, how
 end
 
 function Storage.save(state)
