@@ -110,6 +110,17 @@ function Ue4ss.new(opts)
         return data
     end
 
+    -- Contract: core/api.lua saveGetBackup(key, n) - the n-th older generation
+    -- (1 = right before the current save), or nil. The engine calls it only when the
+    -- current save cannot be parsed. UNVERIFIED in-game (same io.open read as saveGet,
+    -- which itself has not read an existing file in-game yet).
+    function a.saveGetBackup(key, n)
+        if type(n) ~= "number" or n < 1 or n > backups or n % 1 ~= 0 then return nil end
+        local p = path(key)
+        if p == nil then return nil end -- no save loaded
+        return readFile(p .. ".bak" .. n)
+    end
+
     -- Writes a temp file, rotates .bak1 .. .bakN (newest first), then swaps.
     -- os.rename cannot overwrite on Windows, hence the remove/rename dance.
     -- Recovering an older generation is manual: rename .bakK back to the main file.
