@@ -18,7 +18,10 @@ local function load(opts)
         ExecuteInGameThread = rawget(_G, "ExecuteInGameThread"), ForEachUObject = rawget(_G, "ForEachUObject"),
         PAWHOME_MOD_DIR = rawget(_G, "PAWHOME_MOD_DIR"), PAWHOME_EXE = rawget(_G, "PAWHOME_EXE"),
         FindFirstOf = rawget(_G, "FindFirstOf"), print = print, time = os.time,
+        RegisterHook = rawget(_G, "RegisterHook"), ExecuteWithDelay = rawget(_G, "ExecuteWithDelay"),
+        StaticFindObject = rawget(_G, "StaticFindObject"), LoadAsset = rawget(_G, "LoadAsset"),
     }
+    env.hooks, env.delayed = {}, {}
     env.dir = opts.dir or (os.tmpname() .. "_")
     _G.PAWHOME_MOD_DIR = env.dir
     _G.PAWHOME_EXE = env.dir .. "fake.exe"
@@ -32,9 +35,19 @@ local function load(opts)
     if not opts.noDebug then -- debug mode is opt-in through this file
         local f = assert(io.open(env.dir .. "pawhome_debug.txt", "w")); f:close()
     end
+    if opts.autoExplore then
+        local f = assert(io.open(env.dir .. "pawhome_autoexplore.txt", "w")); f:close()
+    end
+    if opts.spawnClass then
+        local f = assert(io.open(env.dir .. "pawhome_spawn_class.txt", "w")); f:write(opts.spawnClass, "\n"); f:close()
+    end
+    _G.RegisterHook = function(path, fn) env.hooks[path] = fn end
+    _G.ExecuteWithDelay = function(ms, fn) env.delayed[#env.delayed + 1] = { ms = ms, fn = fn } end
+    _G.StaticFindObject = opts.staticFindObject or function() return nil end
+    _G.LoadAsset = function() end
     _G.FindFirstOf = opts.findFirstOf or function() return nil end
     _G.LoopAsync = function(ms, fn) env.loops[#env.loops + 1] = { ms = ms, fn = fn } end
-    _G.Key = { F7 = "F7", F8 = "F8", F9 = "F9", F10 = "F10" }
+    _G.Key = { F6 = "F6", F7 = "F7", F8 = "F8", F9 = "F9", F10 = "F10" }
     _G.ModifierKey = { SHIFT = "SHIFT" }
     _G.RegisterKeyBind = function(key, mods, fn) env.keys[key .. "+" .. tostring(mods[1])] = fn end
     _G.ExecuteInGameThread = function(fn) fn() end
@@ -57,7 +70,8 @@ local function load(opts)
             if k == "print" then _G.print = v elseif k == "time" then os.time = v else _G[k] = v end
         end
         for _, f in ipairs({ "pawhome_debug.pawhome.save.sav", "pawhome_discovery.txt", "pawhome_dump.txt",
-                             "pawhome_disabled.txt", "pawhome_debug.txt", "pawhome_verified_builds.txt", "fake.exe" }) do
+                             "pawhome_disabled.txt", "pawhome_debug.txt", "pawhome_verified_builds.txt", "fake.exe",
+                             "pawhome_autoexplore.txt", "pawhome_spawn_class.txt" }) do
             os.remove(env.dir .. f); os.remove(env.dir .. f .. ".tmp")
             for i = 1, 3 do os.remove(env.dir .. f .. ".bak" .. i) end
         end
@@ -79,13 +93,68 @@ local function test(name, fn)
     end)
 end
 
-test("ue4ss main: registers one loop and four Shift debug keys", function()
+test("ue4ss main: registers one loop and five Shift debug keys", function()
     local env = load()
     T.eq(#env.loops, 1)
     T.eq(env.loops[1].ms, 1000)
-    T.truthy(env.keys["F7+SHIFT"] and env.keys["F8+SHIFT"] and env.keys["F9+SHIFT"] and env.keys["F10+SHIFT"], "debug keys")
+    for _, k in ipairs({ "F6", "F7", "F8", "F9", "F10" }) do T.truthy(env.keys[k .. "+SHIFT"], k) end
     T.truthy(env.printedText():find("[PawHome] loaded", 1, true))
+    T.eq(next(env.hooks), nil, "no auto-explore hook without pawhome_autoexplore.txt")
     env.restore()
+end)
+
+-- A fake loaded level: one stray-like cat actor plus its component, as discovery sees them.
+local function fakeLevel()
+    local function obj(name) return { GetFullName = function() return name end, IsValid = function() return true end,
+        GetClass = function() return { GetFullName = function() return "BlueprintGeneratedClass /Game/X.BP_Stray_C" end,
+            ForEachProperty = function() end, ForEachFunction = function() end, GetSuperStruct = function() return nil end } end } end
+    return {
+        obj("BP_StrayCat_C /Game/Map/City.City:PersistentLevel.BP_StrayCat_C_7"),
+        obj("SkeletalMeshComponent /Game/Map/City.City:PersistentLevel.BP_StrayCat_C_7.SkeletalMesh"),
+    }
+end
+
+test("ue4ss main: auto-explore runs discovery and animal dumps after a map load, at most 3 times", function()
+    local env = load({ autoExplore = true })
+    local level = fakeLevel()
+    _G.ForEachUObject = function(fn) for _, o in ipairs(level) do fn(o) end end
+    local hook = env.hooks["/Script/Engine.PlayerController:ClientRestart"]
+    T.truthy(hook, "hook registered")
+    T.truthy(env.printedText():find("auto-explore armed", 1, true))
+    for _ = 1, 5 do hook() end
+    T.eq(#env.delayed, 3, "capped at 3 runs")
+    T.eq(env.delayed[1].ms, 60000)
+    env.delayed[1].fn()
+    local text = env.printedText()
+    T.truthy(text:find("discovery (auto #1)", 1, true), "discovery ran")
+    T.truthy(text:find("dump animal BP_StrayCat_C", 1, true), "the level actor was dumped, not its component")
+    local f = io.open(env.dir .. "pawhome_dump.txt", "rb")
+    T.truthy(f and f:read("a"):find("BP_StrayCat_C_7", 1, true), "dump file has the actor")
+    if f then f:close() end
+end)
+
+test("ue4ss main: Shift+F6 spawns the class from pawhome_spawn_class.txt, then removes it", function()
+    local asked
+    local cls = { IsValid = function() return true end }
+    local env = load({ spawnClass = "/Game/X/BP_StrayCat.BP_StrayCat_C",
+        staticFindObject = function(path) asked = path; return cls end })
+    local actor = { alive = true }
+    function actor:IsValid() return self.alive end
+    function actor:GetFullName() return "BP_StrayCat_C /Game/Map/City.City:PersistentLevel.BP_StrayCat_C_1" end
+    function actor:K2_GetActorLocation() return { X = 0, Y = 0, Z = 0 } end
+    function actor:K2_DestroyActor() self.alive = false end
+    local pawn = { IsValid = function() return true end, K2_GetActorLocation = function() return { X = 1, Y = 2, Z = 3 } end }
+    local world = { IsValid = function() return true end, SpawnActor = function() return actor end }
+    local pc = { IsValid = function() return true end, Pawn = pawn, GetWorld = function() return world end }
+    _G.FindFirstOf = function(name) return name == "PlayerController" and pc or nil end
+
+    env.keys["F6+SHIFT"]()
+    T.eq(asked, "/Game/X/BP_StrayCat.BP_StrayCat_C", "class path read from the file")
+    T.truthy(env.printedText():find("spawn /Game/X/BP_StrayCat.BP_StrayCat_C: BP_StrayCat_C", 1, true))
+    T.eq(env.loops[#env.loops].ms, 5000, "position sampling started")
+    env.keys["F6+SHIFT"]()
+    T.falsy(actor.alive, "second press removes it")
+    T.truthy(env.printedText():find("removed BP_StrayCat_C", 1, true))
 end)
 
 test("ue4ss main: unknown build -> banner says SAFE MODE, caps off", function()

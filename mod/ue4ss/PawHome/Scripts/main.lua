@@ -7,7 +7,9 @@
 -- UE4SS globals used here (print, LoopAsync, ExecuteInGameThread, RegisterKeyBind,
 -- Key, ModifierKey) were VERIFIED to load on inZOI v0.10.0 via the ZoiPets mod;
 -- the Shift+F-key bindings themselves have NOT been pressed in-game yet, and
--- FindFirstOf (Shift+F7) has never been called in inZOI.
+-- FindFirstOf (Shift+F7), the spawn probe (Shift+F6: StaticFindObject, LoadAsset,
+-- World:SpawnActor, K2_GetActorLocation, K2_DestroyActor) and our ClientRestart hook
+-- callback (auto-explore) have never run in inZOI.
 
 local MOD_VERSION = "0.1.0-dev"
 -- Debug mode is OFF unless pawhome_debug.txt exists in the mod folder (same mechanism
@@ -23,8 +25,17 @@ local DEBUG_FUNDS = 1000
 local HOUSEHOLD, ZOI = 1, 1
 -- Caps to enable on a verified build. All off: nothing has in-game evidence yet.
 local REQUESTED_CAPS = {}
--- Classes Shift+F7 dumps (first instance found). Only the lobby cat is known so far.
-local DUMP_CLASSES = { "BP_Pet_Customize_01_C" }
+-- Classes Shift+F7 dumps (first instance found). Only the lobby cat is known so far;
+-- B1TimeManager is the game-clock candidate from the v0.10.0 main-menu scan (V3).
+local DUMP_CLASSES = { "BP_Pet_Customize_01_C", "B1TimeManager" }
+-- M1-3b: class Shift+F6 spawns. Override with the first line of pawhome_spawn_class.txt
+-- (e.g. a stray-cat class found by M1-3a) without editing code.
+local DEFAULT_SPAWN_CLASS = "/Game/Characters/Pets/Operator/OP001/Mesh/BP_Pet_Customize_01.BP_Pet_Customize_01_C"
+-- M1-3a: with pawhome_autoexplore.txt present, run discovery + dumps this long after
+-- each PlayerController restart (map load), at most AUTO_EXPLORE_MAX times per session.
+local AUTO_EXPLORE_DELAY_MS = 60000
+local AUTO_EXPLORE_MAX = 3
+local MAX_ACTOR_DUMPS = 3
 
 local scriptsDir = debug.getinfo(1, "S").source:match("^@(.*[\\/])") or "./"
 package.path = scriptsDir .. "?.lua;" .. package.path
@@ -104,29 +115,95 @@ if DEBUG then
         end
     end
 
+    local dumpReport = modDir .. "pawhome_dump.txt"
+
+    local function dumpClasses(label)
+        for _, cls in ipairs(DUMP_CLASSES) do
+            local obj = FindFirstOf(cls)
+            local valid = obj ~= nil and obj:IsValid()
+            if valid then
+                local _, n = Ue4ss.dumpObject(obj, dumpReport, label .. " " .. cls)
+                log(("dump %s: %s lines -> %s"):format(cls, tostring(n), dumpReport))
+            else
+                log("dump " .. cls .. ": no instance loaded")
+            end
+        end
+    end
+
+    -- Discovery scan, then dump every distinct animal actor class it found in the level
+    -- (strays, if the city has any) plus DUMP_CLASSES. Runs on the game thread.
+    local function explore(label)
+        local report = modDir .. "pawhome_discovery.txt"
+        local _, scanned, animals = Ue4ss.discover(report, label)
+        log(("discovery (%s): %s objects -> %s"):format(label, tostring(scanned), report))
+        for i, a in ipairs(animals or {}) do
+            if i > MAX_ACTOR_DUMPS then break end
+            local _, n = Ue4ss.dumpObject(a.obj, dumpReport, label .. " animal " .. a.class)
+            log(("dump animal %s: %s lines"):format(a.class, tostring(n)))
+        end
+        dumpClasses(label)
+    end
+
     -- Shift+F7: dump properties / functions of the first instance of DUMP_CLASSES
     RegisterKeyBind(Key.F7, { ModifierKey.SHIFT }, function()
-        ExecuteInGameThread(safe(function()
-            local report = modDir .. "pawhome_dump.txt"
-            for _, cls in ipairs(DUMP_CLASSES) do
-                local obj = FindFirstOf(cls)
-                local valid = obj ~= nil and obj:IsValid()
-                if valid then
-                    local _, n = Ue4ss.dumpObject(obj, report, "Shift+F7 " .. cls)
-                    log(("dump %s: %s lines -> %s"):format(cls, tostring(n), report))
-                else
-                    log("dump " .. cls .. ": no instance loaded")
-                end
-            end
-        end))
+        ExecuteInGameThread(safe(function() dumpClasses("Shift+F7") end))
     end)
 
-    -- Shift+F8: discovery report (read-only scan of loaded objects)
+    -- Shift+F8: discovery scan + animal dumps (read-only)
     RegisterKeyBind(Key.F8, { ModifierKey.SHIFT }, function()
+        ExecuteInGameThread(safe(function() explore("manual (Shift+F8)") end))
+    end)
+
+    -- M1-3a auto-explore: opt-in with pawhome_autoexplore.txt. ClientRestart fires when a
+    -- map is (re)loaded; registering a hook on it is VERIFIED to work in inZOI (the bundled
+    -- ConsoleEnablerMod does it, see UE4SS.log), but our callback has never fired yet.
+    if exists(modDir .. "pawhome_autoexplore.txt") then
+        local runs = 0
+        local ok, err = pcall(RegisterHook, "/Script/Engine.PlayerController:ClientRestart", function()
+            if runs >= AUTO_EXPLORE_MAX then return end
+            runs = runs + 1
+            local label = ("auto #%d"):format(runs)
+            log(("auto-explore %s scheduled in %d s"):format(label, AUTO_EXPLORE_DELAY_MS // 1000))
+            ExecuteWithDelay(AUTO_EXPLORE_DELAY_MS, function()
+                ExecuteInGameThread(safe(function() explore(label) end))
+            end)
+        end)
+        log(ok and "auto-explore armed (ClientRestart hook)" or ("auto-explore unavailable: " .. tostring(err)))
+    end
+
+    -- Shift+F6: M1-3b spawn experiment. First press spawns the class next to the player
+    -- and samples its position for 60 s; second press removes it.
+    local Probe = require("pawhome.adapters.ue4ss_probe")
+    local okHelpers, UEHelpers = pcall(require, "UEHelpers")
+    local function playerController()
+        if okHelpers and UEHelpers then return UEHelpers.GetPlayerController() end
+        return FindFirstOf("PlayerController")
+    end
+    local probe = Probe.new({
+        StaticFindObject = StaticFindObject,
+        LoadAsset = LoadAsset,
+        getPlayerController = playerController,
+        getWorld = function()
+            if okHelpers and UEHelpers then return UEHelpers.GetWorld() end
+            return playerController():GetWorld()
+        end,
+        LoopAsync = LoopAsync,
+    }, log)
+    local function spawnClass()
+        local f = io.open(modDir .. "pawhome_spawn_class.txt", "r")
+        if not f then return DEFAULT_SPAWN_CLASS end
+        local line = f:read("l")
+        f:close()
+        line = line and line:match("^%s*(.-)%s*$")
+        return (line and line ~= "") and line or DEFAULT_SPAWN_CLASS
+    end
+    RegisterKeyBind(Key.F6, { ModifierKey.SHIFT }, function()
         ExecuteInGameThread(safe(function()
-            local report = modDir .. "pawhome_discovery.txt"
-            local _, scanned = Ue4ss.discover(report, "manual (Shift+F8)")
-            log(("discovery: %s objects -> %s"):format(tostring(scanned), report))
+            if probe.actor then
+                probe:despawn()
+            elseif probe:spawn(spawnClass()) then
+                probe:sample(60, 5)
+            end
         end))
     end)
 
