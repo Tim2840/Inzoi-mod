@@ -78,3 +78,19 @@
 2. PO 從 Epic 安裝 ModKit（大小待查）。
 3. 用 `/mcp` 連上 `inzoi-game`、`inzoi-modkit`，照 `docs/phase0-probe.md` 做 P1 → P7 → P8（先確認做得到的底線：計時、存資料、UI 按鈕），再做 P2–P6、P9（真寵物的可能性）。
 4. 結果寫 `docs/phase0-results.md`，決定方案 A／B／C。
+
+## 8. 單頁細節（第 0 階段第 1 步，持續補充）
+
+### `FB2SpawnerManager`（[頁面](https://mod-docs.playinzoi.com/docs/modkit-docs/wiki/luaapi/b2/systems/fb2spawnermanager)，2026-10-20 讀取）
+
+- 載入方式：`require('Systems.B2SpawnerManager')`；繼承 `FB2ManagerBase`。
+- 屬性：`CharacterSpawnerGroups`、`GatherableObjectSpawnedTime`、`OldSpawnerMap`、`SpawnersByType`。
+- 17 個函式，**會生成東西的只有** `SpawnGatherableObject`、`SpawnGatherableObjectByTerritoryId`（採集物）與 `SpawnCalendarEventObject`（行事曆活動物件）。
+  角色只有讀取用的 `GetCharacterSpawnerGroup`，**沒有生成角色的函式**；頁面**沒有提到動物**。
+- 10 個覆寫鉤子（例如 `Override_SpawnGatherableObject`、`Override_OnDayChanged`、`Override_RegisterSpawner`）。
+- 結論：這個管理器**不是**「生成一隻貓」的現成入口；P4 仍要在遊戲裡查其他路徑（`FB2EntityManager`、`FB2PopulationSystem`、互動物件、資料模組）。
+
+### ModKit 需求（Epic 商店頁，經搜尋摘要轉述，**未直接讀取**）
+
+- 最低：RAM 12 GB、儲存空間 40 GB、RTX 2060 / RX 5600 XT（6 GB VRAM）；建議：RAM 16 GB、60 GB、RTX 3070 / RX 6800 XT。
+- [Epic 商店頁](https://store.epicgames.com/en-US/p/inzoi-modkit)
