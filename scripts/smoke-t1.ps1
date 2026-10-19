@@ -4,7 +4,13 @@
 #
 # Checks: V1 (UE4SS injected + PawHome loaded), V6 (save file written after start) and,
 # when a PawHome save already existed before the run, read-back ("started (loaded)")
-# and backup rotation (.bak1 now holds the previous save, byte for byte).
+# and backup rotation (the previous save survives, byte for byte, as one of .bak1-.bak3).
+# Why not just .bak1, and why the check runs early: the mod saves more than once per run
+# (on start, again on the first loop tick a second later, and on every game-hour change
+# = every 60 real seconds with the debug clock). Each save rotates once, so the previous
+# save moves down one generation per save and falls out after 3. The script therefore
+# looks for it as soon as the first new save appears (at most a few seconds in, i.e. 2-3
+# saves), not at the end of the run.
 #
 # Consent: T1 needs the PO's one-time consent for this game build. The script never
 # clicks "Continue" or loads a save, but it cannot prove nobody else did, so it never
@@ -58,8 +64,18 @@ $saveBefore = if ($hadSave) { (Get-Item $savePath).LastWriteTime } else { $null 
 $started = Get-Date
 Start-Process 'steam://rungameid/2456740'
 
+function Find-PreviousGeneration {
+    # which .bakN (1-3) holds the save that existed before the run, or $null
+    foreach ($n in 1..3) {
+        $bak = "$savePath.bak$n"
+        if ((Test-Path $bak) -and ((Get-FileHash $bak).Hash -eq $hashBefore)) { return $n }
+    }
+    return $null
+}
+
 $deadline = $started.AddSeconds($TimeoutSec)
 $sawProcess = $false; $loaded = $false; $saved = $false; $crashed = $false
+$rotatedGen = $null; $rotationChecked = $false
 while ((Get-Date) -lt $deadline) {
     $running = [bool](Get-Process -Name $processName -ErrorAction SilentlyContinue)
     if ($running) { $sawProcess = $true } elseif ($sawProcess) { $crashed = $true; break }
@@ -70,8 +86,12 @@ while ((Get-Date) -lt $deadline) {
         $t = (Get-Item $savePath).LastWriteTime
         $saved = ($t -gt $started) -and ($null -eq $saveBefore -or $t -gt $saveBefore)
     }
+    if ($saved -and $hadSave -and -not $rotationChecked) {
+        $rotatedGen = Find-PreviousGeneration
+        $rotationChecked = $true
+    }
     if ($loaded -and $saved) { break }
-    Start-Sleep -Seconds 5
+    Start-Sleep -Seconds 2
 }
 # let it idle a little so late errors reach the log
 if ($loaded -and $saved -and -not $crashed) { Start-Sleep -Seconds 20 }
@@ -140,8 +160,8 @@ $v6 = $saved
 $readBack = $null; $rotated = $null
 if ($hadSave) {
     $readBack = [bool]($pawLines | Where-Object { $_ -match 'started \(loaded\)' })
-    $bak1 = "$savePath.bak1"
-    $rotated = (Test-Path $bak1) -and ((Get-FileHash $bak1).Hash -eq $hashBefore)
+    # checked as soon as the first new save appeared (see the header)
+    $rotated = $null -ne $rotatedGen
 }
 $pass = $v1 -and $v6 -and $aliveAtEnd -and -not $errLines -and ($readBack -ne $false) -and ($rotated -ne $false)
 function Mark($ok) { if ($null -eq $ok) { 'n/a (no save before this run)' } elseif ($ok) { 'PASS' } else { 'FAIL' } }
@@ -162,12 +182,12 @@ $md = @"
 | V1 UE4SS injected and PawHome loaded | $(Mark $v1) |
 | V6 save file written after start | $(Mark $v6) |
 | Read back an existing save (``started (loaded)``) | $(Mark $readBack) |
-| Backup rotation (``.bak1`` = previous save, same hash) | $(Mark $rotated) |
+| Backup rotation (previous save kept as ``.bak1``–``.bak3``, same hash) | $(Mark $rotated) |
 | Game still running at the end of the window (no crash) | $(Mark $aliveAtEnd) |
 | No ``[PawHome]`` error lines | $(Mark (-not $errLines)) |
 
 - Build: ``$build``, fingerprint ``$fingerprint``
-- Save before the run: $(if ($hadSave) { 'yes' } else { 'no' })
+- Save before the run: $(if ($hadSave) { 'yes' } else { 'no' })$(if ($rotatedGen) { " (found as .bak$rotatedGen right after the first new save)" })
 - Close: $closeHow
 - Script: ``scripts/smoke-t1.ps1`` (timeout ${TimeoutSec}s, main menu only, no save loaded by the script)
 
