@@ -133,6 +133,7 @@ if DEBUG then
     -- Discovery scan, then dump every distinct animal actor class it found in the level
     -- (strays, if the city has any) plus DUMP_CLASSES. Runs on the game thread.
     local function explore(label)
+        local started = os.clock()
         local report = modDir .. "pawhome_discovery.txt"
         local _, scanned, animals = Ue4ss.discover(report, label)
         log(("discovery (%s): %s objects -> %s"):format(label, tostring(scanned), report))
@@ -142,6 +143,8 @@ if DEBUG then
             log(("dump animal %s: %s lines"):format(a.class, tostring(n)))
         end
         dumpClasses(label)
+        -- the game thread is blocked for this long (first real measurement of the full scan)
+        log(("explore (%s) took %.1f s on the game thread"):format(label, os.clock() - started))
     end
 
     -- Shift+F7: dump properties / functions of the first instance of DUMP_CLASSES
@@ -157,15 +160,29 @@ if DEBUG then
     -- M1-3a auto-explore: opt-in with pawhome_autoexplore.txt. ClientRestart fires when a
     -- map is (re)loaded; registering a hook on it is VERIFIED to work in inZOI (the bundled
     -- ConsoleEnablerMod does it, see UE4SS.log), but our callback has never fired yet.
+    -- ClientRestart can fire several times for one load (main menu, loading screen, world),
+    -- so: (1) only one scan may be scheduled at a time (`pending`), later triggers are
+    -- ignored and logged; (2) the run counter only advances when a scan actually executes.
     if exists(modDir .. "pawhome_autoexplore.txt") then
-        local runs = 0
+        local runs, pending, triggers = 0, false, 0
         local ok, err = pcall(RegisterHook, "/Script/Engine.PlayerController:ClientRestart", function()
-            if runs >= AUTO_EXPLORE_MAX then return end
-            runs = runs + 1
-            local label = ("auto #%d"):format(runs)
-            log(("auto-explore %s scheduled in %d s"):format(label, AUTO_EXPLORE_DELAY_MS // 1000))
+            triggers = triggers + 1
+            if runs >= AUTO_EXPLORE_MAX then
+                log(("auto-explore trigger #%d ignored (limit of %d scans reached)"):format(triggers, AUTO_EXPLORE_MAX))
+                return
+            end
+            if pending then
+                log(("auto-explore trigger #%d ignored (a scan is already scheduled)"):format(triggers))
+                return
+            end
+            pending = true
+            log(("auto-explore trigger #%d: scan scheduled in %d s"):format(triggers, AUTO_EXPLORE_DELAY_MS // 1000))
             ExecuteWithDelay(AUTO_EXPLORE_DELAY_MS, function()
-                ExecuteInGameThread(safe(function() explore(label) end))
+                ExecuteInGameThread(safe(function()
+                    pending = false
+                    runs = runs + 1
+                    explore(("auto #%d"):format(runs))
+                end))
             end)
         end)
         log(ok and "auto-explore armed (ClientRestart hook)" or ("auto-explore unavailable: " .. tostring(err)))

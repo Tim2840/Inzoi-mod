@@ -139,11 +139,19 @@ function Probe:sample(totalSec, intervalSec, onDone)
                 samples, distance, distance > 100 and "MOVED" or "STATIONARY"))
             self.sampling = false
             if onDone then onDone(distance, samples) end
+            -- The actor is NOT removed automatically (b4 needs it to stay for the 5-minute
+            -- stability check). If the player saves or leaves the world with it alive, it
+            -- might be serialized into the game's own save, so say so loudly.
+            if valid(actor) then Probe.warnStillAlive(self) end
             return true
         end
         return false
     end)
     return true
+end
+
+function Probe.warnStillAlive(self)
+    self.log("WARNING: actor still alive - press Shift+F6 to remove it BEFORE saving or leaving the world")
 end
 
 -- b4

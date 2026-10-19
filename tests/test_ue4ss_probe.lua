@@ -108,6 +108,30 @@ T.test("probe: b3 samples positions and classifies movement", function()
     T.truthy(has(lines, "-> MOVED"))
 end)
 
+T.test("probe: after sampling it warns that the actor is still in the world, until removed", function()
+    local ue = fakeUe()
+    local lines, log = collect()
+    local p = Probe.new(ue, log)
+    p:spawn("/Game/X.BP_Cat_C")
+    p:sample(10, 5)
+    local fn = ue.loops[1].fn
+    fn(); fn(); fn()
+    T.truthy(has(lines, "WARNING: actor still alive - press Shift+F6 to remove it BEFORE saving or leaving the world"))
+    T.truthy(p.actor, "not removed automatically (b4 needs the 5-minute stability window)")
+
+    -- the same run when the actor is already gone: no warning
+    local lines2, log2 = collect()
+    local ue2 = fakeUe()
+    local p2 = Probe.new(ue2, log2)
+    local a2 = p2:spawn("/Game/X.BP_Cat_C")
+    p2:sample(5, 5)
+    local fn2 = ue2.loops[1].fn
+    fn2()
+    a2.alive = false
+    fn2()
+    T.falsy(has(lines2, "WARNING"), "no warning when there is nothing left to remove")
+end)
+
 T.test("probe: b3 reports STATIONARY and stops when the actor vanishes", function()
     local ue = fakeUe()
     local lines, log = collect()

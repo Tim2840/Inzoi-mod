@@ -114,23 +114,54 @@ local function fakeLevel()
     }
 end
 
-test("ue4ss main: auto-explore runs discovery and animal dumps after a map load, at most 3 times", function()
+test("ue4ss main: auto-explore runs discovery and animal dumps after a map load", function()
     local env = load({ autoExplore = true })
     local level = fakeLevel()
     _G.ForEachUObject = function(fn) for _, o in ipairs(level) do fn(o) end end
     local hook = env.hooks["/Script/Engine.PlayerController:ClientRestart"]
     T.truthy(hook, "hook registered")
     T.truthy(env.printedText():find("auto-explore armed", 1, true))
-    for _ = 1, 5 do hook() end
-    T.eq(#env.delayed, 3, "capped at 3 runs")
+    hook()
+    T.eq(#env.delayed, 1)
     T.eq(env.delayed[1].ms, 60000)
     env.delayed[1].fn()
     local text = env.printedText()
     T.truthy(text:find("discovery (auto #1)", 1, true), "discovery ran")
     T.truthy(text:find("dump animal BP_StrayCat_C", 1, true), "the level actor was dumped, not its component")
+    T.truthy(text:find("explore (auto #1) took", 1, true), "scan duration is logged")
     local f = io.open(env.dir .. "pawhome_dump.txt", "rb")
     T.truthy(f and f:read("a"):find("BP_StrayCat_C_7", 1, true), "dump file has the actor")
     if f then f:close() end
+end)
+
+test("ue4ss main: a burst of ClientRestart triggers schedules ONE scan; the run budget counts executed scans", function()
+    local env = load({ autoExplore = true })
+    _G.ForEachUObject = function() end
+    local hook = env.hooks["/Script/Engine.PlayerController:ClientRestart"]
+
+    for _ = 1, 5 do hook() end -- main menu, loading screen, world... all within the delay
+    T.eq(#env.delayed, 1, "only one scan scheduled")
+    T.truthy(env.printedText():find("trigger #2 ignored (a scan is already scheduled)", 1, true))
+
+    env.delayed[1].fn() -- the scan runs: pending clears, run 1 is used
+    T.truthy(env.printedText():find("discovery (auto #1)", 1, true))
+    hook(); env.delayed[2].fn() -- a later map load: run 2
+    hook(); env.delayed[3].fn() -- run 3
+    T.truthy(env.printedText():find("discovery (auto #3)", 1, true))
+    local scheduled = #env.delayed
+    hook() -- fourth map load: budget used up
+    T.eq(#env.delayed, scheduled, "no fourth scan")
+    T.truthy(env.printedText():find("limit of 3 scans reached", 1, true))
+end)
+
+test("ue4ss main: triggers ignored while a scan is pending do not use up the budget", function()
+    local env = load({ autoExplore = true })
+    _G.ForEachUObject = function() end
+    local hook = env.hooks["/Script/Engine.PlayerController:ClientRestart"]
+    for _ = 1, 10 do hook() end -- ten triggers before the first scan can run
+    env.delayed[1].fn()
+    for run = 2, 3 do hook(); env.delayed[run].fn() end
+    T.truthy(env.printedText():find("discovery (auto #3)", 1, true), "all three scans still available")
 end)
 
 test("ue4ss main: Shift+F6 spawns the class from pawhome_spawn_class.txt, then removes it", function()
