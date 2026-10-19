@@ -108,5 +108,6 @@ return {
         animal_control = "Animal control takes neglected pets",
         decay = "Need decay speed",
         lifescale = "Pet lifespan",
+        max_pets_setting = "Max pets per household",
     },
 }

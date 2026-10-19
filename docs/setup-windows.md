@@ -139,7 +139,10 @@ ModKit 是官方的模組編輯器，**免費**，是用 Epic 發的。
 
 ### 6-1 確認 inZOI 的兩條「連線」都註冊好了
 
-在 PowerShell 貼上：
+兩條連線登記在 repo 的 `.mcp.json`（專案設定，2026-10-20 PO 決定，見 ADR 0006），**不是**你的全域設定。
+第一次在 `C:\Dev\Inzoi-mod` 執行 `claude` 時，會問你要不要信任這兩個伺服器，請按同意。
+
+在 PowerShell（位置在 `C:\Dev\Inzoi-mod`）貼上：
 
 ```powershell
 claude mcp list
@@ -200,7 +203,7 @@ py tools\preview_server.py
 | 「`claude` 不是可辨識的 Cmdlet」 | 新裝的程式要**重開 PowerShell** 才找得到。還是不行就貼 `$env:Path += ";$HOME\.local\bin"` 再試 |
 | 「`git` 不是可辨識的…」 | 同上，重開 PowerShell。再不行就重貼 2-2 |
 | 「`py` 不是可辨識的…」 | Python 剛裝好，重開 PowerShell；再不行重貼 2-2 |
-| `claude mcp list` 的 `inzoi-game` 一直連不上，遊戲明明開著 | ① 確認**已經進到存檔裡**，不是停在主選單 ② 11212 埠可能被別的程式占用：到 Steam → inZOI → **右鍵 → 內容 → 啟動選項**，貼上 `-climcpport=11300`，重開遊戲，然後在 PowerShell 貼 `claude mcp remove inzoi-game` 再貼 `claude mcp add --transport http --scope user inzoi-game http://localhost:11300/mcp` ③ 還是不行，把 `claude mcp list` 的整段輸出貼給我 |
+| `claude mcp list` 的 `inzoi-game` 一直連不上，遊戲明明開著 | ① 確認**已經進到存檔裡**，不是停在主選單 ② 11212 埠可能被別的程式占用：到 Steam → inZOI → **右鍵 → 內容 → 啟動選項**，貼上 `-climcpport=11300`，重開遊戲，然後把 repo 的 `.mcp.json` 裡 `inzoi-game` 的網址改成 `http://localhost:11300/mcp`（或請 Claude 幫你改） ③ 還是不行，把 `claude mcp list` 的整段輸出貼給我 |
 | Epic 庫裡找不到 ModKit | 確認登入的是領取它的那個 Epic 帳號；到商店頁面看是不是顯示「已在庫中」 |
 | ModKit 第一次開啟卡在某個百分比很久 | 正常，第一次要編譯著色器，可能要 10–30 分鐘，不要強制關閉 |
 | 想從頭重來 | 直接重貼 2-2，腳本重複執行很安全，已經裝好的會自動跳過 |

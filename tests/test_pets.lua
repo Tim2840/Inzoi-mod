@@ -718,4 +718,21 @@ T.test("simulation: 30 days of total neglect gets the cat taken to the shelter",
     end
 end)
 
+
+T.test("settings: one pet per household by default; the settings page allows at most 4", function()
+    local Mock = require("pawhome.adapters.mock")
+    local App = require("pawhome.app")
+    local mock = Mock.new({ money = 100000 })
+    local app = assert(App.new(mock, { seed = 7 }))
+    app:tick()
+    T.eq(app.ctx.cfg.maxPetsPerHousehold, 1, "shipped default (PO decision 2026-10-20)")
+    local offers = app:offers(1)
+    T.truthy(app:adoptOffer(1, 101, offers[1].id, "First").ok)
+    local second = app:adoptOffer(1, 101, app:offers(1)[1].id, "Second")
+    T.eq(second.reason, "max_pets", "a second pet is refused by default")
+    T.truthy(app:setSetting("maxPetsPerHousehold", 8))
+    T.eq(app.ctx.cfg.maxPetsPerHousehold, 4, "clamped to the maximum of 4")
+    T.truthy(app:adoptOffer(1, 101, app:offers(1)[1].id, "Second").ok, "allowed once raised")
+end)
+
 return true

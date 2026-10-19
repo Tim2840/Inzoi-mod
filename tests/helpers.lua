@@ -3,12 +3,15 @@ local App = require("pawhome.app")
 
 local H = {}
 
--- opts: seed, money, strays, caps, store, locale
+-- opts: seed, money, strays, caps, store, locale, maxPets
+-- maxPets defaults to 4 here because many tests compare several pets in one household;
+-- the shipped default (1) is checked on its own in test_pets.lua.
 function H.new(opts)
     opts = opts or {}
     local mock = Mock.new(opts)
     local app = assert(App.new(mock, { seed = opts.seed or 4242 }))
     app:tick() -- records the start time
+    assert(app:setSetting("maxPetsPerHousehold", opts.maxPets or 4))
     return app, mock
 end
 
