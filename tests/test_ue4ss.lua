@@ -116,6 +116,38 @@ T.test("ue4ss: dumpObject walks the class chain and survives missing APIs", func
     T.truthy(text:find("prop bHidden : BoolProperty = false", 1, true), "super class walked")
 end)
 
+T.test("ue4ss: saveGetBackup returns older generations and rejects bad n", function()
+    local p = prefix()
+    local a = Ue4ss.new({ pathPrefix = p, print = silent, backups = 3 })
+    for i = 1, 4 do a.saveSet("k", "v" .. i) end
+    T.eq(a.saveGetBackup("k", 1), "v3")
+    T.eq(a.saveGetBackup("k", 3), "v1")
+    T.eq(a.saveGetBackup("k", 4), nil, "beyond the kept generations")
+    T.eq(a.saveGetBackup("k", 0), nil)
+    T.eq(a.saveGetBackup("k", 1.5), nil)
+    cleanup(p)
+end)
+
+T.test("ue4ss: a corrupt current save is recovered from a backup through the engine", function()
+    local p = prefix()
+    local minutes = 480
+    local function adapter()
+        return Ue4ss.new({ pathPrefix = p, print = silent, debugFunds = 1000, clock = function() return minutes end })
+    end
+    local app = assert(App.new(adapter(), { seed = 7 }))
+    app:tick()
+    local offers = app:offers(1)
+    T.truthy(app:adoptOffer(1, 1, offers[1].id, "Mochi").ok)
+    minutes = minutes + 60
+    app:tick() -- one more save so .bak1 holds a state that already has Mochi
+    local f = assert(io.open(p .. "debug.pawhome.save.sav", "wb")); f:write("{ broken"); f:close()
+
+    local app2 = assert(App.new(adapter(), { seed = 7 }))
+    T.eq(#app2.ctx.state.pets, 1, "pet restored from .bak1")
+    T.eq(app2.ctx.state.pets[1].name, "Mochi")
+    cleanup(p)
+end)
+
 T.test("ue4ss: falls back to .bak1 when the main file is missing", function()
     local p = prefix()
     local a = Ue4ss.new({ pathPrefix = p, print = silent })

@@ -110,6 +110,17 @@ function Ue4ss.new(opts)
         return data
     end
 
+    -- Contract: core/api.lua saveGetBackup(key, n) - the n-th older generation
+    -- (1 = right before the current save), or nil. The engine calls it only when the
+    -- current save cannot be parsed. UNVERIFIED in-game (same io.open read as saveGet,
+    -- which itself has not read an existing file in-game yet).
+    function a.saveGetBackup(key, n)
+        if type(n) ~= "number" or n < 1 or n > backups or n % 1 ~= 0 then return nil end
+        local p = path(key)
+        if p == nil then return nil end -- no save loaded
+        return readFile(p .. ".bak" .. n)
+    end
+
     -- Writes a temp file, rotates .bak1 .. .bakN (newest first), then swaps.
     -- os.rename cannot overwrite on Windows, hence the remove/rename dance.
     -- Recovering an older generation is manual: rename .bakK back to the main file.
@@ -285,10 +296,21 @@ local function matchGroup(fullName)
     return nil
 end
 
+-- An actor placed directly in a level: "<Class> /Game/Map/X.X:PersistentLevel.<Actor>"
+-- with nothing after the actor name (components look like "...PersistentLevel.A.B").
+local function levelActor(fullName)
+    local cls, actor = fullName:match("^(%S+) .-:PersistentLevel%.([^%.]+)$")
+    return cls, actor
+end
+
 -- forEachObject defaults to the UE4SS global ForEachUObject (injectable for tests).
+-- Returns ok, scannedCount, animalActors where animalActors is a list of
+-- { class = <class name>, name = <full name>, obj = <object> } for animal-group
+-- actors placed in a level (one entry per class), used by the auto-explore dump.
 function Ue4ss.discover(reportPath, label, forEachObject)
     forEachObject = forEachObject or ForEachUObject
     local result, seen, scanned, maxPerBucket = {}, {}, 0, 400
+    local animalActors, actorClasses = {}, {}
     local started = os.clock()
 
     forEachObject(function(obj)
@@ -304,6 +326,13 @@ function Ue4ss.discover(reportPath, label, forEachObject)
         result[group] = result[group] or { classes = {}, instances = {} }
         local bucket = classLike and result[group].classes or result[group].instances
         if #bucket < maxPerBucket then bucket[#bucket + 1] = fullName end
+        if group == "animal" and not classLike then
+            local cls = levelActor(fullName)
+            if cls and not actorClasses[cls] then
+                actorClasses[cls] = true
+                animalActors[#animalActors + 1] = { class = cls, name = fullName, obj = obj }
+            end
+        end
     end)
 
     local f = io.open(reportPath, "a")
@@ -323,7 +352,7 @@ function Ue4ss.discover(reportPath, label, forEachObject)
     end
     f:write("\n")
     f:close()
-    return true, scanned
+    return true, scanned, animalActors
 end
 
 return Ue4ss
