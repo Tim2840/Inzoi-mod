@@ -217,7 +217,7 @@ py tools\preview_server.py
 - [ ] `claude` 能開啟並已登入
 - [ ] 遊戲開著時，`claude mcp list` 的 `inzoi-game` 是 Connected
 - [ ] ModKit 開著時，`inzoi-modkit` 是 Connected
-- [ ] （選用）`py -I tests\run.py` 顯示 `67 passed, 0 failed`
+- [ ] （選用）`py -I tests\run.py` 顯示 `120 passed, 0 failed`
 
 ## 下一步
 
