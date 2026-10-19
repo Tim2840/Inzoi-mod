@@ -54,8 +54,8 @@ generations; the game closed normally.
 | `.bak1` fallback read (main file missing) | **Unverified** | same `io.open` read as `saveGet`, but the fallback branch never ran in-game |
 | `saveGetBackup(key, n)` (reads `.bakN`, 1 ≤ n ≤ 3) | **Unverified** | engine uses it only when the current save cannot be parsed (`core/storage.lua`); offline end-to-end test recovers a pet from `.bak1` |
 | `logSink` (print -> UE4SS.log) | Verified on v0.10.0 and v0.11.0 | `[PawHome]` lines in the T1 result |
-| `discover` (ForEachUObject scan) | Verified on v0.10.0 (main menu) | found `BP_Pet_Customize_01_C`, `B1TimeManager` |
-| `now` (game clock) | **Unverified** | debug clock only; candidate `B1TimeManager` needs an in-save probe (V3) |
+| `discover` (ForEachUObject scan) | Verified on v0.10.0 (main menu) and v0.11.0 (main menu and city) | v0.11.0 city: 584,408 objects in 10.4 s; found `BP_Void_Cat_C`, `Void_Cat1_C`, `B1TimeManager`, `BP_Computer01_C` (T2 result 2026-10-20) |
+| `now` (game clock) | **Unverified** | debug clock only. `B1TimeManager` exists (main menu and city, under the game instance) and has `GetCurrentDateTime` / `GetTimeScale`, but neither was called: return type and units unknown |
 | `slotId` (save slot id) | **Unverified** | constant `"debug"`; needs V3. `nil` from a slot function = no save loaded → no reads, writes refused |
 | `subscribe` | Not implemented | no game event known; the app polls `slotId()` |
 | `locale` | **Unverified** | constant `zh-TW` |
@@ -65,8 +65,8 @@ generations; the game closed normally.
 | `caps` | all `false` | nothing spawn/move/animate-related has been tested |
 | Debug keys Shift+F6/F7/F8/F9/F10 | **Unverified** | registered the same way as ZoiPets' keys, never pressed in-game |
 | Spawn probe (`StaticFindObject`, `LoadAsset`, `World:SpawnActor`, `K2_GetActorLocation`, `K2_DestroyActor`, UEHelpers) | **Unverified** | call shapes copied from mods bundled with UE4SS v3.0.1 (BPModLoaderMod, ConsoleCommandsMod); never run by us |
-| Auto-explore (`RegisterHook` on `PlayerController:ClientRestart`, `ExecuteWithDelay`) | Hook registration seen in UE4SS.log (bundled mods); **our callback never fired** | |
-| `dumpObject` (ForEachProperty / ForEachFunction / GetSuperStruct), `FindFirstOf` | **Unverified** | never called in inZOI; every call is pcall-wrapped |
+| Auto-explore (`RegisterHook` on `PlayerController:ClientRestart`, `ExecuteWithDelay`, `ExecuteInGameThread`) | Verified on v0.11.0 | T2 2026-10-20: our callback fired at the main menu and again later; pending flag ignored a trigger 7 s after the first; scans ran 60 s after a trigger |
+| `dumpObject` (ForEachProperty / ForEachFunction / GetSuperStruct, property reads), `FindFirstOf` | Verified on v0.11.0 | T2 2026-10-20: dumps of 239, 291, 381 and 11 lines, including `ObjectProperty` references and enum/bool values |
 | `buildFingerprint` / safe mode | Verified on v0.11.0 | banner showed `build size:289803704 (SAFE MODE)`; matches the exe size |
 
 With every cap off the engine runs as the virtual pet (plan C): shelter adoption,
@@ -86,16 +86,29 @@ Source: ZoiPets discovery scan, **main menu only**, inZOI v0.10.0, 2026-09-25
 | Material | `MI_OP002_Body_001_Animated` (MaterialInstanceDynamic) |
 | Asset folder | `/Game/Characters/Pets/` exists (only the `Operator/OP001` path has been seen) |
 
+### In the city (T2 / M1-3a, v0.11.0 build 20261013.16166, 2026-10-20)
+
+Full details and the evidence table: `docs/qa/results/2026-10-20-t2-m1-3a-20261013.16166.W-334313.md`.
+
+| Item | Observed |
+|---|---|
+| `BP_Void_Cat_C` ×7 | `/Game/Blueprint/GameObject/Animal/BP_Void_Cat.BP_Void_Cat_C`; a `B1GameObject` (not a Pawn) with static meshes, baked animation (`B1AnimToTex`), interaction components, no movement component, no Controller property |
+| `Void_Cat1_C` ×1 | `/Game/Characters/Void/Void_Cat/Void_Cat1.Void_Cat1_C`; a Character with skeletal mesh, capsule and `CharacterMovementComponent`; `Controller` = a stock `AIController` instance, `AIControllerClass` = `/Script/AIModule.AIController`, `AutoPossessAI = 1` |
+| Game clock candidate | `B1TimeManager` under `BP_B1GameInstance_C`; functions `GetCurrentDateTime`, `GetTimeScale` (not called yet) |
+| Computer | `BP_Computer01_C` (`/Game/Blueprint/GameObject/Furniture/BP_Computer01.BP_Computer01_C`) |
+
 Not known yet (do not build on these):
-- Whether city stray cats use this class. `Operator` suggests the lobby cat belongs to the
-  "cat operator" presentation; strays were not loaded at the main menu.
-- Any property values, callable functions or anim-blueprint variables: the scan only
-  records object names, it never dumped properties or functions.
-- Whether a cat has an AI controller or behaviour tree. The scan would have listed
-  names like `AIC_Cat` (none appeared), but it does not search for AI classes in
-  general, so this is **no evidence either way**.
-- Whether spawning `BP_Pet_Customize_01_C` in a save works, moves, or gets written
-  into the game's own save file.
+- Which of the two city cat classes is the stray cat the player feeds (Coexistence ≥ 60),
+  and whether more `Void_Cat1_C` exist outside the loaded area. The lobby cat
+  `BP_Pet_Customize_01_C` is not loaded in the city.
+- What drives the `AIController` of `Void_Cat1_C` (the controller was not dumped; no
+  behaviour tree / blackboard property showed on the pawn) and whether that cat walks by itself.
+- Whether a *spawned* `Void_Cat1_C` gets a controller. By standard Unreal semantics
+  `AutoPossessAI = 1` would mean placed-in-world only (unverified here), so a spawned one
+  may have none until `SpawnDefaultController()` is called; the probe does not call it yet.
+- Whether spawning any of these classes works, moves, or ends up in the game's own save.
+- The return type and units of `GetCurrentDateTime` / `GetTimeScale`, any save-slot id or
+  household id source, whether the computer's interaction menu can be extended.
 
 ## Engine notes for the owner (no engine rules were changed)
 
