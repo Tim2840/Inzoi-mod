@@ -66,7 +66,8 @@ class found by M1-3a, the agent writes its full object path (e.g.
 `/Game/.../BP_X.BP_X_C`) as the first line of `<Mod>\pawhome_spawn_class.txt`.
 
 **Risk the PO must be told before agreeing (put it in the T2 consent):** the spawned cat
-is *not* removed automatically (b4 needs it to stay for the stability check). If the game
+is *not* removed automatically (the PO removes it with a second Shift+F6; the 5-minute
+stability check of b4 then runs after the removal). If the game
 is saved, or the world is left, while it is still alive, the actor might be written into the
 game's own save. That is why the experiment runs only on a **throwaway copy** of a save and
 only after the backup in step 0.
