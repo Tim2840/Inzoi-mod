@@ -40,14 +40,18 @@ instance of `DUMP_CLASSES` (`BP_Pet_Customize_01_C`, `B1TimeManager`) →
 
 Evidence: the ZoiPets run on **inZOI v0.10.0** (build 20260915.15331, 2026-09-25) and the
 PawHome T1 smoke on **v0.11.0** (build 20261013.16166, 2026-10-19,
-`docs/qa/results/2026-10-19-20261013.16166.W-334313.md`). That T1 run started with no
-previous save (`started (new)`), so only the first write was exercised.
+`docs/qa/results/2026-10-19-20261013.16166.W-334313.md`). That first T1 run started with
+no previous save (`started (new)`), so only the first write was exercised. A second T1 on
+the same build (2026-10-20, `docs/qa/results/2026-10-20-20261013.16166.W-334313.md`) read
+the existing save back (`started (loaded)`) and found the previous save in the `.bak`
+generations; the game closed normally.
 
 | Adapter function | Status | Evidence / blocker |
 |---|---|---|
 | `saveSet` first write (`io.open` + rename into place) | Verified on v0.10.0 and v0.11.0 | ZoiPets save file; PawHome T1 save file |
-| `saveGet` reading an existing save | **Unverified** | T1 was `started (new)`; needs a second T1 (`started (loaded)`) |
-| `.bak1`–`.bak3` rotation (`os.rename` / `os.remove`) and `.bak1` fallback read | **Unverified** | never exercised in-game; Windows `os.rename` cannot overwrite (CI on Windows: cloud F2) |
+| `saveGet` reading an existing save | Verified on v0.11.0 | second T1: `started (loaded)` |
+| `.bak1`–`.bak3` rotation (`os.rename` / `os.remove`) | Verified on v0.11.0 | second T1: the pre-run save was found byte for byte as `.bak1` right after the first new save |
+| `.bak1` fallback read (main file missing) | **Unverified** | same `io.open` read as `saveGet`, but the fallback branch never ran in-game |
 | `saveGetBackup(key, n)` (reads `.bakN`, 1 ≤ n ≤ 3) | **Unverified** | engine uses it only when the current save cannot be parsed (`core/storage.lua`); offline end-to-end test recovers a pet from `.bak1` |
 | `logSink` (print -> UE4SS.log) | Verified on v0.10.0 and v0.11.0 | `[PawHome]` lines in the T1 result |
 | `discover` (ForEachUObject scan) | Verified on v0.10.0 (main menu) | found `BP_Pet_Customize_01_C`, `B1TimeManager` |
