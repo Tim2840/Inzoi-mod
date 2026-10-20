@@ -99,6 +99,17 @@ function Mock.new(opts)
     function m.entityExists(ref) return m.entities[ref] ~= nil and not m.hidden[ref] end
     function m.despawnPet(ref) m.entities[ref] = nil end
     function m.playAnimation(ref, anim) m.animations[#m.animations + 1] = { ref = ref, anim = anim } end
+    m.care = {}
+    function m.giveCare(ref, kind, zoi)
+        local list = m.care[ref] or {}
+        list[#list + 1] = { kind = kind, zoi = zoi }
+        m.care[ref] = list
+    end
+    function m.takeCare(ref)
+        local list = m.care[ref] or {}
+        m.care[ref] = nil
+        return list
+    end
 
     return m
 end

@@ -146,6 +146,14 @@ function Api.despawnPet(ref)
     return (call("despawnPet", ref))
 end
 
+-- Care the player gave the pet in the game itself (e.g. the game's own feed/play
+-- interactions on the cat), since the last call: { { kind = actionId, zoi = zoiId }, ... }.
+function Api.takeCare(ref)
+    if ref == nil then return {} end
+    local ok, v = call("takeCare", ref)
+    return ok and type(v) == "table" and v or {}
+end
+
 function Api.playAnimation(ref, animationId)
     if ref == nil then return false end
     return (call("playAnimation", ref, animationId))

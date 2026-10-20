@@ -25,7 +25,16 @@ local function onHour()
 end
 
 local function onInteraction(p)
-    if R.adapter and type(p) == "table" then R.adapter.onInteractionFinished(p) end
+    if not (R.adapter and type(p) == "table") then return end
+    R.adapter.onInteractionFinished(p)
+    if R.app and ModKit.CARE[p.interaction_bag_id] then
+        local ok, res = pcall(function() return R.app:applyCare() end)
+        if not ok then log("care failed: " .. tostring(res))
+        elseif #res > 0 then
+            local r = res[#res]
+            log("care " .. tostring(r.action) .. " -> " .. tostring(r.petId) .. (r.ok and "" or " (" .. tostring(r.reason) .. ")"))
+        end
+    end
 end
 
 -- B2 Main on_begin. Also called lazily from the first binding callback, because a mod that is

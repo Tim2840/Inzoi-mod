@@ -178,6 +178,36 @@ T.test("care: kittens bond faster than adults", function()
     T.gt(k.bond["101"], ad.bond["101"])
 end)
 
+T.test("care: feeding and play given in the game count like the panel's buttons", function()
+    local app, mock = H.new()
+    local pet = H.adopt(app, 1, {}, "adult")
+    pet.needs.hunger = 30; pet.needs.fun = 20
+    local Bond = require("pawhome.pets.bond")
+    local bondBefore = Bond.get(pet, 202)
+    mock.giveCare(pet.entity, "feed", 202)
+    mock.giveCare(pet.entity, "play", 202)
+    local res = app:applyCare()
+    T.eq(#res, 2)
+    T.truthy(res[1].ok, res[1].message); T.truthy(res[2].ok, res[2].message)
+    T.eq(res[1].source, "game")
+    T.near(pet.needs.hunger, 85 - 4, 0.01)           -- play costs a little hunger
+    T.truthy(pet.needs.fun > 20)
+    T.truthy(Bond.get(pet, 202) > bondBefore)       -- the Zoi who gave the care bonds
+    T.eq(#app:applyCare(), 0)                         -- each event counts once
+    -- the same action again inside the cooldown gives nothing
+    mock.giveCare(pet.entity, "feed", 202)
+    local again = app:applyCare()
+    T.falsy(again[1].ok); T.eq(again[1].reason, "cooldown"); T.eq(again[1].action, "feed")
+end)
+
+T.test("care: game care is ignored while no savegame is loaded", function()
+    local app, mock = H.new()
+    local pet = H.adopt(app, 1, {}, "adult")
+    app.suspended = true
+    mock.giveCare(pet.entity, "feed", 202)
+    T.eq(#app:applyCare(), 0)
+end)
+
 T.test("care: one litter box serves every pet in the home", function()
     local app = H.new()
     local a = H.adopt(app, 1, {}, "adult")

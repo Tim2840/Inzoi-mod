@@ -138,6 +138,27 @@ function App:perform(petId, zoiId, actionId)
     return result
 end
 
+-- Applies care given through the game's own interactions on our cats. Cooldowns and
+-- conditions still apply: feeding a full cat again gives nothing. Returns the results.
+function App:applyCare()
+    self:sync()
+    if self.suspended then return {} end
+    local results = {}
+    for _, pet in ipairs(Registry.home(self.ctx, nil)) do
+        for _, ev in ipairs(Api.takeCare(pet.entity)) do
+            local r = Care.perform(self.ctx, pet.id, ev.zoi, ev.kind)
+            r.source = "game"
+            r.action = r.action or ev.kind
+            results[#results + 1] = r
+        end
+    end
+    if #results > 0 then
+        Engine.flush(self.ctx)
+        self:save()
+    end
+    return results
+end
+
 function App:offers(householdId, refresh)
     self:sync()
     if self.suspended then return {} end
