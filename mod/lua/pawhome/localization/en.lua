@@ -109,5 +109,12 @@ return {
         decay = "Need decay speed",
         lifescale = "Pet lifespan",
         max_pets_setting = "Max pets per household",
+        tagline = "Online pet shop",
+        url = "pawhome.zoi/shop",
+        open = "Open Paw Home",
+        close = "Close",
+        money = "Household funds",
+        care = "Care",
+        adopt_this = "The cat you just met",
     },
 }

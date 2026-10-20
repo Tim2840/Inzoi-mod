@@ -5,7 +5,8 @@
 //
 // In-game protocol (all strings):
 //   to_ui  (relay writes, page reads): "seq,channel,payload;..."  (fields percent-encoded)
-//          seq 0 is the relay's epoch. Channels: pawhome:hello, pawhome:save, pawhome:rpc_result.
+//          seq 0 is the relay's epoch. Channels: pawhome:hello, pawhome:save, pawhome:rpc_result,
+//          pawhome:open (data = JSON entry {shell, tab, stray}: show the shop, e.g. after an interaction).
 //          payload = "<session>|<data>"
 //   to_sim (page writes, relay reads): same format. Channels: pawhome:state, pawhome:rpc.
 // The save data lives in wf.state.pawhome (stored inside the game's save file).
@@ -30,7 +31,7 @@ const Bridge = (() => {
     return data;
   }
 
-  if (!inGame) return { call: (m, a = {}) => httpCall(m, a), preview: true };
+  if (!inGame) return { call: (m, a = {}) => httpCall(m, a), preview: true, onOpen: () => {} };
 
   // ---------------------------------------------------------------- in-game transport
 
@@ -133,6 +134,7 @@ const Bridge = (() => {
   let answered = null;      // the session we already sent the save data to
   let nextRpc = 1;
   const waiting = new Map(); // rpc id -> { resolve, reject, timer }
+  let openHandler = null;   // app.js: show the shop
 
   window._onStateLoaded = ((prev) => (s) => {
     stateReady = true;
@@ -167,6 +169,10 @@ const Bridge = (() => {
         const t = JSON.parse(data);
         if (t && typeof t.key === "string") store()[t.key] = t.value;
       } catch (err) { /* ignore a damaged entry */ }
+    } else if (e.channel === "pawhome:open") {
+      let entry = {};
+      try { entry = JSON.parse(data || "{}"); } catch (err) { /* open with defaults */ }
+      if (openHandler) openHandler(entry);
     } else if (e.channel === "pawhome:rpc_result") {
       let t;
       try { t = JSON.parse(data); } catch (err) { return; }
@@ -217,5 +223,5 @@ const Bridge = (() => {
     });
   }
 
-  return { call, preview: false, ready: () => !!session && answered === session };
+  return { call, preview: false, ready: () => !!session && answered === session, onOpen: (fn) => { openHandler = fn; } };
 })();

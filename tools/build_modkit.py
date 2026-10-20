@@ -62,7 +62,7 @@ def main():
     # provides window.js and uimod_manifest.json); our page files are copied over it.
     app = root / "ui" / "pawhome"
     if app.is_dir():
-        for name in ("app.js", "bridge.js"):
+        for name in ("app.js", "bridge.js", "icons.js"):
             shutil.copyfile(REPO / "mod" / "ui" / name, app / name)
         # The game's browser ignores CSS custom properties (seen in 20261019.16318.W): the
         # in-game copies get the dark theme's values written in place of var(--name).

@@ -109,5 +109,12 @@ return {
         decay = "需求下降速度",
         lifescale = "寵物壽命",
         max_pets_setting = "每戶最多寵物數",
+        tagline = "線上寵物店",
+        url = "pawhome.zoi/shop",
+        open = "打開毛孩之家",
+        close = "關閉",
+        money = "家庭資金",
+        care = "照顧",
+        adopt_this = "剛剛遇到的那隻貓",
     },
 }

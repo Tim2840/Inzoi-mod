@@ -3,6 +3,7 @@
 local Mock = require("pawhome.adapters.mock")
 local App = require("pawhome.app")
 local Util = require("pawhome.core.util")
+local I18n = require("pawhome.core.i18n")
 
 local P = { mock = nil, app = nil, HOUSEHOLD = 1, ZOI = 101 }
 
@@ -44,7 +45,8 @@ end
 function handlers.strays()
     local out = {}
     for i, s in ipairs(P.app:strays(P.HOUSEHOLD)) do
-        out[i] = { id = s.id, stage = s.stage or "adult" }
+        local stage = s.stage or "adult"
+        out[i] = { id = s.id, stage = stage, stageLabel = I18n.t("stages." .. stage) }
     end
     return snapshot({ strays = out })
 end
