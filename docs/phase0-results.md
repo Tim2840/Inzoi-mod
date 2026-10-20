@@ -14,7 +14,7 @@ UE4SS 維持停用。PO 另外裝了其他 CurseForge 模組（Alimony、Witchcr
 | P1 指令清單 | ✅ 406 個指令：Public 146／UserCheat 149／ScriptCheat 111 | ✅ 遊戲 MCP 有 414 個工具（406 個 CLI＋8 個腳手架／查詢工具） | `cli_catalog.json` | |
 | P2 找到流浪貓 | 部分 | ✅ `ObjectTemplate` 綁定在每隻城市貓上觸發（江南 49 隻）；物件 ID `Level_Void_Cat`／`DEV_Void_Cat`；實體 ID 與座標**跨兩次載入不變**（如 89129、87988、89289） | Lua `ObjectTemplate` 綁定、`owner:GetObjectKey().Value`、`GetLocation()` | B1 的 `entity.get_object_info` 找不到這些 ID（「GameObject not found」） |
 | P3 移動或跟隨 | 未知 | ❌（目前）：B2 `SetLocationOnlySimul` 把貓 89129 的模擬座標 X +300 成功，但畫面上的貓沒動（移動前後截圖同位置）。`movement.teleport_to`／`summon` 只接受角色（「Target character not found」） | `FB2Actor:SetLocationOnlySimul` | 能通知畫面的 `Teleport()` 沒匯出給 Lua。城市貓在模擬層本來就不會自己走 |
-| P4 生成貓 | ❌ 文件層面沒路 | ✅（召喚）：照 Witchcraft 的手法，用 `data.patch` 新增腳本列 `SpawnGameObjectToFront S1=DEV_Void_Cat F1=110`，掛在互動的 `FinishScriptIdList` 上；Zoi 做完互動後在她面前生成一隻 `DEV_Void_Cat`（2026-10-21 在家裡生成實體 109727，**截圖看得見**：三花貓坐著、有待機動作，原版「玩／餵零食」互動可用）。建造模式 `building.place_object` 也能放（實體 109298），當時沒在畫面上找到，推測是鏡頭框外，未重測 | `SpawnGameObjectToFront`（資料腳本）、`data.patch`（Public，執行中補丁，讀檔即還原） | 召喚位置是 Zoi 前方固定距離，面對牆時會生到牆外。**是否跨存檔保留尚未測**（要存檔，需 PO 同意） |
+| P4 生成貓 | ❌ 文件層面沒路 | ✅（召喚）：照 Witchcraft 的手法，用 `data.patch` 新增腳本列 `SpawnGameObjectToFront S1=DEV_Void_Cat F1=110`，掛在互動的 `FinishScriptIdList` 上；Zoi 做完互動後在她面前生成一隻 `DEV_Void_Cat`（2026-10-21 在家裡生成實體 109727，**截圖看得見**：三花貓坐著、有待機動作，原版「玩／餵零食」互動可用）。建造模式 `building.place_object` 也能放（實體 109298），當時沒在畫面上找到，推測是鏡頭框外，未重測 | `SpawnGameObjectToFront`（資料腳本）、`data.patch`（Public，執行中補丁，讀檔即還原） | 召喚位置是 Zoi 前方固定距離，面對牆時會生到牆外。**跨存檔保留 ✅**（2026-10-21，PO 同意後實測）：召喚實體 109546 → `game.goto_lobby save=true` → 重新載入，同一實體 ID、同一座標仍在，看得見、互動可用，且不需要那段執行中補丁（讀檔後補丁已還原）。**花色會在載入時重新隨機**（存檔前橘色虎斑，讀回變三花） |
 | P5 存檔後還在 | — | 部分：城市貓的實體 ID 與座標跨 6 次載入都穩定；**外觀不穩定**——同一個實體 89129 前兩次是橘貓、後來是三花 | | 「我的貓」若綁城市貓的實體 ID，花色可能每次讀檔都變 |
 | P6 觸發互動或動作 | 部分 | ✅ `interaction.execute interaction_bag_id=Object_Void_Cat_Dev target_entity_id=89129`：Zoi 走到那隻橘貓旁播放餵零食（截圖確認）。`list_available` 回傳 `Object_Void_Cat_Tickle`（遊ぶ）、`Object_Void_Cat_Dev`（おやつをあげる）；共 7 個貓互動 | `interaction.execute`（UserCheat，遊戲內可用）、`interaction.list_available`（Public） | B2 的 `interaction.started/finished` 事件帶 Zoi ID、互動 ID、貓的實體 ID；NPC 對貓的互動也收得到 |
 | P7 計時器和存資料 | 計時 ✅；存資料不明 | 計時 ✅：B1 `on_tick` 心跳＋`environment.get_time` 看到 11→12 點；B2 `on_tick` 也跑。存資料 ✅（UI）：`wf.state` 存檔→回主選單→讀檔後取回 `{"pet_name":"咪咪","counter":2}`。❌（Lua）：`on_savegame`／`on_loadgame` 在 Main、Time 管理器、貓綁定都沒觸發（2 次存檔、3 次載入） | `wf.state`、`on_tick`、`inzoi.event.on` | B2 `time.hour_changed` ✅：自然流動逐時觸發（12→13→14→15）；`time_skip` 跳 2 小時只觸發一次 |
@@ -49,7 +49,7 @@ UE4SS 維持停用。PO 另外裝了其他 CurseForge 模組（Alimony、Witchcr
 - **方案 A（真領養城市貓）**：辨識、追蹤、互動、偵測都可行；**帶回家（P3）目前做不到**——模擬層移動不會反映到畫面，
   而且城市貓的外觀每次讀檔可能變。可行的折衷：「在城市認養某一隻貓」（牠留在原地，玩家去探望、餵牠，資料記在我們的引擎），
   家裡的部分用虛擬寵物呈現。
-- **方案 B（在家生成）**：**有路了**——資料腳本 `SpawnGameObjectToFront` 召喚 `DEV_Void_Cat`，畫面上看得見、可互動（2026-10-21）。待確認：跨存檔是否保留、花色能否固定、能否讓牠移動。
+- **方案 B（在家生成）**：**有路了**——資料腳本 `SpawnGameObjectToFront` 召喚 `DEV_Void_Cat`，畫面上看得見、可互動（2026-10-21）。跨存檔保留已確認；待確認：花色能否固定、能否讓牠移動、能否移除／重新召喚（遺棄、被帶走時）。
 
 ## 自動化
 
