@@ -21,16 +21,17 @@ inZOI 目前沒有寵物系統。本模組照 The Sims 4《貓狗成群》的玩
 
 | 部分 | 狀態 |
 |---|---|
-| 寵物引擎 `mod/lua/pawhome/` | ✅ 完成，135 項離線測試全過，**只在模擬環境驗證過** |
-| 介面 `mod/ui/`（繁中／英文） | ✅ 完成，只在桌面預覽驗證過 |
-| `adapters/inzoi.lua`（官方 ModKit，連到真遊戲） | ❌ 仍是 `error("TODO(Pn)")`；可用的 API 與通道已實測（`docs/phase0-results.md`） |
-| `mod/ui/bridge.js` 的遊戲內傳輸 | ❌ 待實作（通道：B2 綁定 ⇄ 訊息 ⇄ B1 綁定 ⇄ `uimod.cfg_*` 輪詢 ⇄ UI） |
+| 寵物引擎 `mod/lua/pawhome/` | ✅ 完成，156 項離線測試全過；已在遊戲 B2 執行 |
+| 介面 `mod/ui/`（繁中／英文） | ✅ 遊戲內顯示、領養、設定已實測（2026-10-21）；圖示待做（遊戲字型沒有 emoji） |
+| `adapters/inzoi*.lua`（官方 ModKit） | ✅ 時間、存檔握手、家戶、金錢扣款、召喚與綁定家貓（跨存檔）已實測；送走貓、照顧事件計入引擎待測（`docs/design/modkit-runtime.md` 第 4 節） |
+| `mod/ui/bridge.js` 的遊戲內傳輸 | ✅ 已實測（B2 ⇄ B1 ⇄ `uimod.cfg_*` ⇄ UI，`wf.state` 存檔）；每次載入以 `data.patch` 加入遊戲資料 |
 | 官方路線遊戲內實測 | ✅ 第 0 階段完成（遊戲 `20261019.16318.W`，2026-10-20／21） |
 | UE4SS 路線（`adapters/ue4ss.lua`、`mod/ue4ss/`、`scripts/*ue4ss*`、`scripts/smoke-t1.ps1`） | ⏸ 暫停。有遊戲內證據（v0.11.0），但裝著 UE4SS 時「存檔後離開」會崩潰（ADR 0005） |
 
 ## 第一優先：實作（ADR 0007、0008）
 
-1. 補測「移除召喚的貓」。2. 依實測結果實作 `adapters/inzoi.lua` 與 UI bridge。3. 「領養」互動用資料補丁加進城市貓選單。
+1. 經 adapter 送走貓（`PawHome_SendAway`）的遊戲內測試。2. 照顧事件（餵、玩）計入引擎。3. 「領養」互動用資料補丁加進城市貓選單。4. UI 圖示、模組打包。
+開發版模組：`Documents\inZOI\Mods\InGame\PawHomeDev_A5BI7C`，用 `py -I tools/build_modkit.py` 產生；先在主選單 `luamod.mount` 再讀檔。
 遊戲內測試用 `tools/game_mcp.py`（遊戲 MCP 的 JSON-RPC 呼叫器）；探勘用 ModKit 專案 `PawHome_Probe_DBA66034`（不進 repo）。
 
 ## 規矩
