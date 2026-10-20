@@ -3,6 +3,7 @@ All notable changes are listed here ([Keep a Changelog](https://keepachangelog.c
 
 ## [Unreleased]
 ### Added
+- ADR 0008: the home pet is a summoned `DEV_Void_Cat` (visible, interactable, persists across save/load, appearance re-randomized on load, removable with `DespawnGameObject`); the PO gives big-direction instructions only.
 - ADR 0007: plan C (virtual pet) plus city adoption, engine stays in Lua; phase 0 in-game results (B2/B1/UI data channel, city cats, build-mode placement) in `docs/phase0-results.md`.
 - `tools/game_mcp.py`: call the running game's MCP server from the repo (used for automated in-game probing).
 - Phase 0 desk research for the official ModKit route (`docs/phase0-results.md`, `docs/probe/commands.md`, `docs/probe/lua-api.md`): CLI catalog by access level, Lua bindings/callbacks/events, UI-mod save state, cat object templates found in the ModKit binding keys. Nothing verified in-game yet.
