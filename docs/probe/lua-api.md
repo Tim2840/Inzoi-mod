@@ -120,3 +120,20 @@
 | U7 | Lua ↔ UI 有沒有通道？（`inzoi.message.send_to_client` 到得了 UI 嗎？UI 的 `inzoi.data` 讀得到 Lua 嗎？） | 雙向送一則訊息 |
 | U8 | `interaction_menu` 觸發能不能用在物件（貓）上？ | manifest 寫 `target: "object"` 試；`modkit_write_uimod_manifest` 驗證會先擋不合法的值 |
 | U9 | `UserCheat`／`ScriptCheat` 指令在正式版能不能用？（`ambition.complete` 說明寫 shipping 版無效） | 挑一個無害的 UserCheat 指令試 |
+
+## 5. 遊戲內結果（2026-10-20，遊戲 `20261019.16318.W`）
+
+| # | 結果 | 依據 |
+|---|---|---|
+| U1 | ✅ 是。綁定觸發時 `GetObjectId()` 為 `Level_Void_Cat` 或 `DEV_Void_Cat`；實體 ID 跨載入不變 | 探勘模組 cat 日誌，兩次載入比對 |
+| U2 | ✅ 會，江南 49 隻，每隻各自的 `self` | 同上 |
+| U3 | ✅ `Object_Void_Cat_Tickle`、`Object_Void_Cat_Dev`（可用）；搜尋另有 `_Sad_Lv1–3`、`Perspective_Void_Cat_Dev`、`Ghost_Object_Void_Cat_Dev` | `interaction.list_available`、`interaction.search` |
+| U4 | 未測；B2 有 `FB2Actor:SetLocationOnlySimul`（說明：只動 B2，要通知 B1 用 `Teleport()`，但 `Teleport` 沒匯出） | luals-defs |
+| U5 | ❌ `on_savegame`／`on_loadgame` 沒觸發（Main、Manager=Time、ObjectTemplate；ModKit 預覽模式） | 2 次存檔、3 次載入 |
+| U6 | ❌ 沒有 json（B1、B2 都是 Lua 5.4） | `rawget(_G, "json")` |
+| U7 | 部分：`send_to_client(entity_id, ...)`；B1 Main 收不到；B1 實體綁定待測。B1／B2 互相不能呼叫對方的 CLI 指令 | env／b1 日誌 |
+| U8 | 未測 | |
+| U9 | 主選單 ❌（CheatManager not available）；遊戲內未測 | `visual.hide_cat_eye` |
+
+官方 LuaLS 定義檔在遊戲目錄 `BlueClient/Content/Data/Lua/luals-defs/`（`sandbox.lua` 寫明：擋 `dofile`／`loadfile`／`loadstring`，
+擋 `io`／`os`／`debug`／`File` 的成員存取，擋 `http`／`socket`／`ssl` 模組）。遊戲 MCP 另有 `lua_api_lookup` 可查型別。
