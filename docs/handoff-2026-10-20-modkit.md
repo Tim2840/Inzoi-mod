@@ -16,4 +16,4 @@
 3. 結果寫 `docs/phase0-results.md`，決定方案 A／B／C。
 
 ## 尚未處理
-- `docs/engineering-workflow.md` 內文仍是雲端時期的版本；以 ADR 0006 與 `CLAUDE.md` 為準，之後再改寫。
+- 無（`docs/engineering-workflow.md` 已改寫為 v2.0）。
