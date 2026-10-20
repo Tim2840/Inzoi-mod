@@ -23,4 +23,5 @@
 - 訊息頻道一律加 `pawhome:` 前綴，只處理自己的頻道（同實體上其他模組的訊息也會送進來）。
 - 城市貓的外觀可能每次讀檔都不同（同一個實體 ID 先橘貓後三花），UI 不能宣稱固定花色。
 - 待確認：正式安裝（非 ModKit 預覽）時 Lua 存檔鉤子是否觸發；`uimod.cfg_save` 寫的是全域檔，B1→UI 中轉檔不可當存檔用。
-- 方案 B 的線索留存：`DEV_Void_Cat` 是 `Object` 表的列（`devOnly`），可用 `building.place_object` 放進住宅，原版互動可用但不渲染。
+- **2026-10-21 補充**：用資料腳本 `SpawnGameObjectToFront S1=DEV_Void_Cat` 可以在 Zoi 面前召喚一隻**看得見**、可互動的貓（Age of Magic／Witchcraft 系列的手法）。
+  若確認跨存檔保留，家裡的寵物可以有實體外觀，屆時另開 ADR 調整方案（`caps.spawn` 才能設為 true）。
