@@ -15,7 +15,7 @@ end
 local M = {}
 
 function M.on_begin()
-    Runtime.start({ spawn = false })
+    Runtime.start({ spawn = true })
 end
 
 function M.on_end()

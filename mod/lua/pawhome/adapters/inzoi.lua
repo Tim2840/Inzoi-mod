@@ -10,6 +10,8 @@
 --   platform.charge(hid, amount)         -> true when the money was taken
 --   platform.send(entityId, channel, payload)        B2 -> B1 message (inzoi.message.send_to_client)
 --   platform.enqueue(zoiId, targetId, interactionBagId) -> true when queued
+--   platform.atHome(zoiId)               -> true when the Zoi is on the household's lot
+--   platform.homeCats()                  -> entity ids of the summoned cats on the home lot (optional)
 --   platform.log(line)                   optional
 --
 -- Saving: B2 cannot write the savegame. The UI keeps the data in wf.state (saved inside the
@@ -17,9 +19,10 @@
 -- the engine pauses (see core/api.lua). saveSet sends the new value back to the UI.
 --
 -- Cats: our "home cat" is a DEV_Void_Cat summoned by the data script PawHome_SpawnCat that
--- runs at the end of the interaction PawHome_WelcomeCat. The spawn is asynchronous, so
--- spawnPet returns a placeholder ref ("pending:<n>") that is bound to the real entity when
--- the cat binding reports a new cat on the household's lot.
+-- runs at the end of the interaction PawHome_WelcomeCat. The cat appears in front of the
+-- Zoi, so the interaction is only started while the Zoi is at home; spawnPet returns a
+-- placeholder ref ("pending:<n>") at once and binds it to the real entity when the cat
+-- binding reports a new cat on the household's lot. Sending a cat away waits the same way.
 local Wire = require("pawhome.adapters.inzoi_wire")
 local Serialize = require("pawhome.core.serialize")
 
@@ -47,7 +50,8 @@ function ModKit.new(platform, opts)
         nextMsg = 0,
         sinceHello = math.huge,
         refs = {},          -- placeholder ref -> entity id
-        pending = {},       -- list of { ref, at, household }
+        pending = {},       -- list of { ref, at, household, queued }
+        leaving = {},       -- cat entity ids to send away once the Zoi is home
         nextPending = 1,
         cats = {},          -- entity id -> { home = bool, site = id }
         met = {},           -- entity id -> game minute the possessed Zoi last cared for it
@@ -116,13 +120,11 @@ function ModKit.new(platform, opts)
 
     function a.spawnPet(householdId, spec)
         if not a.caps.spawn then return nil end
-        local zoi = target()
-        if zoi == nil then return nil end
-        if not platform.enqueue(zoi, zoi, ModKit.WELCOME) then return nil end
         local ref = "pending:" .. a.session .. ":" .. a.nextPending
         a.nextPending = a.nextPending + 1
-        a.pending[#a.pending + 1] = { ref = ref, at = a.now(), household = householdId }
-        log("summon queued " .. ref)
+        a.pending[#a.pending + 1] = { ref = ref, at = a.now(), household = householdId, queued = false }
+        log("summon waiting for the Zoi to be home: " .. ref)
+        a.serviceQueue()
         return ref
     end
 
@@ -130,7 +132,9 @@ function ModKit.new(platform, opts)
         local eid = resolve(ref)
         if eid ~= nil then return a.cats[eid] ~= nil end
         for _, p in ipairs(a.pending) do
-            if p.ref == ref then return a.now() - p.at < ModKit.PENDING_MINUTES end
+            -- waiting for the Zoi to come home counts as present; after the summon was
+            -- started, give it a few game hours before the engine may try again
+            if p.ref == ref then return not p.queued or a.now() - p.at < ModKit.PENDING_MINUTES end
         end
         return false
     end
@@ -145,8 +149,26 @@ function ModKit.new(platform, opts)
             persistRefs()
         end
         if eid == nil or a.cats[eid] == nil then return end
+        a.leaving[#a.leaving + 1] = eid
+        a.serviceQueue()
+    end
+
+    -- Starts the summon / goodbye interactions that wait for the Zoi to be at home.
+    function a.serviceQueue()
         local zoi = target()
-        if zoi ~= nil then platform.enqueue(zoi, eid, ModKit.SEND_AWAY) end
+        if zoi == nil or not platform.atHome(zoi) then return end
+        for _, p in ipairs(a.pending) do
+            if not p.queued and platform.enqueue(zoi, zoi, ModKit.WELCOME) then
+                p.queued, p.at = true, a.now()
+                log("summon started " .. p.ref)
+            end
+        end
+        for i = #a.leaving, 1, -1 do
+            local eid = a.leaving[i]
+            if a.cats[eid] == nil or platform.enqueue(zoi, eid, ModKit.SEND_AWAY) then
+                table.remove(a.leaving, i)
+            end
+        end
     end
 
     -- City cats the player's Zoi has fed or played with recently.
@@ -169,6 +191,11 @@ function ModKit.new(platform, opts)
     -- B2 binding tick (any binding, real seconds). Says hello every few seconds until the UI
     -- answers, then once a minute so a UI that was reloaded can find this session again.
     function a.tick(dt)
+        a.sinceQueue = (a.sinceQueue or 0) + (dt or 0)
+        if a.sinceQueue >= ModKit.HELLO_EVERY_SECONDS then
+            a.sinceQueue = 0
+            if a.ready and (#a.pending > 0 or #a.leaving > 0) then a.serviceQueue() end
+        end
         a.sinceHello = a.sinceHello + (dt or 0)
         local every = a.ready and ModKit.HELLO_WHEN_READY_SECONDS or ModKit.HELLO_EVERY_SECONDS
         if a.sinceHello >= every then
@@ -206,6 +233,7 @@ function ModKit.new(platform, opts)
         a.refs = type(refs) == "table" and refs or {}
         a.ready = true
         log("state received (" .. #data .. " bytes)")
+        a.scanHomeCats()
         for _, fn in ipairs(a.listeners) do pcall(fn) end
     end
 
@@ -250,8 +278,23 @@ function ModKit.new(platform, opts)
 
     function a.onCatEnd(eid) a.cats[eid] = nil end
 
-    -- interaction.finished event: remember city cats the player met and care given to cats.
+    -- Summoned cats are not reported by the cat binding, so after our welcome interaction
+    -- the home lot is searched for cats we do not know yet.
+    function a.scanHomeCats()
+        if not platform.homeCats then return end
+        local ok, list = pcall(platform.homeCats)
+        if not ok or type(list) ~= "table" then return end
+        for _, eid in ipairs(list) do
+            if a.cats[eid] == nil or not a.cats[eid].home then a.onCatBegin(eid, { home = true }) end
+        end
+    end
+
+    -- interaction.finished event: summoned cats, city cats the player met, and care given.
     function a.onInteractionFinished(ev)
+        if ev and ev.interaction_bag_id == ModKit.WELCOME then
+            a.scanHomeCats()
+            return
+        end
         local kind = ev and ModKit.CARE[ev.interaction_bag_id]
         if not kind then return end
         local eid = ev.target_entity_id

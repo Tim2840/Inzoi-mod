@@ -62,7 +62,8 @@ const Bridge = (() => {
     return r || {};
   }
   async function cfgLoad(key) {
-    const r = await cli("uimod.cfg_load", { mod_id: modId(), section: SECTION, key });
+    // rejects with "Key not found" until the other side has written the mailbox once
+    const r = await cli("uimod.cfg_load", { mod_id: modId(), section: SECTION, key }).catch(() => ({}));
     const d = r.data;
     if (d && typeof d === "object" && typeof d.value === "string") return d.value;
     return "";
@@ -81,6 +82,45 @@ const Bridge = (() => {
   window.addEventListener("error", (e) => report("error: " + e.message + " @ " + e.filename + ":" + e.lineno));
   window.addEventListener("unhandledrejection", (e) => report("rejection: " + (e.reason && e.reason.message || e.reason)));
   report("page loaded, wf=" + !!window.wf + " saveState=" + !!(window.inzoi && window.inzoi.saveState));
+
+  // Game data the Lua side relies on, added at every load with the Public data.patch command
+  // (runtime patches are dropped when the session ends, so nothing is written to the save).
+  //  - PawHome_WelcomeCat: the Zoi strikes the cat-heart pose; at the end a DEV_Void_Cat is
+  //    summoned in front of her (the home cat, ADR 0008).
+  //  - PawHome_SendAway: the Zoi plays with the cat once more; at the end the cat is removed.
+  // Neither is added to any interaction menu; only the mod puts them in a Zoi's queue.
+  // Verified in game 20261019.16318.W (2026-10-21): these minimal rows are accepted and
+  // PawHome_WelcomeCat summons a visible, persistent cat.
+  const GAME_DATA = [
+    ["Script", "PawHome_SpawnCat", { ID: "PawHome_SpawnCat", Scripts: [{ IfType: "If", Conditions: [], Executes: [
+      { BaseObject: "Self", Command: "SpawnGameObjectToFront", S1: "DEV_Void_Cat", S2: "None", F1: 110, F2: 0, Prob: 1 }] }] }],
+    ["Script", "PawHome_DespawnTarget", { ID: "PawHome_DespawnTarget", Scripts: [{ IfType: "If", Conditions: [], Executes: [
+      { BaseObject: "Target", Command: "DespawnGameObject", S1: "None", S2: "None", F1: 0, F2: 0, Prob: 1 }] }] }],
+    ["Interaction", "PawHome_WelcomeCat", { ID: "PawHome_WelcomeCat", ActionIdList: ["Self_Pose_CatHeart"],
+      FinishScriptIdList: ["PawHome_SpawnCat"], InteractionSlotUsage: "None", NoneTargetPlayable: true,
+      PostureId: ["Stand"], BodyParts: ["BothHands"] }],
+    ["InteractionBag", "PawHome_WelcomeCat", { ID: "PawHome_WelcomeCat", GroupId: "Group_Self_Expression",
+      PostureGroupId: "StandGroup", AgingConditionFlags: 504, RepeatCount: 1,
+      InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_WelcomeCat", Label: "A" }] }] }],
+    ["Interaction", "PawHome_SendAway", { ID: "PawHome_SendAway", ActionIdList: ["Object_Void_Cat_Tickle"],
+      FinishScriptIdList: ["PawHome_DespawnTarget"], InteractionSlotUsage: "Single",
+      PostureId: ["Stand"], BodyParts: ["BothHands"] }],
+    ["InteractionBag", "PawHome_SendAway", { ID: "PawHome_SendAway", PostureGroupId: "StandGroup",
+      AgingConditionFlags: 504, RepeatCount: 1,
+      InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_SendAway", Label: "A" }] }] }],
+  ];
+  (async () => {
+    for (const [alias, id, row] of GAME_DATA) {
+      // table_get rejects when the row does not exist yet
+      const exists = await cli("data.table_get", { alias, row: id }).then((r) => !!(r && r.success), () => false);
+      if (exists) continue;                                     // already added this session
+      try {
+        const r = await cli("data.patch", { method: "Append", query: alias, value: JSON.stringify(row) });
+        if (!r || !r.success) report("data.patch " + alias + "/" + id + " failed: " + JSON.stringify(r));
+      } catch (err) { report("data.patch " + alias + "/" + id + " threw: " + JSON.stringify(err)); }
+    }
+    report("game data ready");
+  })();
 
   const epoch = String(Math.floor(Math.random() * 900000) + 100000);
   const outbox = [];        // what the page sends to the relay
@@ -139,6 +179,7 @@ const Bridge = (() => {
     }
   }
 
+  let lastPollError = null;
   async function poll() {
     try {
       const entries = decodeMailbox(await cfgLoad("to_ui"));
@@ -158,7 +199,8 @@ const Bridge = (() => {
       }
       answerHello();
     } catch (err) {
-      if (window.inzoi.debug) window.inzoi.debug.log("[PawHome] poll failed: " + err);
+      const text = "poll failed: " + (err && err.message || JSON.stringify(err));
+      if (text !== lastPollError) { lastPollError = text; report(text); }
     } finally {
       setTimeout(poll, POLL_MS);
     }

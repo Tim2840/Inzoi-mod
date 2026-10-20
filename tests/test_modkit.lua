@@ -20,6 +20,7 @@ local function world(opts)
         toSim = {}, toClient = {}, -- queued inzoi.message deliveries
         toasts = {},
         queued = {},              -- interactions put in the Zoi's queue
+        home = true,              -- is the Zoi on the household's lot
         uiState = opts.uiState,   -- what wf.state.pawhome held when the save was loaded
     }
     w.b2 = {
@@ -34,6 +35,7 @@ local function world(opts)
             return true
         end,
         send = function(eid, ch, payload) w.toClient[#w.toClient + 1] = { eid, ch, payload } end,
+        atHome = function() return w.home end,
         enqueue = function(zoi, target, bag)
             w.queued[#w.queued + 1] = { zoi = zoi, target = target, bag = bag }
             return true
@@ -309,6 +311,21 @@ T.test("modkit: the placeholder-to-cat mapping survives save and load", function
     T.eq(#again.w.queued, 0, "no second cat is summoned")
 end)
 
+T.test("modkit: a cat adopted away from home is summoned when the Zoi gets home", function()
+    local s = boot({ spawn = true })
+    s.pump()
+    s.w.home = false
+    local offers = s.app:offers(77, true)
+    T.truthy(s.app:adoptOffer(77, 501, offers[1].id, "Mimi").ok, "adopting works anywhere")
+    T.eq(#s.w.queued, 0, "nothing is summoned at the gym")
+    s.w.hour = s.w.hour + 6
+    T.truthy(s.adapter.entityExists(s.app.ctx.state.pets[1].entity), "still counted as on its way")
+    s.w.home = true
+    s.pump(1)
+    T.eq(s.w.queued[1].bag, ModKit.WELCOME, "summoned once home")
+    T.eq(#s.w.queued, 1)
+end)
+
 T.test("modkit: a summon that never shows up is given up after a while so the engine retries", function()
     local s = boot({ spawn = true })
     s.pump()
@@ -330,6 +347,21 @@ T.test("modkit: sending a pet away queues the goodbye interaction on its cat", f
 end)
 
 -- ------------------------------------------------------------------ city cats and care
+
+T.test("modkit: a summoned cat found on the home lot after the welcome interaction is bound", function()
+    local s = boot({ spawn = true })
+    s.w.homeCats = {}
+    s.w.b2.homeCats = function() return s.w.homeCats end
+    s.pump()
+    local offers = s.app:offers(77, true)
+    T.truthy(s.app:adoptOffer(77, 501, offers[1].id, "Mimi").ok)
+    -- the cat appears; the cat binding never reports it, only the lot search finds it
+    s.w.homeCats = { 112400 }
+    s.adapter.onInteractionFinished({ entity_id = 501, target_entity_id = 501, interaction_bag_id = ModKit.WELCOME })
+    local ref = s.app.ctx.state.pets[1].entity
+    T.eq(s.adapter.refs[ref], 112400)
+    T.truthy(s.adapter.entityExists(ref))
+end)
 
 T.test("modkit: city cats the Zoi fed can be adopted as strays; others cannot", function()
     local s = boot()

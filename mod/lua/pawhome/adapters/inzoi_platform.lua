@@ -76,12 +76,66 @@ function Platform.b2(opts)
     end
     p.value = value
 
+    -- Verified 2026-10-21: FB2EntityManager:GetAllEntities(type) returns a TArray with Num(),
+    -- indexed from 1, whose items are the game objects (FB2GameObject / FB2Character).
+    local function eachEntity(entityType, fn)
+        local em = inzoi.getB2Manager("FB2EntityManager")
+        local list = em:GetAllEntities(entityType)
+        for i = 1, list:Num() do
+            local item = list[i]
+            if item ~= nil and fn(item) then return item end
+        end
+        return nil
+    end
+
+    -- The character object of a Zoi. Bindings do not always report existing Zois, so the
+    -- entity manager is searched when needed and the answer cached.
+    function p.character(eid)
+        local c = p.zois[eid]
+        if c then
+            local alive = pcall(function() return c:GetEntityId() end)
+            if alive then return c end
+            p.zois[eid] = nil
+        end
+        c = eachEntity(inzoi.EB2EntityType.Character, function(item)
+            local ok, id = pcall(function() return value(item:GetEntityId()) end)
+            return ok and id == eid
+        end)
+        if c then p.zois[eid] = c end
+        return c
+    end
+
+    -- Summoned cats on the household's lot: DEV_Void_Cat objects whose site is the home site.
+    -- (Runtime-summoned cats never reach the ObjectTemplate binding, seen 2026-10-21.)
+    function p.homeCats()
+        local home, out = p.homeSite(), {}
+        if not home then return out end
+        eachEntity(inzoi.EB2EntityType.GameObject, function(item)
+            local ok, isCat, site, eid = pcall(function()
+                return tostring(item:GetObjectTableId()) == "DEV_Void_Cat",
+                    tostring(item:GetLocatedSiteDtId()), item:GetObjectKey().Value
+            end)
+            if ok and isCat and site == home then
+                p.cats[eid] = item
+                out[#out + 1] = eid
+            end
+            return false
+        end)
+        return out
+    end
+
     -- UNVERIFIED: FB2Actor:GetHouseholdEntityId, FB2EntityManager:FindHousehold, Currency component.
     local function wallet(hid)
         local em = inzoi.getB2Manager("FB2EntityManager")
-        for _, character in pairs(p.zois) do
-            local hidStruct = character:GetHouseholdEntityId()
-            if value(hidStruct) == hid then
+        -- the controlled Zoi first; objects the game has released are skipped and forgotten
+        local order, me = {}, p.possessed()
+        if me and p.character(me) then order[1] = me end
+        for eid in pairs(p.zois) do if eid ~= me then order[#order + 1] = eid end end
+        for _, eid in ipairs(order) do
+            local ok, hidStruct = pcall(function() return p.zois[eid]:GetHouseholdEntityId() end)
+            if not ok then
+                p.zois[eid] = nil
+            elseif value(hidStruct) == hid then
                 local household = em:FindHousehold(hidStruct)
                 return household and household:GetComponent(inzoi.EB2ComponentType.Currency), hidStruct
             end
@@ -130,12 +184,41 @@ function Platform.b2(opts)
         return 0
     end
 
+    -- TrySubtractCurrency(value) answers true but does not change the money (seen 2026-10-21),
+    -- so the city's currency (FB2City.GetCurrencyId) is reduced explicitly. Only a call
+    -- after which the balance really dropped counts; the working call is reported once.
+    local chargeReported = false
     function p.charge(hid, amount)
-        local ok, done = pcall(function()
-            local w = wallet(hid)
-            return w and w:TrySubtractCurrency(amount)
-        end)
-        return ok and done == true
+        local w, owner
+        local okW = pcall(function() w, owner = wallet(hid) end)
+        if not okW or not w then return false end
+        local function balance()
+            local a, b = w:GetCurrency(owner)
+            return tonumber(type(b) == "number" and b or a)
+        end
+        local before = balance()
+        if not before or before < amount then return false end
+        local reason = inzoi.EB1TransactionReason.ExpenseDefault
+        local attempts = {
+            { "AddCurrency(-n)", function() return w:AddCurrency(-amount, reason, owner, false, owner) end },
+            { "SetCurrency(id)", function()
+                local id = inzoi.FB2City.GetCurrencyId()
+                return w:SetCurrency(id, before - amount, reason, owner, false, owner)
+            end },
+        }
+        local notes = {}
+        for _, a in ipairs(attempts) do
+            local ok, r = pcall(a[2])
+            local after = balance()
+            if after and after <= before - amount then
+                if not chargeReported and p.report then p.report("charge via " .. a[1] .. ": " .. before .. " -> " .. after) end
+                chargeReported = true
+                return true
+            end
+            notes[#notes + 1] = a[1] .. ": " .. tostring(ok) .. "/" .. tostring(r) .. " balance " .. tostring(after)
+        end
+        if p.report then p.report("charge failed: " .. table.concat(notes, "; ")) end
+        return false
     end
 
     -- Verified: inzoi.message.send_to_client(number entity id, channel, payload) reaches the
@@ -147,7 +230,7 @@ function Platform.b2(opts)
     -- UNVERIFIED: FB2InteractionComponent:AddInteractionQueueByParam (luals-defs).
     function p.enqueue(zoi, targetEid, bagId)
         local ok, result = pcall(function()
-            local character = p.zois[zoi]
+            local character = p.character(zoi)
             if not character then error("no character object for " .. tostring(zoi)) end
             local target
             if targetEid == zoi then
@@ -158,11 +241,14 @@ function Platform.b2(opts)
                 target = cat:GetObjectKey()
             end
             local ic = character:GetComponent(inzoi.EB2ComponentType.Interaction)
+            -- all parameters: (target, impact point, bag, play reason, insert front,
+            -- multi sequence, reason text, send packet, is next interaction)
             return ic:AddInteractionQueueByParam(target, character:GetLocation(), bagId,
-                inzoi.EB1InteractionPlayReason.User, false)
+                inzoi.EB1InteractionPlayReason.User, false, false, "PawHome", true, false)
         end)
-        if p.report then p.report("enqueue " .. tostring(bagId) .. ": " .. tostring(ok) .. " " .. tostring(result)) end
-        return ok
+        local success = ok and (result == inzoi.EB1AddInteractionQueueResult.Success or result == 37)
+        if p.report then p.report("enqueue " .. tostring(bagId) .. ": " .. tostring(ok) .. " result " .. tostring(result)) end
+        return success
     end
 
     -- Home site of the controlled Zoi. Verified field: entity.get_character_info returns
@@ -174,6 +260,20 @@ function Platform.b2(opts)
         local t = cli("entity.get_character_info entity_id=" .. zoi)
         homeSite = t and t.home_site_id
         return homeSite
+    end
+
+    -- UNVERIFIED: FB2Actor:GetLocatedSiteDtId (luals-defs). The first answer is reported.
+    local homeReported = false
+    function p.atHome(zoi)
+        local character = p.character(zoi)
+        if not character then return false end
+        local ok, site = pcall(function() return tostring(character:GetLocatedSiteDtId()) end)
+        local home = p.homeSite()
+        if not homeReported and p.report then
+            p.report("atHome: Zoi site " .. tostring(ok and site) .. ", home " .. tostring(home))
+            homeReported = true
+        end
+        return ok and home ~= nil and site == home
     end
 
     -- Cat identity, verified 2026-10-20: owner:GetObjectKey().Value, owner:GetLocation().

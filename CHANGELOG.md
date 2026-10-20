@@ -3,6 +3,8 @@ All notable changes are listed here ([Keep a Changelog](https://keepachangelog.c
 
 ## [Unreleased]
 ### Added
+- Official ModKit route runs in the game (20261019.16318.W): B2 engine, B1 relay and the Paw Home panel; adoption charges the household's money; the adopted cat is summoned at home as a visible DEV_Void_Cat and stays bound to the pet across save and load (`docs/design/modkit-runtime.md`).
+- `tools/build_modkit.py`: assembles the playable mod folder from the repo.
 - ADR 0008: the home pet is a summoned `DEV_Void_Cat` (visible, interactable, persists across save/load, appearance re-randomized on load, removable with `DespawnGameObject`); the PO gives big-direction instructions only.
 - ADR 0007: plan C (virtual pet) plus city adoption, engine stays in Lua; phase 0 in-game results (B2/B1/UI data channel, city cats, build-mode placement) in `docs/phase0-results.md`.
 - `tools/game_mcp.py`: call the running game's MCP server from the repo (used for automated in-game probing).

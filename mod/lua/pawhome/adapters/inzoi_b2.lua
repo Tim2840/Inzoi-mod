@@ -9,12 +9,7 @@ local R = { platform = nil, adapter = nil, app = nil, handlers = {}, opts = {}, 
 
 -- Lines also go to the B1 relay's log (pawhome:diag), the only place a running B2 can report to.
 local function log(line)
-    if not R.platform then return end
-    R.platform.log(line)
-    pcall(function()
-        local eid = R.platform.possessed()
-        if eid then R.platform.send(eid, "pawhome:diag", line) end
-    end)
+    if R.platform then R.platform.log(line) end    -- also reaches the relay log (see start)
 end
 
 local function who()
@@ -40,6 +35,15 @@ function R.start(opts)
     R.opts = opts
     R.platform = Platform.b2(opts)
     R.platform.report = function(line) log(line) end
+    -- the adapter logs through platform.log; show those lines in the relay log as well
+    local keep = R.platform.log
+    R.platform.log = function(line)
+        keep(line)
+        pcall(function()
+            local eid = R.platform.possessed()
+            if eid then R.platform.send(eid, "pawhome:diag", line) end
+        end)
+    end
     -- os is blocked in the game's sandbox; seed from the game clock instead
     pcall(function()
         local d, h, m = R.platform.time()
@@ -83,7 +87,20 @@ end
 
 -- Manager(Time) on_tick, real seconds.
 function R.tick(dt)
-    if ensure() then R.adapter.tick(dt) end
+    if not ensure() then return end
+    R.adapter.tick(dt)
+    -- one status line shortly after start: how many cats the cat binding has reported
+    R.uptime = (R.uptime or 0) + (dt or 0)
+    if not R.statusSent and R.uptime > 10 then
+        R.statusSent = true
+        local cats, home, zois = 0, 0, 0
+        for _, c in pairs(R.adapter.cats) do
+            cats = cats + 1
+            if c.home then home = home + 1 end
+        end
+        for _ in pairs(R.platform.zois) do zois = zois + 1 end
+        log(("status: %d cats known (%d at home), %d Zois known"):format(cats, home, zois))
+    end
 end
 
 -- Zoi(ResidenceFamily) on_begin / on_end: keeps the character objects the platform needs.
@@ -113,7 +130,11 @@ end
 function R.onCatBegin(owner)
     if not ensure() then return end
     local ok, eid, info = pcall(R.platform.catInfo, owner)
-    if ok and eid then R.adapter.onCatBegin(eid, info) end
+    if not ok then log("cat begin failed: " .. tostring(eid)) return end
+    if #R.adapter.pending > 0 then
+        log("cat " .. tostring(eid) .. " appeared on " .. tostring(info.site) .. ", home=" .. tostring(info.home))
+    end
+    R.adapter.onCatBegin(eid, info)
 end
 
 function R.onCatEnd(owner)

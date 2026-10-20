@@ -31,27 +31,35 @@ UI ──wf.state──▶ 遊戲存檔（UIMD 區塊）
 4. `saveSet` 更新快取並送 `pawhome:save`；UI 寫進 `wf.state.pawhome`，下次遊戲存檔時一起存。
 5. UI 沒回應（UI 模組被停用）時引擎維持暫停，不會產生沒存檔的假狀態。
 
-## 4. adapter 函式對照
+## 4. adapter 函式對照（2026-10-21 遊戲 `20261019.16318.W` 實測）
 
 | 函式 | 實作 | 狀態 |
 |---|---|---|
-| `now()` | `FB2TimeManager:GetDay()*1440 + GetHour()*60 + GetMinute()` | 未驗證（方法在定義檔） |
-| `slotId` / `saveGet` / `saveSet` | 第 3 節 | 通道已驗證，協定待實作 |
-| `subscribe("slot_changed")` | 收到 `pawhome:state` 時觸發 | — |
-| `notify` | `pawhome:toast` → B1 `toast.show` | `toast.show` 已驗證 |
-| `householdMembers` | `FB2Household:GetHouseholdMembers()` | 未驗證 |
-| `funds` / `charge` | `FB2CurrencyComponent:GetCurrencyAmount` / `TrySubtractCurrency` | 未驗證 |
-| `spawnPet` | 把自訂互動 `PawHome_WelcomeCat` 排進 Zoi 佇列（`FB2InteractionComponent:AddInteractionQueueByParam`）；互動結束腳本 `SpawnGameObjectToFront S1=DEV_Void_Cat`；新貓由 `ObjectTemplate` 綁定的 `on_begin` 回報實體 ID。**非同步**：回傳 nil，下一個小時引擎再問 `entityExists` | 生成已驗證；排佇列未驗證 |
-| `entityExists` | 貓綁定的 `on_begin`／`on_end` 維護的集合 | 綁定已驗證 |
-| `despawnPet` | 排入互動 `PawHome_SendAway`，結束腳本 `DespawnGameObject BaseObject=Target` | 移除已驗證；排佇列未驗證 |
-| `listStrays` | 城市貓綁定記錄的實體 ID 與座標 | 已驗證 |
+| `now()` | `FB2TimeManager:GetDay()*1440 + GetHour()*60 + GetMinute()` | ✅ 已驗證 |
+| `slotId` / `saveGet` / `saveSet` | 第 3 節（握手、`wf.state`） | ✅ 已驗證，含存檔→讀檔 |
+| `notify` | `pawhome:toast` → B1 `toast.show` | ✅（toast 本身已驗證） |
+| `householdMembers` / 家戶 | `household.get_members`（回 `household_id`、`members[].entity_id`） | ✅ 已驗證 |
+| `funds` | 家戶貨幣元件 `GetCurrency(owner)`（owner＝家戶的 `FB1EntityId`；out 參數不傳） | ✅ 已驗證（₼256） |
+| `charge` | `SetCurrency(FB2City.GetCurrencyId(), 餘額-金額, ExpenseDefault, owner, false, owner)`；以前後餘額確認 | ✅ 已驗證（256→106，存檔後仍是 106）。`TrySubtractCurrency` 回 true 但不扣錢 |
+| `spawnPet` | 待定代號；Zoi 在家時以 `FB2InteractionComponent:AddInteractionQueueByParam(…, User, false, false, "PawHome", true, false)` 排入 `PawHome_WelcomeCat`（結果 37＝Success）；互動結束後以 `GetAllEntities(GameObject)` 找家裡的新 `DEV_Void_Cat` 綁定 | ✅ 已驗證，綁定跨存檔保留、讀檔後不重複召喚 |
+| `entityExists` | 綁定或家裡搜尋得知的貓 | ✅ |
+| `despawnPet` | 排入 `PawHome_SendAway`（結束腳本 `DespawnGameObject Target`） | 移除腳本已驗證；經 adapter 排入未在遊戲內跑過 |
+| `listStrays` | 城市貓綁定＋`interaction.finished` | 綁定與事件已驗證 |
 | `bringStray` | 不支援（`caps.moveStray = false`） | 實測做不到 |
 | `addBuff` / `playAnimation` | 暫不支援 | — |
 
-## 5. 資料補丁（隨模組出貨，`non_ufs/JsonPatch`，需 ModKit 資料工作區）
+### 實測得到的限制
+- 遊戲的實體查詢只收 `FB1EntityId`，不收數字，也沒有建構方式：一律從遊戲物件取得（`GetEntityId()`、`GetHouseholdEntityId()`、`GetObjectKey()`），找不到時以 `GetAllEntities(類型)` 搜尋（TArray，`Num()`，索引從 1）。
+- 綁定只涵蓋載入時就存在的實體：熱掛載不會補 `on_begin`；執行中召喚的貓也不會觸發 `ObjectTemplate` 綁定。
+- 開發時 `luamod.mount` 要在讀檔前掛上；主選單掛載後 B2 會在模擬開始時拿到腳本。
+- 遊戲的靜態分析會**拒絕載入有錯誤的檔案**（例如提到 `loadstring`），也會把名稱像 `Inzoi` 的區域變數當成 `INZOI` 命名空間。
+- 遊戲瀏覽器沒有 `replaceChildren`／`append`／`Array.flat`，不吃 CSS 變數，字型沒有 emoji。
+
+## 5. 遊戲資料（每次載入由 UI 以 Public 的 `data.patch` 加入，不寫進存檔）
 
 - `Script`：`PawHome_SpawnCat`（`SpawnGameObjectToFront DEV_Void_Cat`）、`PawHome_DespawnTarget`（`DespawnGameObject Target`）。
-- `Interaction`／`InteractionBag`／`Action_Interaction`：`PawHome_WelcomeCat`（對自己）、`PawHome_SendAway`（對貓）、`PawHome_Adopt`（對城市貓）。
+- `Interaction`／`InteractionBag`：`PawHome_WelcomeCat`（沿用原版 `Self_Pose_CatHeart` 動作）、`PawHome_SendAway`（沿用 `Object_Void_Cat_Tickle` 動作）。只填必要欄位，其他用預設值（已驗證可行）。不加進任何選單，只由模組排進佇列。
+- 待做：`PawHome_Adopt`（城市貓選單的領養入口）。
 - `ObjectSelectionSet_Dev[Id=DEV_Void_Cat]…InteractionBagList` 加 `PawHome_Adopt`（Witchcraft 已證明可行）。
 - 照顧動作直接沿用原版 `Object_Void_Cat_Dev`（餵零食）、`Object_Void_Cat_Tickle`（玩），由 `interaction.finished` 事件計入。
 
