@@ -36,7 +36,7 @@ PO 的目標（2026-10-21）：接近 The Sims 4《貓狗成群》家貓的程�
   拿不到鎖就先做不需要遊戲的工作，稍後再試。只讀查詢（`data.table_get`、`cli_help`、`game.get_state`、掃描）不用鎖。
 - 拿鎖之後、操作之前，先看 `game.get_state`：如果狀態不是上一個持鎖者留下的樣子（例如 PO 正在玩），立刻停手並回報。
 - **不要存 PO 的存檔。** 需要存檔的測試用專用測試存檔（名稱見 M2，完成前一律不存檔離開）。
-- 開發版模組資料夾 `Documents\inZOI\Mods\InGame\PawHomeDev_A5BI7C` 是共用的：只在持鎖時用 `py -I tools/build_modkit.py` 重建，釋放鎖前不需要還原。
+- 開發版模組資料夾 `Documents\inZOI\Mods\InGame\PawHomeDev_A5BI7C` 是共用的：只在持鎖時用 `py -I tools/build_modkit.py "C:/Users/user/Documents/inZOI/Mods/InGame/PawHomeDev_A5BI7C"` 重建；之後在主選單 `luamod_remount`、`uimod_enable Keyword=PawHomeDev`，再讀檔，釋放鎖前不需要還原。
 - ModKit 的官方文件在 `C:\Games\inZOIModKit\inZOIModKit\Data\Tools\mcp\modkit\`（`workspace_docs/`、`data_asset_schemas/`、`datatable_docs/`、`cli_catalog.json`）；Lua 定義檔在遊戲目錄 `BlueClient/Content/Data/Lua/luals-defs/`。
 - 研究結論寫進 `docs/research/<主題>.md`：每一條都標「已驗證（遊戲版本、日期、依據）」或「未驗證」，不捏造。
 - 只改自己工作線的檔案；共用檔案（`mod/ui/bridge.js` 的 `GAME_DATA`、`mod/lua/pawhome/adapters/inzoi*.lua`）的修改要小而集中，方便合併。
