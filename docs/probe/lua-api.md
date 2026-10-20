@@ -128,11 +128,11 @@
 | U1 | ✅ 是。綁定觸發時 `GetObjectId()` 為 `Level_Void_Cat` 或 `DEV_Void_Cat`；實體 ID 跨載入不變 | 探勘模組 cat 日誌，兩次載入比對 |
 | U2 | ✅ 會，江南 49 隻，每隻各自的 `self` | 同上 |
 | U3 | ✅ `Object_Void_Cat_Tickle`、`Object_Void_Cat_Dev`（可用）；搜尋另有 `_Sad_Lv1–3`、`Perspective_Void_Cat_Dev`、`Ghost_Object_Void_Cat_Dev` | `interaction.list_available`、`interaction.search` |
-| U4 | 未測；B2 有 `FB2Actor:SetLocationOnlySimul`（說明：只動 B2，要通知 B1 用 `Teleport()`，但 `Teleport` 沒匯出） | luals-defs |
+| U4 | ❌：`movement.teleport_to`／`summon` 只接受角色；B2 `SetLocationOnlySimul` 改了模擬座標但畫面不動（`Teleport()` 沒匯出） | 第七、八輪＋截圖 |
 | U5 | ❌ `on_savegame`／`on_loadgame` 沒觸發（Main、Manager=Time、ObjectTemplate；ModKit 預覽模式） | 2 次存檔、3 次載入 |
 | U6 | ❌ 沒有 json（B1、B2 都是 Lua 5.4） | `rawget(_G, "json")` |
-| U7 | ❌（目前）：`send_to_client(entity_id, ...)` 不報錯，但 B1 Main 與 B1 Zoi 綁定都收不到；B1 訂閱 B2 事件也收不到。B1／B2 互相不能呼叫對方的 CLI 指令 | env／b1／b1zoi 日誌 |
-| U8 | 未測 | |
+| U7 | ✅：B2 `Zoi/ResidenceFamily` 綁定 `send_to_client(數字ID, 頻道, 內容)` → B1 同實體 `Zoi/ResidenceFamily` 綁定 `on_lua_message`；反向 `send_to_sim`。B1→UI 用 `uimod.cfg_save`／`cfg_load` 輪詢。UI 可直接呼叫 B1、B2 的 Public 指令 | 第六、七輪 |
+| U8 | 未測。另：manifest 的 `game_event` 觸發沒有送到 `inzoi.trigger.onActivated` | 第五輪 |
 | U9 | 主選單 ❌（CheatManager not available）；遊戲內 ✅（`environment.time_skip`、`interaction.execute`、`game.goto_lobby`） | 第四輪 |
 
 官方 LuaLS 定義檔在遊戲目錄 `BlueClient/Content/Data/Lua/luals-defs/`（`sandbox.lua` 寫明：擋 `dofile`／`loadfile`／`loadstring`，
