@@ -94,3 +94,19 @@
 
 - 最低：RAM 12 GB、儲存空間 40 GB、RTX 2060 / RX 5600 XT（6 GB VRAM）；建議：RAM 16 GB、60 GB、RTX 3070 / RX 6800 XT。
 - [Epic 商店頁](https://store.epicgames.com/en-US/p/inzoi-modkit)
+
+### 第 1 步追加（2026-10-20 讀取）
+
+| 型別 | 讀到的重點 | 對寵物的意義 |
+|---|---|---|
+| [`FB2AdoptionManager`](https://mod-docs.playinzoi.com/docs/modkit-docs/wiki/luaapi/b2/systems/fb2adoptionmanager) | 「管理領養流程」；屬性與函式全是角色型別（`FB1CharacterAttribute`、`FB2CharacterGenerateParam`、`EB1GrowthStep`），分 `RequestAdoption_Medical` / `RequestAdoption_Physical` | 看起來是**領養小孩**，不是寵物（依型別名稱推論，頁面沒明講） |
+| [`FB2HowlingComponent`](https://mod-docs.playinzoi.com/docs/modkit-docs/wiki/luaapi/b2/components/fb2howlingcomponent) | 「管理嚎叫（吠叫等）」；`OnReceiveHowling(HowlingId, SenderId)`、失敗冷卻 | 可能和動物聲音有關，物種不明 |
+| [`FB2EntityManager`](https://mod-docs.playinzoi.com/docs/modkit-docs/wiki/luaapi/b2/systems/fb2entitymanager) | 75 個函式：`GetAllEntities(EB2EntityType)`、`FindCharacter`、`FindGameObject`、`Register`、`Unregister`、`DestroyObject`、`RequestCharacterStateChange`… | 可以找、列舉、註冊、移除實體；**沒提到動物** |
+| [`FB2TimeTaskManager`](https://mod-docs.playinzoi.com/docs/modkit-docs/wiki/luaapi/b2/systems/fb2timetaskmanager) | 只有查詢、移除、清空排程任務；**沒有建立任務的函式** | P7「每小時跑一次」要另找方法（例如覆寫既有的每日／每時規則） |
+| [`EB2EntityType`](https://mod-docs.playinzoi.com/docs/modkit-docs/wiki/luaapi/b2/enums/eb2entitytype) | `City`、`Site`、`Character`、`GameObject`、`HowlingEmitter`、`Household`、`HouseholdBiz`、`Career`、`Vehicle`、`CoopScheduler`、`Spawner`、`Inventory` | **沒有「動物」實體類型** |
+
+**推論（未驗證）**：UE4SS 觀察到城市貓 `BP_Void_Cat_C` 的繼承鏈是 `BP_AnimalObjectTemplate → B1GameObject`，
+而模擬層沒有動物實體類型，所以遊戲裡的貓很可能是**會動的「遊戲物件」（GameObject）**。若成立，官方路線的寵物
+可以考慮做成 **ModKit 互動物件**（互動物件規格＋DataAsset）：照顧動作是物件的互動，效果用 Lua 覆寫接到引擎。
+第 0 階段要確認：P2 時用 `FB2EntityManager:GetAllEntities(GameObject)` 找城市貓、看牠的元件與互動；
+P9 時看能不能以 `BP_AnimalObjectTemplate` 這類範本做新的物件。
