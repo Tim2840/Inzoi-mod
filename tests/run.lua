@@ -1,7 +1,7 @@
 -- Runs every suite and returns the number of failures.
 local T = require("framework")
 
-for _, suite in ipairs({ "test_core", "test_pets", "test_slots", "test_clock", "test_presence", "test_ue4ss", "test_ue4ss_main", "test_ue4ss_probe" }) do
+for _, suite in ipairs({ "test_core", "test_pets", "test_slots", "test_clock", "test_presence", "test_ue4ss", "test_ue4ss_main", "test_ue4ss_probe", "test_inzoi_probe" }) do
     local ok, err = pcall(require, suite)
     if not ok then
         T.failed = T.failed + 1

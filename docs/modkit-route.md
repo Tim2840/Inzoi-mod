@@ -77,7 +77,16 @@
 1. **不需安裝**：繼續讀 B2 的 Systems／Components 單頁（`FB2SpawnerManager`、`FB2AdoptionManager`、`FB2HowlingComponent` 等）看有沒有函式說明。
 2. PO 從 Epic 安裝 ModKit（大小待查）。
 3. 用 `/mcp` 連上 `inzoi-game`、`inzoi-modkit`，照 `docs/phase0-probe.md` 做 P1 → P7 → P8（先確認做得到的底線：計時、存資料、UI 按鈕），再做 P2–P6、P9（真寵物的可能性）。
-4. 結果寫 `docs/phase0-results.md`，決定方案 A／B／C。
+4. 結果寫 `docs/phase0-results.md`（已有空白範本），決定方案 A／B／C。
+
+**探勘腳本**（P1／P7 用，唯讀，2026-10-20 加入，**未在遊戲裡跑過**）：在 ModKit 的 Lua 環境執行
+`print(require("pawhome.adapters.inzoi").discover())`，把輸出整段貼進 `docs/phase0-results.md` 的「探勘腳本輸出」。
+它會 `require` 官方頁面寫的 `Systems.B2SpawnerManager`，以及照同樣命名規則**猜**的 `Systems.B2TimeManager`、
+`B2TimeTaskManager`、`B2AdoptionManager`、`B2EntityManager`、`B2PopulationSystem`、`B2HouseholdManager`，
+列出每個模組的函式、`Override_` 鉤子與欄位，再掃全域變數，最後把名字含 pet／animal／cat／adopt／spawn 等字的項目集中列出。
+它只讀 table、不呼叫任何遊戲函式。想多試其他路徑：`discover({ "Components.B2HowlingComponent" })`。
+`require("pawhome...")` 在 ModKit 裡能不能這樣載入也是 P7 要確認的事；不行的話，直接把 `adapters/inzoi_probe.lua`
+的內容貼進編輯器，最後改成 `print(Probe.run({ require = require, G = _G, version = _VERSION }))`。
 
 ## 8. 單頁細節（第 0 階段第 1 步，持續補充）
 

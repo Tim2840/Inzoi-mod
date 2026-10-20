@@ -3,8 +3,9 @@
 -- probe question that fills it in. Until then caps are all false, so the mod
 -- runs as a "virtual pet" (plan C): no spawning, no moving, no animations.
 --
--- Run Adapter.discover() once inside the ModKit Lua editor and paste the output
--- into docs/phase0-results.md - it lists every global and inzoi.* entry point.
+-- Run Adapter.discover() once inside the ModKit Lua environment and paste the output
+-- into docs/phase0-results.md - it lists the B2 modules that load, their functions
+-- and Override_ hooks, and every global.
 local Adapter = {}
 
 Adapter.caps = { spawn = false, moveStray = false, buffs = false, animate = false }
@@ -43,26 +44,12 @@ function Adapter.playAnimation(ref, animationId) error("TODO(P6)") end
 -- Language code the game is using, e.g. "zh-TW" / "en".
 function Adapter.locale() return "en" end
 
--- Writes a discovery report: all globals and the contents of any inzoi-like tables.
-function Adapter.discover()
-    local lines = {}
-    local function dump(name, t, depth)
-        if depth > 2 or type(t) ~= "table" then return end
-        local keys = {}
-        for k in pairs(t) do keys[#keys + 1] = tostring(k) end
-        table.sort(keys)
-        lines[#lines + 1] = name .. ": " .. table.concat(keys, ", ")
-        for _, k in ipairs(keys) do dump(name .. "." .. k, t[k], depth + 1) end
-    end
-    for _, root in ipairs({ "inzoi", "game", "Game", "zoi", "Zoi", "cli", "CLI", "ui", "UI" }) do
-        if _G[root] ~= nil then dump(root, _G[root], 0) end
-    end
-    local globals = {}
-    for k in pairs(_G) do globals[#globals + 1] = tostring(k) end
-    table.sort(globals)
-    lines[#lines + 1] = "_G: " .. table.concat(globals, ", ")
-    lines[#lines + 1] = "_VERSION: " .. tostring(_VERSION)
-    return table.concat(lines, "\n")
+-- Discovery report for Phase 0 (P1/P7): loads the documented module path and the guessed
+-- ones, lists their functions and Override_ hooks, and scans the globals. Read-only.
+-- See adapters/inzoi_probe.lua.
+function Adapter.discover(extra)
+    local Probe = require("pawhome.adapters.inzoi_probe")
+    return (Probe.run({ require = require, G = _G, version = _VERSION, extra = extra }))
 end
 
 return Adapter

@@ -8,7 +8,7 @@
 - MCP：repo 的 `.mcp.json` 已登記 `inzoi-game`（:11212）、`inzoi-modkit`（:11213）；第一次執行 `claude` 時 PO 要按信任。
 - 遊戲資料夾：**UE4SS 已停用**（`Win64\dwmapi.dll` 改名為 `dwmapi.dll.off`，改回即恢復）；`ue4ss\Mods\PawHome\pawhome_disabled.txt` 存在；ZoiPets 的 `enabled.txt` 改名為 `enabled.txt.off`。紀錄：`C:\Dev\backups\2026-10-20-pre-M1-3b\isolation-state.txt`。
 - 存檔備份（已驗證）：`C:\Dev\backups\2026-10-20-pre-T2`、`-pre-M1-3b`、`-pre-isolation`、`-pre-isolation-2`。
-- 測試：135/135（Lua 5.4）。
+- 測試：135/135（Lua 5.4）。之後雲端 session 加了 ModKit 探勘腳本（`adapters/inzoi_probe.lua`），145/145。
 
 ## 下一步
 1. ModKit 裝好後：PO 開遊戲（進存檔）與 ModKit，`claude mcp list` 確認兩個伺服器 Connected。
