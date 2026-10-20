@@ -16,8 +16,8 @@ UE4SS 維持停用。PO 另外裝了其他 CurseForge 模組（Alimony、Witchcr
 | P3 移動或跟隨 | 未知 | 未測 | B2 有 `FB2Actor:SetLocationOnlySimul`（只動模擬層，不通知 B1） | 貓在模擬層 3 分鐘內座標完全不動 |
 | P4 生成貓 | ❌ 文件層面沒路 | 未測 | — | |
 | P5 存檔後還在 | — | 部分：城市貓的實體 ID 跨載入穩定（不是我們生成的貓） | | |
-| P6 觸發互動或動作 | 部分 | 部分：`interaction.list_available target=89129` 回傳 `Object_Void_Cat_Tickle`（遊ぶ）、`Object_Void_Cat_Dev`（おやつをあげる）；共 7 個貓互動 | `interaction.list_available`、`interaction.search`（Public） | 觸發要用 `interaction.execute`（UserCheat），未測 |
-| P7 計時器和存資料 | 計時 ✅；存資料不明 | 計時 ✅：B1 `on_tick` 心跳＋`environment.get_time` 看到 11→12 點；B2 `on_tick` 也跑。存資料 ✅（UI）：`wf.state` 存檔→回主選單→讀檔後取回 `{"pet_name":"咪咪","counter":2}`。❌（Lua）：`on_savegame`／`on_loadgame` 在 Main、Time 管理器、貓綁定都沒觸發（2 次存檔、3 次載入） | `wf.state`、`on_tick`、`inzoi.event.on` | `time.hour_changed` 有訂閱成功，但紀錄被其他事件擠掉，**未確認** |
+| P6 觸發互動或動作 | 部分 | ✅ `interaction.execute interaction_bag_id=Object_Void_Cat_Dev target_entity_id=89129`：Zoi 走到那隻橘貓旁播放餵零食（截圖確認）。`list_available` 回傳 `Object_Void_Cat_Tickle`（遊ぶ）、`Object_Void_Cat_Dev`（おやつをあげる）；共 7 個貓互動 | `interaction.execute`（UserCheat，遊戲內可用）、`interaction.list_available`（Public） | B2 的 `interaction.started/finished` 事件帶 Zoi ID、互動 ID、貓的實體 ID；NPC 對貓的互動也收得到 |
+| P7 計時器和存資料 | 計時 ✅；存資料不明 | 計時 ✅：B1 `on_tick` 心跳＋`environment.get_time` 看到 11→12 點；B2 `on_tick` 也跑。存資料 ✅（UI）：`wf.state` 存檔→回主選單→讀檔後取回 `{"pet_name":"咪咪","counter":2}`。❌（Lua）：`on_savegame`／`on_loadgame` 在 Main、Time 管理器、貓綁定都沒觸發（2 次存檔、3 次載入） | `wf.state`、`on_tick`、`inzoi.event.on` | B2 `time.hour_changed` ✅（`{hour=13}`；`time_skip` 跳 2 小時只觸發一次） |
 | P8 UI 呼叫指令 | ✅ 文件完整 | ✅ overlay 視窗顯示在遊戲內；按鈕 → `toast.show` 跳出通知（PO 目視＋`ui.find` 讀到） | `toast.show` | 預設字型**不支援 emoji**（🐱 顯示成方框） |
 | P9 加入互動選單 | 部分 | 未測 | `interaction_menu` | |
 | P10 狗 | 有範本 | 未測 | | |
@@ -27,11 +27,11 @@ UE4SS 維持停用。PO 另外裝了其他 CurseForge 模組（Alimony、Witchcr
 1. **B1／B2 嚴格分執行緒**：B2 Lua 呼叫 B1 指令回「is B1-only… Cannot call from sim thread Lua」；B1 Lua 呼叫 B2 指令回「is B2-only… Cannot call from game thread Lua」。
    唯一例外：B2 的 `on_end`（模擬拆除時）呼叫 B1 指令成功過。
 2. **B2→B1 訊息**：`inzoi.message.send_to_client` 第一個參數必須是實體 ID；呼叫不報錯，但 B1 的 Main 收不到（`on_lua_message` 沒觸發）。
-   送到綁定在該實體上的 B1 腳本會不會收到：**下一輪測**（已寫好 B1 Zoi 綁定）。
+   B1 的 Zoi 綁定（`*`）也沒收到（第四輪，送給被操控的 Zoi 16597）。**目前沒有找到 B2→B1 的可用通道。**
 3. **B1 不能訂閱 B2 事件**：B1 的 `inzoi.event.on("time.hour_changed")` 回 nil、之後也沒收到。
 4. **Lua 環境**：B1、B2 都是 Lua 5.4，**沒有 json**；`io` 不存在、`os` 成員被擋；`require` 只能載入白名單模組（BlueLuaKit 規則 `require-not-allowed`）。
 5. **Shipping 版不寫遊戲 log**，Lua 的 `print` 看不到。探勘改用 `uimod.cfg_save`（B1）寫檔。
-6. **UserCheat 指令在主選單無效**（「CheatManager not available」）；遊戲內未測。
+6. **UserCheat 指令在主選單無效**（「CheatManager not available」），**在遊戲內可用**（`environment.time_skip`、`environment.time_speed`、`interaction.execute`、`game.load`、`game.goto_lobby`）。
 
 ## 初步判斷（不是結論）
 
@@ -41,8 +41,15 @@ UE4SS 維持停用。PO 另外裝了其他 CurseForge 模組（Alimony、Witchcr
   還沒解的是「帶回家」（P3）與「把某隻貓標記成我們的」——後者可以在 UI 的 `wf.state` 記實體 ID。
 - **方案 B** 仍然看不到路。
 
+## 自動化
+
+遊戲內測試可以不需要 PO 點擊：`tools/game_mcp.py` 直接呼叫遊戲 MCP（`game.load` → `environment.time_skip` →
+`interaction.execute` → `game.goto_lobby save=false`），日誌從 `ModKitPreview/PawHome_Probe_DBA66034/probe/*.cfg` 讀。
+權限：repo 的 `.claude/settings.local.json`（不進版控）只允許 `py -I tools/game_mcp.py`；會寫入存檔的步驟仍先問 PO。
+
 ## 下一步
 
-1. 第四輪（腳本已寫好、已掛上預覽）：確認 `time.hour_changed`、B2→B1 Zoi 綁定的訊息、UserCheat 在遊戲內能不能用（`environment.time_skip`、`interaction.execute`）。
-2. 自動化：遊戲 MCP 有 `game.load`／`game.goto_lobby`，可以不用 PO 手動點；目前被 Claude Code 自動模式的安全分類器擋下，需要 PO 開權限。
-3. 依 U7 結果決定引擎放 Lua 還是 UI，寫 ADR。
+1. U7：再找 B2→B1／Lua→UI 的通道（`inzoi.data` 的 domain、`ui_event`、B1 綁定在貓物件上）。找不到的話，引擎就放在 UI 的 JS，
+   Lua 只做 B2 掛鉤（讀貓、讀事件）——但 B2 的結果要怎麼交給 UI 仍是同一個問題。
+2. P3：在測試存檔裡試 `SetLocationOnlySimul` 移動一隻貓（不存檔），看 B1 畫面跟不跟。
+3. 依結果決定方案與引擎位置，寫 ADR。

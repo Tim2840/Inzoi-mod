@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+
+# Claude Code local permissions (per machine)
+.claude/settings.local.json

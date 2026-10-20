@@ -131,9 +131,9 @@
 | U4 | 未測；B2 有 `FB2Actor:SetLocationOnlySimul`（說明：只動 B2，要通知 B1 用 `Teleport()`，但 `Teleport` 沒匯出） | luals-defs |
 | U5 | ❌ `on_savegame`／`on_loadgame` 沒觸發（Main、Manager=Time、ObjectTemplate；ModKit 預覽模式） | 2 次存檔、3 次載入 |
 | U6 | ❌ 沒有 json（B1、B2 都是 Lua 5.4） | `rawget(_G, "json")` |
-| U7 | 部分：`send_to_client(entity_id, ...)`；B1 Main 收不到；B1 實體綁定待測。B1／B2 互相不能呼叫對方的 CLI 指令 | env／b1 日誌 |
+| U7 | ❌（目前）：`send_to_client(entity_id, ...)` 不報錯，但 B1 Main 與 B1 Zoi 綁定都收不到；B1 訂閱 B2 事件也收不到。B1／B2 互相不能呼叫對方的 CLI 指令 | env／b1／b1zoi 日誌 |
 | U8 | 未測 | |
-| U9 | 主選單 ❌（CheatManager not available）；遊戲內未測 | `visual.hide_cat_eye` |
+| U9 | 主選單 ❌（CheatManager not available）；遊戲內 ✅（`environment.time_skip`、`interaction.execute`、`game.goto_lobby`） | 第四輪 |
 
 官方 LuaLS 定義檔在遊戲目錄 `BlueClient/Content/Data/Lua/luals-defs/`（`sandbox.lua` 寫明：擋 `dofile`／`loadfile`／`loadstring`，
 擋 `io`／`os`／`debug`／`File` 的成員存取，擋 `http`／`socket`／`ssl` 模組）。遊戲 MCP 另有 `lua_api_lookup` 可查型別。
