@@ -94,6 +94,7 @@
 
 - 最低：RAM 12 GB、儲存空間 40 GB、RTX 2060 / RX 5600 XT（6 GB VRAM）；建議：RAM 16 GB、60 GB、RTX 3070 / RX 6800 XT。
 - [Epic 商店頁](https://store.epicgames.com/en-US/p/inzoi-modkit)
+- **實際安裝（2026-10-20，讀 Epic 安裝紀錄）**：版本 `20261011.16078.W.MODKIT.EGS`，位置 `C:\Games\inZOIModKit`，大小 **93.4 GB**（遠大於上面轉述的 40–60 GB，以實際為準）。
 
 ### 第 1 步追加（2026-10-20 讀取）
 

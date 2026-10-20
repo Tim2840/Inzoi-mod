@@ -4,7 +4,7 @@
 
 ## 目前狀態
 - 分支：`chore/modkit-kickoff`（本交接所在，疊在 `docs/modkit-route` 上，**都還沒合併**進預設分支，合併要問 PO）。
-- ModKit：PO 正在從 Epic 安裝。
+- ModKit：**已安裝**（`20261011.16078`，`C:\Games\inZOIModKit`，93.4 GB）。
 - MCP：repo 的 `.mcp.json` 已登記 `inzoi-game`（:11212）、`inzoi-modkit`（:11213）；第一次執行 `claude` 時 PO 要按信任。
 - 遊戲資料夾：**UE4SS 已停用**（`Win64\dwmapi.dll` 改名為 `dwmapi.dll.off`，改回即恢復）；`ue4ss\Mods\PawHome\pawhome_disabled.txt` 存在；ZoiPets 的 `enabled.txt` 改名為 `enabled.txt.off`。紀錄：`C:\Dev\backups\2026-10-20-pre-M1-3b\isolation-state.txt`。
 - 存檔備份（已驗證）：`C:\Dev\backups\2026-10-20-pre-T2`、`-pre-M1-3b`、`-pre-isolation`、`-pre-isolation-2`。
