@@ -3,6 +3,7 @@ All notable changes are listed here ([Keep a Changelog](https://keepachangelog.c
 
 ## [Unreleased]
 ### Added
+- Phase 0 desk research for the official ModKit route (`docs/phase0-results.md`, `docs/probe/commands.md`, `docs/probe/lua-api.md`): CLI catalog by access level, Lua bindings/callbacks/events, UI-mod save state, cat object templates found in the ModKit binding keys. Nothing verified in-game yet.
 - UE4SS route (`adapters/ue4ss.lua`, `mod/ue4ss/PawHome`, `scripts/install-ue4ss.ps1`): runs the engine inside inZOI through UE4SS with all caps off (virtual pet). Safe mode for unknown game builds, kill switch, startup banner, three save generations, debug mode only with `pawhome_debug.txt`. T1 main-menu smoke passed twice on inZOI v0.11.0 (first write, read-back and `.bak` rotation verified in-game); everything that touches the game world is written but **unverified** (`docs/ue4ss-adapter.md`).
 - M1-3 tooling, never run in-game: object dump (Shift+F7), discovery scan with animal dumps (Shift+F8), opt-in auto-explore after a map load, and a spawn probe (Shift+F6) that logs spawn result, controller, 60 s of position samples and removal.
 - `scripts/smoke-t1.ps1` (automated T1 run, writes `docs/qa/results/`) and `docs/qa/smoke-checklist.md` (T2 steps and evidence).
