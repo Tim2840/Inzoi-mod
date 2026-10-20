@@ -133,23 +133,14 @@ if ($inRepo) {
 }
 
 # ---------------------------------------------------------------- 4. MCP 伺服器
-Write-Step '把 inZOI MCP 伺服器註冊到 Claude Code'
-if (Get-Command claude -ErrorAction SilentlyContinue) {
-    $servers = @(
-        @{ Name = 'inzoi-game';   Url = 'http://localhost:11212/mcp' },  # 遊戲開著時才連得到
-        @{ Name = 'inzoi-modkit'; Url = 'http://localhost:11213/mcp' }   # ModKit 編輯器開著時才連得到
-    )
-    foreach ($s in $servers) {
-        claude mcp get $s.Name *> $null
-        if ($LASTEXITCODE -eq 0) {
-            Write-Ok "$($s.Name) 已經註冊"
-        } else {
-            claude mcp add --transport http --scope user $s.Name $s.Url
-            if ($LASTEXITCODE -eq 0) { Write-Ok "$($s.Name) -> $($s.Url)" } else { Write-Warn "$($s.Name) 註冊失敗" }
-        }
-    }
+# PO decision 2026-10-20 (ADR 0006): the two inZOI MCP servers are registered per project in
+# the repo's .mcp.json, not in the user's global Claude Code config. This step only checks.
+Write-Step '確認 inZOI MCP 伺服器設定（專案的 .mcp.json）'
+if (Test-Path (Join-Path $RepoDir '.mcp.json')) {
+    Write-Ok '.mcp.json 已存在：inzoi-game -> localhost:11212、inzoi-modkit -> localhost:11213'
+    Write-Host '    第一次在這個資料夾執行 claude 時，會詢問是否信任這兩個伺服器，請按同意。'
 } else {
-    Write-Warn '還沒有 claude 指令，先略過；裝好之後重新執行這支腳本就會補上'
+    Write-Warn '找不到 .mcp.json：請先把 repo 更新到最新（git pull）'
 }
 
 # ---------------------------------------------------------------- 5. 需要登入帳號的部分

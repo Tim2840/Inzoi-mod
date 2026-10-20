@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "inzoi-game": {
+      "type": "http",
+      "url": "http://localhost:11212/mcp"
+    },
+    "inzoi-modkit": {
+      "type": "http",
+      "url": "http://localhost:11213/mcp"
+    }
+  }
+}

@@ -5,7 +5,7 @@ return {
     lifeScale = 1.0,              -- 2.0 = pets live twice as long
     needDecayScale = 1.0,         -- 0.5 = needs drop half as fast
     animalControl = true,         -- badly neglected pets are taken to the shelter (can be redeemed)
-    maxPetsPerHousehold = 4,
+    maxPetsPerHousehold = 1,      -- PO 2026-10-20 (ADR 0006): one pet by default; the settings page allows up to 4
     catchupCapHours = 12,         -- never simulate more than this after a long gap (load / fast-forward)
     notificationCooldownHours = 6,
     shelterFee = 150,

@@ -108,5 +108,6 @@ return {
         animal_control = "被忽略的寵物會被動保員帶走",
         decay = "需求下降速度",
         lifescale = "寵物壽命",
+        max_pets_setting = "每戶最多寵物數",
     },
 }

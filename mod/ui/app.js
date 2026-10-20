@@ -181,6 +181,15 @@
     return h("div", { class: "setting" }, h("span", {}, label), h("span", { style: "display:flex;gap:8px;align-items:center" }, input, out));
   }
 
+  // Whole-number setting shown as a plain count (not a "×" multiplier).
+  function countSlider(label, key, min, max, settings) {
+    const out = h("span", { class: "sub" }, String(settings[key]));
+    const input = h("input", { type: "range", class: "range", min, max, step: 1, value: settings[key], "aria-label": label,
+      oninput: (e) => { out.textContent = e.target.value; },
+      onchange: async (e) => { await call("setSetting", { key, value: Number(e.target.value) }); render(); } });
+    return h("div", { class: "setting" }, h("span", {}, label), h("span", { style: "display:flex;gap:8px;align-items:center" }, input, out));
+  }
+
   function renderSettings(view) {
     const u = view.ui, s = view.settings;
     const lang = h("select", { "aria-label": u.language,
@@ -194,7 +203,8 @@
       toggle(u.misbehavior, "misbehaviorEnabled", s),
       toggle(u.animal_control, "animalControl", s),
       slider(u.decay, "needDecayScale", 0.25, 2, 0.25, s),
-      slider(u.lifescale, "lifeScale", 0.5, 4, 0.5, s));
+      slider(u.lifescale, "lifeScale", 0.5, 4, 0.5, s),
+      countSlider(u.max_pets_setting, "maxPetsPerHousehold", 1, 4, s));
   }
 
   function renderDevBar() {

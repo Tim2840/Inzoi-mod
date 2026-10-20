@@ -199,7 +199,7 @@ function App:rename(petId, name)
 end
 
 local SETTING_RANGES = {
-    lifeScale = { 0.5, 4 }, needDecayScale = { 0.25, 2 }, maxPetsPerHousehold = { 1, 8 }, redeemFee = { 0, 5000 },
+    lifeScale = { 0.5, 4 }, needDecayScale = { 0.25, 2 }, maxPetsPerHousehold = { 1, 4 }, redeemFee = { 0, 5000 },
 }
 
 function App:setSetting(key, value)
