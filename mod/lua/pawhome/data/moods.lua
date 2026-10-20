@@ -10,4 +10,5 @@ return {
     uncomfortable = { buff = "pawhome_worried",      minutes = 240, minBond = 25 },
     tense         = { buff = nil },
     angry         = { buff = "pawhome_worried",      minutes = 240, minBond = 25 },
+    sick          = { buff = "pawhome_worried",      minutes = 240, minBond = 25 },
 }

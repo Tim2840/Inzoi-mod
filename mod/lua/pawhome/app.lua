@@ -8,6 +8,7 @@ local Rng = require("pawhome.core.rng")
 local Util = require("pawhome.core.util")
 local Registry = require("pawhome.pets.registry")
 local Enrichment = require("pawhome.pets.enrichment")
+local Illness = require("pawhome.pets.illness")
 local enrichmentData = require("pawhome.data.enrichment")
 local Engine = require("pawhome.pets.engine")
 local Care = require("pawhome.pets.care")
@@ -213,6 +214,15 @@ function App:redeem(householdId, zoiId, petId)
     return result
 end
 
+function App:vet(householdId, zoiId, petId)
+    self:sync()
+    if self.suspended then return self:noSave() end
+    local result = Illness.vet(self.ctx, householdId, petId)
+    result.notifications = Engine.flush(self.ctx)
+    self:save()
+    return result
+end
+
 function App:rename(petId, name)
     self:sync()
     if self.suspended then return self:noSave() end
@@ -284,6 +294,7 @@ local function petView(ctx, pet, zoiId)
         needs = needs, traits = traits,
         bond = math.floor(bond + 0.5), bondLevel = Bond.level(bond), bondLabel = I18n.t("bond." .. Bond.level(bond)),
         actions = acts,
+        illness = Illness.view(ctx, pet),
     }
 end
 

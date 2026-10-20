@@ -2,13 +2,18 @@ return {
     mod = { name = "Paw Home" },
     needs = { hunger = "Hunger", energy = "Energy", fun = "Fun", bladder = "Litter" },
     stages = { kitten = "Kitten", adult = "Adult", elder = "Elder" },
+    illness = {
+        upset_tummy = { name = "Upset Tummy", desc = "Went hungry for too long. Tires and gets bored faster. Recovers with good care, or see the vet." },
+        cold        = { name = "Cat Cold", desc = "Exhausted and caught a chill. Tires much faster. Recovers with rest and care, or see the vet." },
+        fleas       = { name = "Fleas", desc = "Itchy and grumpy, gets bored faster. Only the vet can get rid of them." },
+    },
     furniture = {
         CatScratcher01 = "Cat Scratcher", CatTower01 = "Cat Tower", CatWheel01 = "Cat Wheel",
         effect = "{need} drops {pct}% slower",
     },
     moods = {
         happy = "Happy", playful = "Playful", energized = "Energized", content = "Content",
-        asleep = "Asleep", sad = "Sad", uncomfortable = "Uncomfortable", tense = "Tense", angry = "Angry",
+        asleep = "Asleep", sad = "Sad", uncomfortable = "Uncomfortable", tense = "Tense", angry = "Angry", sick = "Unwell",
     },
     bond = { stranger = "Stranger", acquainted = "Acquainted", friend = "Friend", best_friend = "Best Friend" },
     habits = { scratch = "Scratching furniture", knock = "Knocking things over", counter = "Jumping on counters" },
@@ -38,6 +43,9 @@ return {
         get_to_know  = { name = "Get to Know", desc = "Learn about this pet's personality." },
     },
     msg = {
+        fell_ill = "{name} isn't feeling well: {illness}.",
+        recovered = "{name} has recovered and feels like their old self.",
+        vet_cured = "The vet treated {name}. All better!",
         adopted = "{name} has joined your household!",
         grew_up = "{name} grew up into a {stage}.",
         died = "{name} passed away peacefully of old age. Thank you for the happy years.",
@@ -61,6 +69,7 @@ return {
         renamed = "Renamed to {name}.",
     },
     fail = {
+        not_sick = "{name} is healthy.",
         no_pet = "That pet does not exist.",
         not_home = "{name} is not at home.",
         unknown_action = "Unknown action.",
@@ -78,6 +87,9 @@ return {
         redeem_wait = "{name} can be redeemed in {hours} h.",
     },
     ui = {
+        vet = "Take to the vet ({fee})",
+        illness = "Pets can fall ill",
+        sick = "Unwell",
         title = "Paw Home",
         pets = "Pets",
         furniture = "Cat furniture at home",
