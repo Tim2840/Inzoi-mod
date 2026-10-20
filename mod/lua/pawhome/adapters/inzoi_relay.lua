@@ -62,8 +62,11 @@ function Relay.new(platform, opts)
     function r.onMessage(ownerEid, channel, payload)
         local kind = Wire.kind(channel)
         if not kind then return end                       -- another mod's message
+        if r.active ~= ownerEid then log("talking to Zoi " .. tostring(ownerEid) .. " (" .. kind .. ")") end
         r.active = ownerEid
-        if kind == "toast" then
+        if kind == "diag" then
+            log("B2: " .. tostring(payload))
+        elseif kind == "toast" then
             platform.toast(payload)
         elseif kind == "hello" then
             post(channel, tostring(payload) .. "|")

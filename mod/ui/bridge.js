@@ -71,6 +71,17 @@ const Bridge = (() => {
     await cli("uimod.cfg_save", { mod_id: modId(), section: SECTION, key, value });
   }
 
+  // The game shows no browser console; page errors go to <mod>/log/ui.cfg instead.
+  const pageLog = [];
+  function report(line) {
+    pageLog.push(new Date().toISOString() + " " + line);
+    while (pageLog.length > 30) pageLog.shift();
+    cli("uimod.cfg_save", { mod_id: modId(), section: "log", key: "ui", value: esc(pageLog.join("\n")) }).catch(() => {});
+  }
+  window.addEventListener("error", (e) => report("error: " + e.message + " @ " + e.filename + ":" + e.lineno));
+  window.addEventListener("unhandledrejection", (e) => report("rejection: " + (e.reason && e.reason.message || e.reason)));
+  report("page loaded, wf=" + !!window.wf + " saveState=" + !!(window.inzoi && window.inzoi.saveState));
+
   const epoch = String(Math.floor(Math.random() * 900000) + 100000);
   const outbox = [];        // what the page sends to the relay
   let nextSeq = 1;

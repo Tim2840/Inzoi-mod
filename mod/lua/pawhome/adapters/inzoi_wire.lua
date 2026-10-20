@@ -131,7 +131,8 @@ function Wire.toJson(v)
     elseif t == "table" then
         local arr, n = isArray(v)
         local out = {}
-        if arr and n > 0 then
+        -- an empty table becomes [] : the UI's empty collections (pets, offers) are lists
+        if arr then
             for i = 1, n do out[i] = Wire.toJson(v[i]) end
             return "[" .. table.concat(out, ",") .. "]"
         end

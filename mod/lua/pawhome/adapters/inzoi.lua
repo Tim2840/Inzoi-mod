@@ -23,7 +23,7 @@
 local Wire = require("pawhome.adapters.inzoi_wire")
 local Serialize = require("pawhome.core.serialize")
 
-local Inzoi = {
+local ModKit = {
     HELLO_EVERY_SECONDS = 5,
     HELLO_WHEN_READY_SECONDS = 60,
     PENDING_MINUTES = 180,       -- give up on a summon after 3 game hours; the engine retries
@@ -34,7 +34,7 @@ local Inzoi = {
     CARE = { Object_Void_Cat_Dev = "feed", Object_Void_Cat_Tickle = "play" },
 }
 
-function Inzoi.new(platform, opts)
+function ModKit.new(platform, opts)
     opts = opts or {}
     local a = {
         caps = { spawn = opts.spawn == true, moveStray = false, buffs = false, animate = false },
@@ -106,7 +106,7 @@ function Inzoi.new(platform, opts)
     function a.charge(hid, amount) return platform.charge(hid, amount) == true end
 
     local function persistRefs()
-        a.saveSet(Inzoi.REFS_KEY, Serialize.encode(a.refs))
+        a.saveSet(ModKit.REFS_KEY, Serialize.encode(a.refs))
     end
 
     local function resolve(ref)
@@ -118,7 +118,7 @@ function Inzoi.new(platform, opts)
         if not a.caps.spawn then return nil end
         local zoi = target()
         if zoi == nil then return nil end
-        if not platform.enqueue(zoi, zoi, Inzoi.WELCOME) then return nil end
+        if not platform.enqueue(zoi, zoi, ModKit.WELCOME) then return nil end
         local ref = "pending:" .. a.session .. ":" .. a.nextPending
         a.nextPending = a.nextPending + 1
         a.pending[#a.pending + 1] = { ref = ref, at = a.now(), household = householdId }
@@ -130,7 +130,7 @@ function Inzoi.new(platform, opts)
         local eid = resolve(ref)
         if eid ~= nil then return a.cats[eid] ~= nil end
         for _, p in ipairs(a.pending) do
-            if p.ref == ref then return a.now() - p.at < Inzoi.PENDING_MINUTES end
+            if p.ref == ref then return a.now() - p.at < ModKit.PENDING_MINUTES end
         end
         return false
     end
@@ -146,7 +146,7 @@ function Inzoi.new(platform, opts)
         end
         if eid == nil or a.cats[eid] == nil then return end
         local zoi = target()
-        if zoi ~= nil then platform.enqueue(zoi, eid, Inzoi.SEND_AWAY) end
+        if zoi ~= nil then platform.enqueue(zoi, eid, ModKit.SEND_AWAY) end
     end
 
     -- City cats the player's Zoi has fed or played with recently.
@@ -156,7 +156,7 @@ function Inzoi.new(platform, opts)
         for _, eid in pairs(a.refs) do owned[eid] = true end
         for eid, at in pairs(a.met) do
             local cat = a.cats[eid]
-            if cat and not cat.home and not owned[eid] and now - at < Inzoi.MET_CAT_MINUTES then
+            if cat and not cat.home and not owned[eid] and now - at < ModKit.MET_CAT_MINUTES then
                 out[#out + 1] = { id = "cat" .. eid, ref = eid, stage = "adult", appearance = eid }
             end
         end
@@ -170,7 +170,7 @@ function Inzoi.new(platform, opts)
     -- answers, then once a minute so a UI that was reloaded can find this session again.
     function a.tick(dt)
         a.sinceHello = a.sinceHello + (dt or 0)
-        local every = a.ready and Inzoi.HELLO_WHEN_READY_SECONDS or Inzoi.HELLO_EVERY_SECONDS
+        local every = a.ready and ModKit.HELLO_WHEN_READY_SECONDS or ModKit.HELLO_EVERY_SECONDS
         if a.sinceHello >= every then
             local eid = target()
             if eid ~= nil then
@@ -181,6 +181,18 @@ function Inzoi.new(platform, opts)
     end
 
     local function onState(data)
+        if a.ready then
+            -- A UI that was reloaded during the session (mod remount) starts with an empty
+            -- wf.state: the game restores it only when a save is loaded. Keep our data and
+            -- give the UI a full copy instead of taking its (empty) one.
+            local count = 0
+            for key, value in pairs(a.cache) do
+                sendLong("save", Wire.toJson({ key = key, value = value }))
+                count = count + 1
+            end
+            log("UI reconnected; sent it " .. count .. " keys")
+            return
+        end
         local t, err = Wire.fromJson(data ~= "" and data or "{}")
         if type(t) ~= "table" then
             log("state from UI is unreadable: " .. tostring(err))
@@ -190,7 +202,7 @@ function Inzoi.new(platform, opts)
         for k, v in pairs(t) do
             if type(v) == "string" then a.cache[k] = v end
         end
-        local refs = a.cache[Inzoi.REFS_KEY] and Serialize.decode(a.cache[Inzoi.REFS_KEY])
+        local refs = a.cache[ModKit.REFS_KEY] and Serialize.decode(a.cache[ModKit.REFS_KEY])
         a.refs = type(refs) == "table" and refs or {}
         a.ready = true
         log("state received (" .. #data .. " bytes)")
@@ -240,7 +252,7 @@ function Inzoi.new(platform, opts)
 
     -- interaction.finished event: remember city cats the player met and care given to cats.
     function a.onInteractionFinished(ev)
-        local kind = ev and Inzoi.CARE[ev.interaction_bag_id]
+        local kind = ev and ModKit.CARE[ev.interaction_bag_id]
         if not kind then return end
         local eid = ev.target_entity_id
         if ev.entity_id == target() then a.met[eid] = a.now() end
@@ -261,4 +273,4 @@ function Inzoi.new(platform, opts)
     return a
 end
 
-return Inzoi
+return ModKit

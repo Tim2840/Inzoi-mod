@@ -10,12 +10,30 @@
     sad: "😿", uncomfortable: "😾", tense: "🙀", angry: "😾",
   };
   const STAGE_FACE = { kitten: "🐱", adult: "🐈", elder: "🐈‍⬛" };
+  // The game's UI font has no emoji (they render as empty boxes), so in the game the
+  // decorative icons are left out; every button and status already has a text label.
+  const EMOJI = Bridge.preview;
+  const icon = (glyph) => (EMOJI ? glyph : "");
 
   const state = { snap: null, tab: "pets", petId: null, offers: null, strays: null, busy: false };
   const root = document.getElementById("app");
   const toasts = document.getElementById("toasts");
 
   // ------------------------------------------------------------ helpers
+  // The game's browser (Coherent Gameface) lacks some newer DOM methods (replaceChildren was
+  // missing in game 20261019.16318.W), so only long-standing calls are used here.
+  function flatten(list, out = []) {
+    for (const c of list) Array.isArray(c) ? flatten(c, out) : out.push(c);
+    return out;
+  }
+  function detach(el) { if (el && el.parentNode) el.parentNode.removeChild(el); }
+  function setChildren(el, ...children) {
+    while (el.firstChild) el.removeChild(el.firstChild);
+    for (const c of flatten(children)) {
+      if (c == null || c === false) continue;
+      el.appendChild(c.nodeType ? c : document.createTextNode(String(c)));
+    }
+  }
   function h(tag, attrs, ...children) {
     const el = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs || {})) {
@@ -25,10 +43,7 @@
       else if (k === "text") el.textContent = v;
       else el.setAttribute(k, v === true ? "" : v);
     }
-    for (const c of children.flat()) {
-      if (c == null || c === false) continue;
-      el.append(c.nodeType ? c : document.createTextNode(String(c)));
-    }
+    setChildren(el, children);
     return el;
   }
   const fmt = (s, params) => String(s).replace(/\{(\w+)\}/g, (_, k) => (params && k in params ? params[k] : `{${k}}`));
@@ -38,9 +53,9 @@
   function toast(text, isError) {
     for (const t of toasts.children) if (t.textContent === text) return; // no duplicates
     const el = h("div", { class: "toast" + (isError ? " err" : "") }, text);
-    toasts.append(el);
-    while (toasts.children.length > MAX_TOASTS) toasts.firstChild.remove(); // keep the newest
-    setTimeout(() => el.remove(), 3600);
+    toasts.appendChild(el);
+    while (toasts.children.length > MAX_TOASTS) detach(toasts.firstChild); // keep the newest
+    setTimeout(() => detach(el), 3600);
   }
 
   async function call(method, args) {
@@ -77,7 +92,7 @@
     const u = view.ui;
     return h("section", { class: "card", "aria-label": pet.name },
       h("div", { class: "pet-head" },
-        h("div", { class: "avatar", "aria-hidden": "true" }, pet.status === "impounded" ? "🚐" : MOOD_FACE[pet.mood] || STAGE_FACE[pet.stage]),
+        h("div", { class: "avatar", "aria-hidden": "true" }, icon(pet.status === "impounded" ? "🚐" : MOOD_FACE[pet.mood] || STAGE_FACE[pet.stage])),
         h("div", {},
           h("h2", { text: pet.name }),
           h("div", { class: "sub" }, `${pet.stageLabel} · ${pet.ageLabel}`),
@@ -102,7 +117,7 @@
           class: "act", title: a.desc, disabled: !a.ready,
           onclick: async () => { await call("perform", { petId: pet.id, action: a.id }); render(); },
         },
-          h("span", { class: "ico", "aria-hidden": "true" }, ACTION_ICON[a.id] || "•"),
+          h("span", { class: "ico", "aria-hidden": "true" }, icon(ACTION_ICON[a.id]) || "•"),
           h("span", { class: "lbl" }, a.label),
           a.cooldown > 0 ? h("span", { class: "cd" }, fmt(u.cooldown, { min: a.cooldown })) : null))));
   }
@@ -141,7 +156,7 @@
   function renderStray(s, u) {
     const input = h("input", { type: "text", placeholder: u.name_label, maxlength: 24, "aria-label": u.name_label });
     return h("section", { class: "card offer" },
-      h("div", { class: "sub" }, `${STAGE_FACE[s.stage] || "🐈"} ${s.stage}`),
+      h("div", { class: "sub" }, `${icon(STAGE_FACE[s.stage] || "🐈")} ${s.stage}`.trim()),
       h("div", { class: "row" },
         input,
         h("button", {
@@ -226,9 +241,15 @@
   }
 
   async function render() {
+    // In the game the mod answers only after the save data has been handed over.
+    if (!state.snap && !Bridge.preview && Bridge.ready && !Bridge.ready()) {
+      setChildren(root, h("p", { class: "empty" }, "…"));
+      setTimeout(render, 1000);
+      return;
+    }
     if (!state.snap) {
       const first = await call("view", {});
-      if (!first) return root.replaceChildren(h("p", { class: "empty" }, "Cannot reach the mod."));
+      if (!first) return setChildren(root, h("p", { class: "empty" }, "Cannot reach the mod."));
     }
     await loadTab();
     const view = state.snap.view, u = view.ui;
@@ -240,9 +261,9 @@
     }, label);
     const body = view.noSave && state.tab !== "settings" ? h("div", { class: "card empty" }, u.no_save)
       : state.tab === "pets" ? renderPets(view) : state.tab === "adopt" ? renderAdopt(view) : renderSettings(view);
-    root.replaceChildren(
+    setChildren(root, 
       h("header", { class: "top" },
-        h("h1", {}, "🐾 " + view.title),
+        h("h1", {}, (EMOJI ? "🐾 " : "") + view.title),
         h("div", { class: "meta" }, `$${state.snap.money}`, h("br"), Bridge.preview ? `Day ${state.snap.day} · ${state.snap.time}` : "")),
       h("nav", { class: "tabs", role: "tablist" }, tab("pets", u.pets), tab("adopt", u.adopt), tab("settings", u.settings)),
       body,

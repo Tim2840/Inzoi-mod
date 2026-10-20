@@ -68,13 +68,10 @@ end
 
 function M.decode(text)
     if type(text) ~= "string" or text == "" then return nil, "empty" end
-    local fn, err
-    if setfenv then -- Lua 5.1 / LuaJIT
-        fn, err = loadstring("return " .. text, "=pawhome-save")
-        if fn then setfenv(fn, {}) end
-    else
-        fn, err = load("return " .. text, "=pawhome-save", "t", {})
-    end
+    -- Lua 5.4 everywhere (game, UE4SS, tests). The game's sandbox rejects any file that even
+    -- mentions the old Lua 5.1 loader, so there is no fallback for it; `load` with an empty
+    -- environment and text-only mode cannot run code from the save.
+    local fn, err = load("return " .. text, "=pawhome-save", "t", {})
     if not fn then return nil, err end
     local ok, result = pcall(fn)
     if not ok then return nil, result end

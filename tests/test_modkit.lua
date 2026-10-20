@@ -2,7 +2,7 @@
 -- follows the same protocol as mod/ui/bridge.js, with the real engine and RPC on top.
 local T = require("framework")
 local Wire = require("pawhome.adapters.inzoi_wire")
-local Inzoi = require("pawhome.adapters.inzoi")
+local ModKit = require("pawhome.adapters.inzoi")
 local Relay = require("pawhome.adapters.inzoi_relay")
 local App = require("pawhome.app")
 local Rpc = require("pawhome.rpc")
@@ -96,13 +96,13 @@ end
 local function boot(opts)
     opts = opts or {}
     local w = world(opts)
-    local adapter = Inzoi.new(w.b2, { session = opts.session or "S1", spawn = opts.spawn })
+    local adapter = ModKit.new(w.b2, { session = opts.session or "S1", spawn = opts.spawn })
     local app = assert(App.new(adapter, { seed = 7 }))
     adapter.rpc = function(method, args)
         return Rpc.handle(app, { household = w.household, zoi = w.zoi }, method, args)
     end
     local relay = Relay.new(w.b1, { epoch = "R1" })
-    local ui = fakeUi(w, opts.uiState)
+    local scenario = { w = w, adapter = adapter, app = app, relay = relay, ui = fakeUi(w, opts.uiState) }
     local function pump(rounds)
         for _ = 1, rounds or 6 do
             adapter.tick(10)
@@ -110,7 +110,7 @@ local function boot(opts)
                 local m = table.remove(w.toClient, 1)
                 relay.onMessage(m[1], m[2], m[3])
             end
-            ui.poll()
+            scenario.ui.poll()      -- whichever page is loaded right now
             relay.tick(10)
             while #w.toSim > 0 do
                 local m = table.remove(w.toSim, 1)
@@ -119,7 +119,8 @@ local function boot(opts)
             app:tick()
         end
     end
-    return { w = w, adapter = adapter, app = app, relay = relay, ui = ui, pump = pump }
+    scenario.pump = pump
+    return scenario
 end
 
 -- ------------------------------------------------------------------ wire
@@ -151,6 +152,11 @@ T.test("wire: JSON round trip of nested tables, unicode and escapes", function()
     T.eq(Wire.fromJson('{"a":"\\u54aa"}').a, "咪")
 end)
 
+T.test("wire: an empty table is sent to the UI as an empty list", function()
+    T.eq(Wire.toJson({}), "[]")
+    T.eq(Wire.toJson({ pets = {} }), '{"pets":[]}')
+end)
+
 T.test("wire: other mods' channels are ignored", function()
     T.eq(Wire.kind("pawhome:save"), "save")
     T.eq(Wire.kind("AlimonyMoods"), nil)
@@ -161,7 +167,7 @@ end)
 
 T.test("modkit: the engine stays paused until the UI hands over the save data", function()
     local w = world()
-    local adapter = Inzoi.new(w.b2, { session = "S1" })
+    local adapter = ModKit.new(w.b2, { session = "S1" })
     T.eq(adapter.slotId(), nil)
     local app = assert(App.new(adapter, { seed = 1 }))
     T.truthy(app:noSave(), "no save loaded yet")
@@ -215,6 +221,25 @@ T.test("modkit: a UI that was reloaded finds the running session again", functio
     T.eq(reloaded.answered, "S1", "it answered with its wf.state")
 end)
 
+T.test("modkit: a UI reloaded mid-session with an empty wf.state does not wipe the pets", function()
+    local s = boot()
+    s.pump()
+    local offers = s.app:offers(77, true)
+    T.truthy(s.app:adoptOffer(77, 501, offers[1].id, "Mimi").ok)
+    s.pump()
+    -- the page is remounted: wf.state is empty until the next save is loaded
+    local reloaded = fakeUi(s.w, {})
+    reloaded.relayEpoch = s.ui.relayEpoch
+    reloaded.lastSeen = s.ui.lastSeen
+    reloaded.epoch = "ui3"
+    s.ui = reloaded
+    for _ = 1, 7 do s.adapter.tick(10) end
+    s.pump(3)
+    T.eq(s.app:view(77, 501).pets[1].name, "Mimi", "the engine kept its pets")
+    T.truthy(reloaded.state[Storage.KEY], "the reloaded UI got a full copy back")
+    T.truthy(reloaded.state[Storage.KEY]:find("Mimi"), "including the pet")
+end)
+
 T.test("modkit: toasts are shown by the relay, not written to the mailbox", function()
     local s = boot()
     s.pump()
@@ -256,7 +281,7 @@ T.test("modkit: adopting with spawn queues the welcome interaction and binds the
     local offers = s.app:offers(77, true)
     local r = s.app:adoptOffer(77, 501, offers[1].id, "Mimi")
     T.truthy(r.ok, r.message)
-    T.eq(s.w.queued[1].bag, Inzoi.WELCOME)
+    T.eq(s.w.queued[1].bag, ModKit.WELCOME)
     local pet = s.app:view(77, 501).pets[1]
     -- a city cat appearing elsewhere is not ours
     s.adapter.onCatBegin(9001, { home = false })
@@ -299,7 +324,7 @@ T.test("modkit: sending a pet away queues the goodbye interaction on its cat", f
     local ref = s.adapter.spawnPet(77, {})
     s.adapter.onCatBegin(109546, { home = true })
     s.adapter.despawnPet(ref)
-    T.eq(s.w.queued[#s.w.queued].bag, Inzoi.SEND_AWAY)
+    T.eq(s.w.queued[#s.w.queued].bag, ModKit.SEND_AWAY)
     T.eq(s.w.queued[#s.w.queued].target, 109546)
     T.eq(s.adapter.refs[ref], nil)
 end)

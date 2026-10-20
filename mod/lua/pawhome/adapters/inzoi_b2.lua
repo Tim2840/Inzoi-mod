@@ -1,0 +1,128 @@
+-- B2 runtime: owns the adapter and the engine for one game session. The thin binding
+-- scripts in mod/modkit/lua/B2 forward their callbacks here.
+local ModKit = require("pawhome.adapters.inzoi")
+local Platform = require("pawhome.adapters.inzoi_platform")
+local App = require("pawhome.app")
+local Rpc = require("pawhome.rpc")
+
+local R = { platform = nil, adapter = nil, app = nil, handlers = {}, opts = {}, failed = nil }
+
+-- Lines also go to the B1 relay's log (pawhome:diag), the only place a running B2 can report to.
+local function log(line)
+    if not R.platform then return end
+    R.platform.log(line)
+    pcall(function()
+        local eid = R.platform.possessed()
+        if eid then R.platform.send(eid, "pawhome:diag", line) end
+    end)
+end
+
+local function who()
+    local zoi = R.platform.possessed()
+    return { household = R.platform.household(), zoi = zoi }
+end
+
+local function onHour()
+    if R.app then
+        local ok, err = pcall(function() R.app:tick() end)
+        if not ok then log("tick failed: " .. tostring(err)) end
+    end
+end
+
+local function onInteraction(p)
+    if R.adapter and type(p) == "table" then R.adapter.onInteractionFinished(p) end
+end
+
+-- B2 Main on_begin. Also called lazily from the first binding callback, because a mod that is
+-- mounted while a game is running never gets Main.on_begin for that session.
+function R.start(opts)
+    opts = opts or R.opts or {}
+    R.opts = opts
+    R.platform = Platform.b2(opts)
+    R.platform.report = function(line) log(line) end
+    -- os is blocked in the game's sandbox; seed from the game clock instead
+    pcall(function()
+        local d, h, m = R.platform.time()
+        math.randomseed(d * 1440 + h * 60 + m)
+    end)
+    R.adapter = ModKit.new(R.platform, { spawn = opts.spawn })
+    local app, err = App.new(R.adapter, { seed = math.random(1, 2^30) })
+    if not app then log("engine failed to start: " .. tostring(err)) return end
+    R.app = app
+    R.adapter.rpc = function(method, args) return Rpc.handle(R.app, who(), method, args) end
+    R.handlers = {
+        ["time.hour_changed"] = function() onHour() end,
+        ["interaction.finished"] = onInteraction,
+    }
+    for name, fn in pairs(R.handlers) do
+        local ok, e = pcall(inzoi.event.on, name, fn)       -- verified 2026-10-20 (B2)
+        if not ok then log("subscribe " .. name .. " failed: " .. tostring(e)) end
+    end
+    log("started, session " .. R.adapter.session)
+end
+
+-- B2 Main on_end.
+function R.stop()
+    for name, fn in pairs(R.handlers) do pcall(inzoi.event.off, name, fn) end
+    R.handlers = {}
+    R.failed = nil
+    log("stopped")
+    if R.platform then R.platform.flushLog() end
+    R.app, R.adapter = nil, nil
+end
+
+local function ensure()
+    if R.adapter or R.failed then return R.adapter ~= nil end
+    local ok, err = pcall(R.start)
+    if not ok then
+        R.failed = tostring(err)
+        log("start failed: " .. R.failed)
+    end
+    return R.adapter ~= nil
+end
+
+-- Manager(Time) on_tick, real seconds.
+function R.tick(dt)
+    if ensure() then R.adapter.tick(dt) end
+end
+
+-- Zoi(ResidenceFamily) on_begin / on_end: keeps the character objects the platform needs.
+function R.onZoiBegin(owner)
+    if not ensure() then return end
+    local ok, eid = pcall(function() return R.platform.value(owner:GetEntityId()) end)
+    if ok and eid then
+        if not R.platform.zois[eid] then R.platform.zois[eid] = owner end
+    elseif not R.zoiIdFailed then
+        R.zoiIdFailed = true
+        log("Zoi id unreadable: " .. tostring(eid))
+    end
+end
+
+function R.onZoiEnd(owner)
+    if not R.platform then return end
+    local ok, eid = pcall(function() return R.platform.value(owner:GetEntityId()) end)
+    if ok and eid then R.platform.zois[eid] = nil end
+end
+
+-- Zoi(ResidenceFamily) on_lua_message.
+function R.onMessage(channel, payload)
+    if ensure() then R.adapter.onMessage(channel, payload) end
+end
+
+-- ObjectTemplate(cat) on_begin / on_end.
+function R.onCatBegin(owner)
+    if not ensure() then return end
+    local ok, eid, info = pcall(R.platform.catInfo, owner)
+    if ok and eid then R.adapter.onCatBegin(eid, info) end
+end
+
+function R.onCatEnd(owner)
+    if not ensure() then return end
+    local ok, eid = pcall(function() return owner:GetObjectKey().Value end)
+    if ok and eid then
+        R.adapter.onCatEnd(eid)
+        R.platform.cats[eid] = nil
+    end
+end
+
+return R
