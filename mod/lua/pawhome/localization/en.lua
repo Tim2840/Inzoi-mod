@@ -2,6 +2,10 @@ return {
     mod = { name = "Paw Home" },
     needs = { hunger = "Hunger", energy = "Energy", fun = "Fun", bladder = "Litter" },
     stages = { kitten = "Kitten", adult = "Adult", elder = "Elder" },
+    furniture = {
+        CatScratcher01 = "Cat Scratcher", CatTower01 = "Cat Tower", CatWheel01 = "Cat Wheel",
+        effect = "{need} drops {pct}% slower",
+    },
     moods = {
         happy = "Happy", playful = "Playful", energized = "Energized", content = "Content",
         asleep = "Asleep", sad = "Sad", uncomfortable = "Uncomfortable", tense = "Tense", angry = "Angry",
@@ -76,6 +80,8 @@ return {
     ui = {
         title = "Paw Home",
         pets = "Pets",
+        furniture = "Cat furniture at home",
+        furniture_none = "No cat furniture yet. Cat towers, scratchers and wheels (Build mode, Pet) keep cats happier.",
         cooldown = "{min} min",
         no_strays = "No stray cats around right now.",
         no_save = "Load a savegame to see your pets.",

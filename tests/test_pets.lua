@@ -45,6 +45,39 @@ T.test("needs: hunger drops about 4/hour awake for an average adult", function()
     T.near(pet.needs.fun, 100 - 2.2 * 6, 0.5)
 end)
 
+T.test("furniture: a scratcher and a tower slow fun and energy decay at home", function()
+    local app, mock = H.new()
+    local pet = H.adopt(app, 1, {}, "adult")
+    mock.lot[1] = { "CatScratcher01", "CatTower01_v01", "Sofa01" }
+    H.setNeeds(pet, 100)
+    H.advance(app, mock, 6 * 60)
+    T.near(pet.needs.fun, 100 - 2.2 * 6 * (1 - 0.35), 0.5)
+    T.near(pet.needs.energy, 100 - 2.5 * 6 * (1 - 0.15), 0.5)
+    T.near(pet.needs.hunger, 100 - 4.0 * 6, 0.5)                -- no furniture for food
+end)
+
+T.test("furniture: duplicates count once and the cut is capped", function()
+    local app, mock = H.new()
+    local pet = H.adopt(app, 1, {}, "adult")
+    mock.lot[1] = { "CatScratcher01", "CatScratcher01", "CatTower01", "CatTower01_v01", "CatWheel01" }
+    H.setNeeds(pet, 100)
+    H.advance(app, mock, 6 * 60)
+    T.near(pet.needs.fun, 100 - 2.2 * 6 * 0.5, 0.5)             -- 0.6 capped at 0.5
+end)
+
+T.test("furniture: listed in the view with its effects, in both languages", function()
+    local app, mock = H.new()
+    H.adopt(app, 1, {}, "adult")
+    mock.lot[1] = { "CatWheel01" }
+    local v = app:view(1, 101)
+    T.eq(#v.furniture, 1); T.eq(v.furniture[1].id, "CatWheel01")
+    T.eq(v.furniture[1].name, "Cat Wheel")
+    T.eq(v.furniture[1].effects[1], "Fun drops 25% slower")
+    T.truthy(v.ui.furniture_none ~= nil)
+    mock.lot[1] = {}
+    T.eq(#app:view(1, 101).furniture, 0)
+end)
+
 T.test("needs: glutton gets hungry faster than a pet with no traits", function()
     local app, mock = H.new()
     local plain = H.adopt(app, 1, {}, "adult")

@@ -12,6 +12,7 @@
 --   platform.enqueue(zoiId, targetId, interactionBagId) -> true when queued
 --   platform.atHome(zoiId)               -> true when the Zoi is on the household's lot
 --   platform.homeCats()                  -> entity ids of the summoned cats on the home lot (optional)
+--   platform.homeObjects(watched)        -> object row ids from `watched` found on the home lot (optional)
 --   platform.log(line)                   optional
 --
 -- Saving: B2 cannot write the savegame. The UI keeps the data in wf.state (saved inside the
@@ -108,6 +109,10 @@ function ModKit.new(platform, opts)
     function a.householdMembers(hid) return platform.householdMembers(hid) or {} end
     function a.funds(hid) return platform.funds(hid) or 0 end
     function a.charge(hid, amount) return platform.charge(hid, amount) == true end
+    function a.homeObjects(hid, watched)
+        if not platform.homeObjects then return {} end
+        return platform.homeObjects(watched) or {}
+    end
 
     local function persistRefs()
         a.saveSet(ModKit.REFS_KEY, Serialize.encode(a.refs))

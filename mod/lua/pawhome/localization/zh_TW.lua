@@ -2,6 +2,10 @@ return {
     mod = { name = "毛孩之家" },
     needs = { hunger = "飢餓", energy = "精力", fun = "娛樂", bladder = "貓砂" },
     stages = { kitten = "幼貓", adult = "成貓", elder = "老貓" },
+    furniture = {
+        CatScratcher01 = "貓抓板", CatTower01 = "貓跳台", CatWheel01 = "貓滾輪",
+        effect = "{need}下降慢 {pct}%",
+    },
     moods = {
         happy = "開心", playful = "愛玩", energized = "精力充沛", content = "滿足",
         asleep = "睡覺中", sad = "難過", uncomfortable = "不舒服", tense = "緊張", angry = "生氣",
@@ -76,6 +80,8 @@ return {
     ui = {
         title = "毛孩之家",
         pets = "寵物",
+        furniture = "家裡的貓家具",
+        furniture_none = "家裡還沒有貓家具。擺上貓跳台、貓抓板或貓滾輪（建造模式「寵物」分類），貓會更開心。",
         cooldown = "{min} 分鐘",
         no_strays = "附近目前沒有流浪貓。",
         no_save = "載入存檔後才會看到你的寵物。",

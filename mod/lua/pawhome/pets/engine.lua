@@ -12,6 +12,7 @@ local Moods = require("pawhome.pets.moods")
 local Bond = require("pawhome.pets.bond")
 local Traits = require("pawhome.pets.traits")
 local Util = require("pawhome.core.util")
+local Enrichment = require("pawhome.pets.enrichment")
 local needsData = require("pawhome.data.needs")
 local habits = require("pawhome.data.habits")
 local moodData = require("pawhome.data.moods")
@@ -193,6 +194,8 @@ function E.tick(ctx, now)
         return {}
     end
     local remaining = math.min(now - last, ctx.cfg.catchupCapHours * 60)
+    ctx.enrichment = {}                 -- look at the lots again on every tick
+    ctx.decayMul = Enrichment.decayMul
 
     -- play the interval forward in chunks; the clock ctx.now follows
     local start = now - remaining
