@@ -36,7 +36,13 @@ function CatB1.new(platform)
     local function applyScale(cat)
         if not (cat.scale and cat.actor and platform.valid(cat.actor)) then return false end
         local ok, done = pcall(platform.setScale, cat.actor, cat.scale)
-        return ok and done == true
+        if ok and done == true then
+            if cat.logged ~= cat.scale then log("size " .. tostring(cat.scale) .. " on " .. tostring(cat.eid)) end
+            cat.logged = cat.scale
+            return true
+        end
+        log("size failed on " .. tostring(cat.eid) .. ": " .. tostring(done))
+        return false
     end
 
     local function blocked(cat)
@@ -49,6 +55,7 @@ function CatB1.new(platform)
         if not (cat.actor and platform.valid(cat.actor)) then return false end
         local ok, done = pcall(platform.playVat, cat.actor, name)
         if ok and done then
+            log("plays " .. tostring(name) .. " on " .. tostring(cat.eid))
             cat.ours = lower(name)
             cat.lastSeen = cat.ours
             return true
