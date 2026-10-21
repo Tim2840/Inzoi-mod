@@ -32,6 +32,7 @@ function Coats.new(platform)
         local ok, done = pcall(platform.applyCoat, actor, texture)
         if ok and done then
             c.applied[eid] = texture
+            log("cat " .. tostring(eid) .. " wears " .. texture)
         else
             log("could not set the coat of cat " .. tostring(eid) .. ": " .. tostring(done))
         end
@@ -61,6 +62,8 @@ function Coats.new(platform)
 
     -- The current list from B2 (replaces the previous one).
     function c.setList(text)
+        if tostring(text or "") ~= c.lastList then log("list from B2: " .. tostring(text)) end
+        c.lastList = tostring(text or "")
         c.map = Coats.parse(text)
         pcall(platform.cfgSave, Coats.SECTION, Coats.KEY, tostring(text or ""))
         for eid in pairs(c.map) do apply(eid) end
