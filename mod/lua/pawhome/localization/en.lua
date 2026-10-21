@@ -44,6 +44,7 @@ return {
         get_to_know  = { name = "Get to Know", desc = "Learn about this pet's personality." },
     },
     msg = {
+        backup_restored = "Your pets are back!",
         fell_ill = "{name} isn't feeling well: {illness}.",
         recovered = "{name} has recovered and feels like their old self.",
         vet_cured = "The vet treated {name}. All better!",
@@ -70,6 +71,7 @@ return {
         renamed = "Renamed to {name}.",
     },
     fail = {
+        no_backup = "There is no backup to restore.",
         not_sick = "{name} is healthy.",
         no_pet = "That pet does not exist.",
         not_home = "{name} is not at home.",
@@ -89,6 +91,8 @@ return {
         redeem_wait = "{name} can be redeemed in {hours} h.",
     },
     ui = {
+        backup_found = "Found a copy of your pets from day {day}: {names}. This save has none, maybe it was saved while Paw Home was off.",
+        backup_restore = "Bring them back",
         vet = "Take to the vet ({fee})",
         illness = "Pets can fall ill",
         sick = "Unwell",

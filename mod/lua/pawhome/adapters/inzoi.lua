@@ -33,6 +33,8 @@ local ModKit = {
     PENDING_MINUTES = 180,       -- give up on a summon after 3 game hours; the engine retries
     MET_CAT_MINUTES = 3 * 1440,  -- city cats the Zoi met within 3 game days can be adopted
     REFS_KEY = "pawhome.refs",
+    SAVE_KEY = "pawhome.save",   -- core/storage.lua Storage.KEY: the engine's data
+    BACKUP_EVERY_SECONDS = 30,   -- at most one backup copy to the relay per 30 real seconds
     WELCOME = "PawHome_WelcomeCat",
     SEND_AWAY = "PawHome_SendAway",
     CARE = { Object_Void_Cat_Dev = "feed", Object_Void_Cat_Tickle = "play" },
@@ -57,6 +59,9 @@ function ModKit.new(platform, opts)
         cats = {},          -- entity id -> { home = bool, site = id }
         met = {},           -- entity id -> game minute the possessed Zoi last cared for it
         careLog = {},       -- entity id -> list of { kind, zoi, at } not yet taken by the engine
+        backupDirty = false,
+        sinceBackup = math.huge,
+        backupOffer = nil,  -- { day, cache } from the relay when the savegame had no data
         coats = {},         -- pet ref -> coat texture name (from the engine, see setCoats)
         coatsSent = nil,    -- the last coat list sent to B1
         rpc = nil,          -- function(method, args) -> result table
@@ -94,6 +99,44 @@ function ModKit.new(platform, opts)
     function a.saveSet(key, value)
         a.cache[key] = value
         sendLong("save", Wire.toJson({ key = key, value = value }))
+        a.backupDirty = true
+    end
+
+    -- Backups: the savegame keeps our data in the UI's wf.state, which is lost when the game
+    -- is saved while the UI mod is off. The relay keeps a copy per household in the mod's
+    -- settings files (uimod.cfg_save), outside the savegame. Copies without pets are not sent,
+    -- so an empty new start never overwrites a good backup.
+    local function petCount(cache)
+        local state = cache[ModKit.SAVE_KEY] and Serialize.decode(cache[ModKit.SAVE_KEY])
+        local n = 0
+        for _, pet in ipairs(type(state) == "table" and type(state.pets) == "table" and state.pets or {}) do
+            if pet.status == "home" or pet.status == "impounded" then n = n + 1 end
+        end
+        return n
+    end
+
+    local function sendBackup()
+        local hid = platform.household and platform.household()
+        if hid == nil or petCount(a.cache) == 0 then return end
+        if sendLong("backup", Wire.toJson({ hid = hid, day = math.floor(a.now() / 1440), cache = a.cache })) then
+            a.backupDirty = false
+        end
+    end
+
+    function a.backup() return a.backupOffer end
+
+    function a.restoreBackup()
+        local offer = a.backupOffer
+        if not offer then return false end
+        a.backupOffer = nil
+        for key, value in pairs(offer.cache) do
+            if type(value) == "string" then a.saveSet(key, value) end
+        end
+        local refs = a.cache[ModKit.REFS_KEY] and Serialize.decode(a.cache[ModKit.REFS_KEY])
+        a.refs = type(refs) == "table" and refs or {}
+        log("backup from day " .. tostring(offer.day) .. " restored")
+        a.scanHomeCats()
+        return true
     end
 
     function a.subscribe(event, fn)
@@ -227,6 +270,13 @@ function ModKit.new(platform, opts)
     -- B2 binding tick (any binding, real seconds). Says hello every few seconds until the UI
     -- answers, then once a minute so a UI that was reloaded can find this session again.
     function a.tick(dt)
+        a.sinceBackup = a.sinceBackup + (dt or 0)
+        -- the player started over instead of restoring: back up the new pets from now on
+        if a.backupOffer and a.backupDirty and petCount(a.cache) > 0 then a.backupOffer = nil end
+        if a.ready and a.backupDirty and a.backupOffer == nil and a.sinceBackup >= ModKit.BACKUP_EVERY_SECONDS then
+            a.sinceBackup = 0
+            pcall(sendBackup)
+        end
         a.sinceQueue = (a.sinceQueue or 0) + (dt or 0)
         if a.sinceQueue >= ModKit.HELLO_EVERY_SECONDS then
             a.sinceQueue = 0
@@ -270,6 +320,13 @@ function ModKit.new(platform, opts)
         a.refs = type(refs) == "table" and refs or {}
         a.ready = true
         log("state received (" .. #data .. " bytes)")
+        if a.cache[ModKit.SAVE_KEY] == nil then
+            -- nothing in this savegame: ask the relay whether it kept a copy for this household
+            local hid, eid = platform.household and platform.household(), target()
+            if hid ~= nil and eid ~= nil then
+                platform.send(eid, Wire.channel("backup_get"), a.session .. "|" .. tostring(hid))
+            end
+        end
         a.scanHomeCats()
         for _, fn in ipairs(a.listeners) do pcall(fn) end
     end
@@ -292,11 +349,20 @@ function ModKit.new(platform, opts)
     -- B2 Zoi binding on_lua_message(self, owner, channel, payload).
     function a.onMessage(channel, payload)
         local kind = Wire.kind(channel)
-        if kind ~= "state" and kind ~= "rpc" then return end
+        if kind ~= "state" and kind ~= "rpc" and kind ~= "backup_data" then return end
         local session, _, data = a.assembler.add(payload)
         if data == nil then return end
         if session ~= a.session then return end      -- an answer to an earlier game session
-        if kind == "state" then onState(data) else onRpc(data) end
+        if kind == "state" then onState(data)
+        elseif kind == "rpc" then onRpc(data)
+        else
+            local t = data ~= "" and Wire.fromJson(data)
+            -- the engine offers it only while this savegame has no pets (App:backupInfo)
+            if type(t) == "table" and type(t.cache) == "table" and petCount(t.cache) > 0 then
+                a.backupOffer = { day = t.day, cache = t.cache }
+                log("relay has a backup from day " .. tostring(t.day))
+            end
+        end
     end
 
     -- ObjectTemplate binding on a cat: on_begin. info = { home = bool, site = id }.

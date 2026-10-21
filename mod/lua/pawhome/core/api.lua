@@ -146,6 +146,19 @@ function Api.despawnPet(ref)
     return (call("despawnPet", ref))
 end
 
+-- A copy of this household's mod data kept outside the savegame, offered when the savegame
+-- has none (e.g. it was saved while the UI mod was off): { day = n, cache = { key = value } }.
+function Api.backup()
+    local ok, v = call("backup")
+    return ok and type(v) == "table" and v or nil
+end
+
+-- Puts the backup's data in place of the current (empty) data. True when done.
+function Api.restoreBackup()
+    local ok, v = call("restoreBackup")
+    return ok and v == true
+end
+
 -- Object row ids found on the household's lot, limited to `watched` (a list of row ids).
 function Api.homeObjects(householdId, watched)
     local ok, v = call("homeObjects", householdId, watched)

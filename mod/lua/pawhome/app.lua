@@ -2,6 +2,7 @@
 -- and the game adapter use, and turns pet data into plain view tables for the UI.
 local Api = require("pawhome.core.api")
 local Storage = require("pawhome.core.storage")
+local Serialize = require("pawhome.core.serialize")
 local I18n = require("pawhome.core.i18n")
 local Log = require("pawhome.core.log")
 local Rng = require("pawhome.core.rng")
@@ -79,6 +80,24 @@ end
 --
 -- The game runs Lua on one thread and a public call never yields, so the slot cannot change
 -- between the sync at the start of a call and the save at its end.
+-- Reads the savegame data again (after a slot change or a restored backup).
+function App:reload()
+    local state, how = Storage.load()
+    if not state then
+        Log.error("cannot load the slot (" .. tostring(how) .. "); the mod is paused for it")
+        self.suspended = true
+        return false
+    end
+    local ctx = self.ctx
+    ctx.state, ctx.cfg = state, state.settings
+    ctx.rng = Rng.new(state.rng or self.seed)   -- never carry the previous save's random state over
+    ctx.events = {}
+    applyLocale(ctx)
+    self.suspended = false
+    Coats.publish(ctx)
+    return true
+end
+
 function App:syncSlot()
     if not self.slotAware then return false end
     local slot = Api.slotId()
@@ -90,20 +109,8 @@ function App:syncSlot()
         self.suspended = true
         return true
     end
-    local state, how = Storage.load()
-    if not state then
-        -- e.g. the new slot was written by a newer version: touch nothing until the slot changes again
-        Log.error("cannot load the new slot (" .. tostring(how) .. "); the mod is paused for it")
-        self.suspended = true
-        return true
-    end
-    local ctx = self.ctx
-    ctx.state, ctx.cfg = state, state.settings
-    ctx.rng = Rng.new(state.rng or self.seed)   -- never carry the previous save's random state over
-    ctx.events = {}
-    applyLocale(ctx)
-    self.suspended = false
-    Coats.publish(ctx)
+    -- a slot written by a newer version stays paused until the slot changes again
+    self:reload()
     return true
 end
 
@@ -313,6 +320,33 @@ local function petView(ctx, pet, zoiId)
     }
 end
 
+-- A backup worth offering: only while this savegame has no pets and the backup has some.
+function App:backupInfo()
+    if self.suspended or #self.ctx.state.pets > 0 then return nil end
+    local b = Api.backup()
+    local raw = b and type(b.cache) == "table" and b.cache[Storage.KEY]
+    local old = raw and Serialize.decode(raw)
+    if type(old) ~= "table" or type(old.pets) ~= "table" then return nil end
+    local names = {}
+    for _, pet in ipairs(old.pets) do
+        if pet.status == "home" or pet.status == "impounded" then names[#names + 1] = tostring(pet.name) end
+    end
+    if #names == 0 then return nil end
+    local day = tonumber(b.day) or 0
+    local list = table.concat(names, ", ")
+    return { day = day, names = names, text = I18n.t("ui.backup_found", { day = day, names = list }) }
+end
+
+function App:restoreBackup()
+    self:sync()
+    if self.suspended then return self:noSave() end
+    if not self:backupInfo() or not Api.restoreBackup() then
+        return { ok = false, reason = "no_backup", message = I18n.t("fail.no_backup") }
+    end
+    self:reload()
+    return { ok = true, message = I18n.t("msg.backup_restored"), notifications = {} }
+end
+
 -- Cat furniture on the lot and what each piece does, for the panel.
 local function furnitureView(householdId)
     local out = {}
@@ -354,6 +388,7 @@ function App:view(householdId, zoiId)
         noSave = self.suspended,
         training = { level = level, label = I18n.t("ui.training", { level = level }) },
         furniture = (householdId ~= nil and not self.suspended) and furnitureView(householdId) or {},
+        backup = self:backupInfo(),
         settings = Util.copy(ctx.cfg),
     }
 end
