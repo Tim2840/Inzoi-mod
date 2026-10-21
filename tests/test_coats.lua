@@ -188,6 +188,37 @@ T.test("coats (B1): right after a load the last list is used until B2 sends the 
     T.eq(cat.texture, "Void_Cat_001_003_D", "coloured from the cached list at once")
 end)
 
+T.test("coats (B1): a coat that is not ready when the actor appears is retried every second", function()
+    local p = fakeB1()
+    p.fail[7] = true                              -- the material is not ready yet
+    local keeper = CoatKeeper.new(p)
+    local cat = { eid = 7 }
+    keeper.setList("7=Void_Cat_001_001_D")
+    keeper.onActor(cat)
+    T.eq(cat.texture, nil)
+    keeper.tick(0.4); keeper.tick(0.4); T.eq(cat.texture, nil, "not a full second yet")
+    keeper.tick(0.4); T.eq(cat.texture, nil, "the retry fails too")
+    p.fail[7] = nil                               -- now it is ready
+    keeper.tick(1.0); T.eq(cat.texture, "Void_Cat_001_001_D")
+    local n = #p.applied
+    keeper.tick(5); keeper.tick(5)
+    T.eq(#p.applied, n, "nothing more to do")
+end)
+
+T.test("coats (B1): a coat that never works is given up after 20 tries", function()
+    local p = fakeB1()
+    p.fail[7] = true
+    local calls, orig = 0, p.applyCoat
+    p.applyCoat = function(actor, texture) calls = calls + 1 return orig(actor, texture) end
+    local keeper = CoatKeeper.new(p)
+    local cat = { eid = 7 }
+    keeper.setList("7=Void_Cat_001_001_D")
+    keeper.onActor(cat)
+    for _ = 1, 60 do keeper.tick(1) end
+    T.eq(cat.texture, nil)
+    T.truthy(calls <= 21, "stopped trying (" .. calls .. " calls)")
+end)
+
 T.test("coats (B1): a cat whose material cannot be set does not break the others", function()
     local p = fakeB1()
     p.fail[1] = true

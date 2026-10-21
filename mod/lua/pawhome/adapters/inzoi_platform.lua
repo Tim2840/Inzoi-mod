@@ -362,25 +362,24 @@ function Platform.b1(opts)
     end
 
     local COAT_DIR = "/Game/Characters/Void/Void_Cat/Textures/"
-    local textures = {}
     function p.applyCoat(actor, texture)
-        local tex = textures[texture]
-        if tex == nil then
-            tex = UE.UObject.Load(COAT_DIR .. texture .. "." .. texture)
-            if tex == nil then return false end
-            textures[texture] = tex
-        end
+        -- asked of the game every time: a texture object kept from an earlier call may have been
+        -- released by the game by now (suspected cause of coats that stopped applying; unverified)
+        local tex = UE.UObject.Load(COAT_DIR .. texture .. "." .. texture)
+        if tex == nil then return false, "texture " .. texture .. " not found" end
         local comps = actor:K2_GetComponentsByClass(UE.UMeshComponent)
-        local set = 0
+        local set, errors = 0, {}
         for i = 1, comps:Num() do
             -- only dynamic instances take parameters; the dummy skeletal mesh has no material
-            local ok = pcall(function()
+            local ok, err = pcall(function()
                 local mat = comps:Get(i):GetMaterial(0)
                 mat:SetTextureParameterValue("Color Tex", tex)
             end)
-            if ok then set = set + 1 end
+            if ok then set = set + 1 else errors[#errors + 1] = tostring(err):sub(1, 60) end
         end
-        return set > 0
+        -- the second result says why nothing was set (shown in the log)
+        return set > 0, ("%d of %d mesh components took it%s"):format(set, comps:Num(),
+            #errors > 0 and (": " .. table.concat(errors, " / ")) or "")
     end
 
     function p.log(line)

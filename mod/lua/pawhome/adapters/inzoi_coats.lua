@@ -9,7 +9,11 @@
 --   platform.applyCoat(actor, texture)    -> true when the coat was set
 --   platform.cfgSave(section, key, value) / platform.cfgLoad(section, key)
 --   platform.log(line)                    optional
-local Coats = { SECTION = "coats", KEY = "map" }
+local Coats = {
+    SECTION = "coats", KEY = "map",
+    RETRY_SECONDS = 1,     -- a coat that could not be set (the material is not ready right after the
+    RETRY_TRIES = 20,      -- actor appears) is tried again every second, up to 20 times
+}
 
 function Coats.parse(text)
     local map = {}
@@ -20,7 +24,7 @@ function Coats.parse(text)
 end
 
 function Coats.new(platform)
-    local c = { actors = {}, map = {}, applied = {} }
+    local c = { actors = {}, map = {}, applied = {}, tries = {}, since = 0 }
 
     local function log(line)
         if platform.log then pcall(platform.log, "[PawHome coats] " .. line) end
@@ -29,12 +33,16 @@ function Coats.new(platform)
     local function apply(eid)
         local actor, texture = c.actors[eid], c.map[eid]
         if actor == nil or texture == nil or c.applied[eid] == texture then return end
-        local ok, done = pcall(platform.applyCoat, actor, texture)
+        local ok, done, why = pcall(platform.applyCoat, actor, texture)
         if ok and done then
             c.applied[eid] = texture
+            c.tries[eid] = nil
             log("cat " .. tostring(eid) .. " wears " .. texture)
         else
-            log("could not set the coat of cat " .. tostring(eid) .. ": " .. tostring(done))
+            c.tries[eid] = (c.tries[eid] or 0) + 1
+            if c.tries[eid] == 1 then
+                log("could not set the coat of cat " .. tostring(eid) .. " yet: " .. tostring(why or done))
+            end
         end
     end
 
@@ -49,14 +57,24 @@ function Coats.new(platform)
         local ok, eid = pcall(platform.actorEntityId, actor)
         if not ok or eid == nil then return end
         c.actors[eid] = actor
-        c.applied[eid] = nil
+        c.applied[eid], c.tries[eid] = nil, nil
         apply(eid)
     end
 
     function c.onActorEnd(actor)
         local ok, eid = pcall(platform.actorEntityId, actor)
         if ok and eid ~= nil and c.actors[eid] == actor then
-            c.actors[eid], c.applied[eid] = nil, nil
+            c.actors[eid], c.applied[eid], c.tries[eid] = nil, nil, nil
+        end
+    end
+
+    -- B1 tick (real seconds): retries the coats that were not ready when the actor appeared.
+    function c.tick(dt)
+        c.since = c.since + (dt or 0)
+        if c.since < Coats.RETRY_SECONDS then return end
+        c.since = 0
+        for eid, tries in pairs(c.tries) do
+            if tries < Coats.RETRY_TRIES then apply(eid) end
         end
     end
 
@@ -65,6 +83,7 @@ function Coats.new(platform)
         if tostring(text or "") ~= c.lastList then log("list from B2: " .. tostring(text)) end
         c.lastList = tostring(text or "")
         c.map = Coats.parse(text)
+        c.tries = {}                       -- a fresh list: every cat may be tried again
         pcall(platform.cfgSave, Coats.SECTION, Coats.KEY, tostring(text or ""))
         for eid in pairs(c.map) do apply(eid) end
     end

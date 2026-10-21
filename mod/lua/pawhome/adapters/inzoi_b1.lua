@@ -26,6 +26,7 @@ function R.start(opts) ensure(opts) end
 function R.tick(dt)
     ensure().tick(dt)
     R.cats.tick(dt)
+    R.coats.tick(dt)
 end
 
 -- B1 Zoi(ResidenceFamily) on_lua_message. owner is an AB1Character.
