@@ -30,6 +30,8 @@ local function quote(s) return '"' .. tostring(s):gsub('"', "'") .. '"' end
 --   catZ       the cat's own Z before the move (it stands on a floor), if on the same storey
 -- and falls back to the observed capsule half height. Returns z, how.
 Platform.ZOI_HALF_HEIGHT = 83
+Platform.CALL_DISTANCE = 100   -- cm from the Zoi to a called cat
+Platform.CALL_ANGLE = 35       -- degrees to the side of her facing direction
 function Platform.floorUnderZoi(zoiZ, nodeFloor, halfHeight, catZ)
     local guess = zoiZ - Platform.ZOI_HALF_HEIGHT
     local half = type(halfHeight) == "number" and halfHeight > 20 and halfHeight < 200 and halfHeight or nil
@@ -46,6 +48,30 @@ function Platform.floorUnderZoi(zoiZ, nodeFloor, halfHeight, catZ)
         return catZ, "cat floor"
     end
     return guess, "default half height"
+end
+
+-- Where to put a called cat: a spot near the Zoi that is clear of furniture. Straight ahead of a Zoi who
+-- sits at a table is under the table (seen 2026-10-22: the cat was "gone"), and objects have only an
+-- origin here, so clearance is measured to the origins. `objects` = list of { x, y } in cm. Candidates run
+-- from "ahead, a little to the side" outwards; the first one with enough clearance wins, else the one
+-- with the most. Returns x, y, yaw, how.
+Platform.CLEAR_CM = 70
+function Platform.pickSpot(zx, zy, yaw, objects)
+    local best, bestClear
+    for _, dist in ipairs({ 100, 130, 160 }) do
+        for _, turn in ipairs({ 35, -35, 0, 70, -70, 105, -105, 140, -140, 180 }) do
+            local a = yaw + turn
+            local x, y = zx + math.cos(math.rad(a)) * dist, zy + math.sin(math.rad(a)) * dist
+            local clear = math.huge
+            for _, o in ipairs(objects or {}) do
+                local d = math.sqrt((o.x - x) ^ 2 + (o.y - y) ^ 2)
+                if d < clear then clear = d end
+            end
+            if clear >= Platform.CLEAR_CM then return x, y, (a + 180) % 360, "clear" end
+            if not bestClear or clear > bestClear then best, bestClear = { x, y, (a + 180) % 360 }, clear end
+        end
+    end
+    return best[1], best[2], best[3], "least crowded"
 end
 
 -- ---------------------------------------------------------------- B2 (simulation thread)
@@ -215,7 +241,7 @@ function Platform.b2(opts)
         return x, y, z, yaw
     end
 
-    -- Moves the B2 cat entity 90 cm in front of `zoiId` (or the possessed Zoi) and returns
+    -- Moves the B2 cat entity about 1 m in front of `zoiId`, slightly to the side, (or the possessed Zoi) and returns
     -- x, y, z, yaw for the B1 actor.
     function p.moveCatToZoi(eid, zoiId)
         local zoi = tonumber(zoiId) or p.possessed()
@@ -226,12 +252,21 @@ function Platform.b2(opts)
         if not okLoc or not loc then return nil end
         local okRot, rot = pcall(function() return character:GetRotation() end)
         local zoiYaw = (okRot and rot and tonumber(rot.Yaw)) or 0
-        local rad = math.rad(zoiYaw)
-        local dist = 90
-        local x = (tonumber(loc.X) or 0) + math.cos(rad) * dist
-        local y = (tonumber(loc.Y) or 0) + math.sin(rad) * dist
         local zoiZ = tonumber(loc.Z) or 0
-        local catYaw = (zoiYaw + 180) % 360
+        local zx, zy = tonumber(loc.X) or 0, tonumber(loc.Y) or 0
+        local near = {}
+        eachEntity(inzoi.EB2EntityType.GameObject, function(item)
+            local ok, ox, oy, id = pcall(function()
+                local l = item:GetLocation()
+                return tonumber(l.X), tonumber(l.Y), tostring(item:GetObjectTableId())
+            end)
+            if ok and ox and oy and math.abs(ox - zx) < 300 and math.abs(oy - zy) < 300 and id ~= "DEV_Void_Cat" then
+                near[#near + 1] = { x = ox, y = oy }
+            end
+            return false
+        end)
+        local x, y, catYaw, how = Platform.pickSpot(zx, zy, zoiYaw, near)
+        if p.report then p.report(string.format("cat spot: %s (%d objects within 3 m)", how, #near)) end
         local cat = p.cats[eid]
         if not cat then p.homeCats(); cat = p.cats[eid] end
         -- the Zoi's location is her body centre: find the floor under her feet
@@ -259,7 +294,8 @@ function Platform.b2(opts)
             end)
         end
         if p.report then
-            p.report(string.format("moveCatToZoi %s -> zoi %s at (%.1f, %.1f, %.1f)", tostring(eid), tostring(zoi), x, y, z))
+            p.report(string.format("moveCatToZoi %s -> zoi %s (%.1f, %.1f, yaw %.1f) cat at (%.1f, %.1f, %.1f)", tostring(eid), tostring(zoi),
+                tonumber(loc.X) or 0, tonumber(loc.Y) or 0, zoiYaw, x, y, z))
         end
         return x, y, z, catYaw
     end

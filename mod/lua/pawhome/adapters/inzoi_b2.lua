@@ -5,7 +5,7 @@ local Platform = require("pawhome.adapters.inzoi_platform")
 local App = require("pawhome.app")
 local Rpc = require("pawhome.rpc")
 
-local DEFAULT_OPTS = { spawn = true, animate = true, scale = true }
+local DEFAULT_OPTS = { spawn = true, animate = false, scale = true }   -- EXPERIMENT 2026-10-22
 local R = { platform = nil, adapter = nil, app = nil, handlers = {}, opts = DEFAULT_OPTS, failed = nil }
 
 -- Lines also go to the B1 relay's log (pawhome:diag), the only place a running B2 can report to.

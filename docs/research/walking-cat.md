@@ -134,3 +134,12 @@ PO 的問題：Age of Magic（AOM）模組召喚的貓好像會動，我們能�
 | 7.3 | 遊戲自己的 `PlayVATAnim` 動作（Action 列，BaseObject=Target）讓貓真的動：自訂 `AnimGameObject`＋`Action`（只有這一個動作、`IsWaitFinishAction=false`）＋`Interaction`＋`InteractionBag`，用 `interaction.execute` 排進 Zoi 的佇列，互動立刻結束、Zoi 不做任何事，貓卻把整段播完（站起來再坐下，兩次連拍都看到） | 已驗證（2 次）；之後在較近的鏡頭下重做 4 次**看不出站起**，只看到頭部細微晃動 | `ScreenShot00162–169`、`00170–177`；`00220–235` |
 | 7.4 | 因此 mod 改為用這條路徑播所有貓的動畫：`PawHome_Vat_<key>` 互動（`bridge.js` `CAT_CLIPS`），B2 把它排進受控 Zoi 的佇列（`inzoi.lua` `playClip`），循環片段在播完時重排，Zoi 佇列不空時等待；單次片段播完回到心情對應的循環。**排隊成功（結果 37），但這條路徑是否每次都真的在動，還沒有穩定的證據** | 實作完成、測試過；遊戲內效果未穩定驗證 | 離線測試；日誌 `enqueue PawHome_Vat_* … result 37` |
 | 7.5 | 備註：Age of Magic 的貓與我們的 `DEV_Void_Cat` 是同一種物件（同一場景中兩隻貓的物件資料與網格元件相同） | 已驗證 | `entity.get_object_info` 15861、18787 |
+
+## 第 8 節：PO 的現場回饋（2026-10-22 晚）
+
+| # | 發現 | 狀態 | 依據 |
+|---|---|---|---|
+| 8.1 | PO：移除所有模組之後貓就會動了。加上第 7 節（我們直接呼叫 `PlayAnimSequence` 之後貓只停在一格），最可能的原因是**原版的貓本來就會動，是我們去碰動畫才把它弄定格**；Age of Magic 的貓會動，是因為它沒有碰這個元件。還沒有單獨只開我們的模組、且不碰動畫的對照 | PO 回報；對照待做 | PO 訊息 |
+| 8.2 | 因此 `animate` 預設改為 **false**（實驗）：不再送任何動畫給貓，貓用原版自己的待機動作。要驗證：用這個版本召喚一隻**新的**貓（舊的貓已經被我們碰過，狀態可能卡住），看它會不會自己舔毛 | 待 PO 驗證 | `inzoi_b2.lua` DEFAULT_OPTS |
+| 8.3 | 叫貓過來：貓放在 Zoi 前面 1 公尺、偏側 35 度，並且避開附近家具（Zoi 坐在餐桌時，正前方是桌子底下，貓看起來像消失）；Zoi 的位置與朝向寫入日誌 | 離線測試過；遊戲內只看到「貓在日誌裡的位置正確」，最終畫面未確認 | `Platform.pickSpot` |
+| 8.4 | PO：摸貓時 Zoi 對著空氣摸。可能原因：我們用兩種方法搬貓（模擬位置 `SetLocationAndRotationOnlySimul`＋畫面位置 `K2_SetActorLocation`），兩邊不一致時，遊戲的互動走到模擬位置、畫面上的貓卻在別處。**未驗證** | 假設 | 見下一步 |

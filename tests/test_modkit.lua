@@ -939,6 +939,25 @@ T.test("cat B1: teleport message moves the cat actor and reapplies after a stale
     T.eq(a.yaw, 90.0)
 end)
 
+T.test("platform: a called cat is put in a spot clear of furniture, not under the table in front of the Zoi", function()
+    local Platform = require("pawhome.adapters.inzoi_platform")
+    -- nothing around: ahead, a little to the side, 1 m away
+    local x, y, yaw, how = Platform.pickSpot(0, 0, 0, {})
+    T.eq(how, "clear")
+    T.truthy(x > 70 and math.abs(y) > 40 and math.abs(y) < 70, "ahead and to the side")
+    T.truthy(math.abs(((yaw - 180 - 35) + 180) % 360 - 180) < 1, "faces the Zoi")
+    -- a table right in front of her (origin 1 m ahead): the cat goes somewhere else
+    local table_ = { { x = 100, y = 0 } }
+    local x2, y2 = Platform.pickSpot(0, 0, 0, table_)
+    local d = math.sqrt((x2 - 100) ^ 2 + y2 ^ 2)
+    T.truthy(d >= Platform.CLEAR_CM, "clear of the table: " .. d)
+    -- crowded all around: the least crowded spot, still answered
+    local crowd = {}
+    for a = 0, 350, 10 do crowd[#crowd + 1] = { x = math.cos(math.rad(a)) * 120, y = math.sin(math.rad(a)) * 120 } end
+    local _, _, _, how3 = Platform.pickSpot(0, 0, 0, crowd)
+    T.truthy(how3 == "clear" or how3 == "least crowded")
+end)
+
 T.test("platform: a called cat lands on the floor under the Zoi, not at her body centre", function()
     local Platform = require("pawhome.adapters.inzoi_platform")
     -- seen in game 2026-10-22: Zoi Z 158.0, floor 75.3; the cat floated when put at 158
