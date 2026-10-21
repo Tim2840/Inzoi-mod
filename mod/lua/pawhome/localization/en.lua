@@ -83,6 +83,7 @@ return {
         ignores_scold = "{name} just ignores you.",
         action_done = "{name}: {action}.",
         renamed = "Renamed to {name}.",
+        litter_placed = "Placing a litter box at home.",
     },
     fail = {
         no_litter_box = "There is no litter box at home yet.",
@@ -103,16 +104,21 @@ return {
         no_save = "No savegame is loaded yet.",
         not_impounded = "{name} is not at the shelter.",
         redeem_wait = "{name} can be redeemed in {hours} h.",
+        place_litter_failed = "Go home first to place a litter box.",
     },
     -- labels in the game's own menus (interaction names); tools/build_modkit.py writes them to
     -- l10n/<culture>_mod/PawHome.po under the text id "mod_PawHome_<key>"
     game = {
         shop_phone = "Paw Home pet shop",
         adopt_cat = "Adopt this cat (Paw Home)",
+        place_litter = "Place Litter Box (Paw Home)",
+        clean_litter = "Use Litter Box (Paw Home)",
     },
     ui = {
         tip = "Click your cat in the world to pet it, play with it or give it treats. Its mood and needs show here.",
         litter_hint = "Put a litter box in the house (Build mode, Pet) to look after the litter.",
+        place_litter = "Place Litter Box",
+        use_litter = "Send to Litter Box",
         want_hint = "Pick it from the cat's menu",
         album = "Album",
         album_hint = "Little gifts your cats bring after a happy moment.",

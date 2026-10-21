@@ -83,6 +83,7 @@ return {
         ignores_scold = "{name} 完全不理你。",
         action_done = "{name}：{action}。",
         renamed = "已改名為 {name}。",
+        litter_placed = "正在家裡擺放貓砂盆。",
     },
     fail = {
         no_litter_box = "家裡還沒有貓砂盆。",
@@ -103,14 +104,19 @@ return {
         no_save = "還沒有載入存檔。",
         not_impounded = "{name} 不在收容所。",
         redeem_wait = "{name} 還要 {hours} 小時才能領回。",
+        place_litter_failed = "請先回家再擺放貓砂盆。",
     },
     game = {
         shop_phone = "毛孩之家寵物店",
         adopt_cat = "領養這隻貓（毛孩之家）",
+        place_litter = "擺放貓砂盆（毛孩之家）",
+        clean_litter = "去貓砂盆如廁（毛孩之家）",
     },
     ui = {
         tip = "直接點遊戲裡的貓，就能摸摸牠、陪牠玩、餵牠零食。牠的心情和需求會顯示在這裡。",
         litter_hint = "在家裡擺一個貓砂盆（建造模式「寵物」分類）才能照顧貓砂。",
+        place_litter = "擺放貓砂盆",
+        use_litter = "讓貓去貓砂盆如廁",
         want_hint = "從貓的互動選單選擇",
         album = "圖鑑",
         album_hint = "貓咪在開心時刻帶給你的小禮物。",

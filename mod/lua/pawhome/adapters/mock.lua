@@ -106,6 +106,16 @@ function Mock.new(opts)
     m.coatList = nil                    -- the last list the mod gave setCoats
     function m.setCoats(list) m.coatList = list end
     function m.playAnimation(ref, anim) m.animations[#m.animations + 1] = { ref = ref, anim = anim } end
+    m.teleports = {}                    -- { ref, object } teleports requested
+    function m.movePetToObject(ref, objectId)
+        m.teleports[#m.teleports + 1] = { ref = ref, object = objectId }
+        return true
+    end
+    function m.placeLitterBox(hid)
+        m.lot[hid] = m.lot[hid] or {}
+        m.lot[hid][#m.lot[hid] + 1] = "PawHome_LitterBox"
+        return true
+    end
     m.looks = {}                        -- ref -> the last look the engine asked for
     function m.petLook(ref, look) m.looks[ref] = look end
     m.backupOffer = nil                 -- { day, cache } the tests put here

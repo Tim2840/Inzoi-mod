@@ -130,14 +130,51 @@ function Platform.b2(opts)
         local home, want, out = p.homeSite(), {}, {}
         if not home then return out end
         for _, id in ipairs(watched or {}) do want[id] = true end
+        if want.PawHome_LitterBox then want.Bustub01_v01 = true end
         eachEntity(inzoi.EB2EntityType.GameObject, function(item)
             local ok, id, site = pcall(function()
                 return tostring(item:GetObjectTableId()), tostring(item:GetLocatedSiteDtId())
             end)
-            if ok and want[id] and site == home then out[#out + 1] = id end
+            if ok and want[id] and site == home then out[#out + 1] = (id == "Bustub01_v01" and "PawHome_LitterBox" or id) end
             return false
         end)
         return out
+    end
+
+    -- Finds an object of `objectId` (or its base-game tub row Bustub01_v01 for PawHome_LitterBox)
+    -- on the home lot, moves the B2 cat entity there, and returns x, y, z, yaw for the B1 actor.
+    function p.moveCatToObject(eid, objectId)
+        local home = p.homeSite()
+        if not home then return nil end
+        local want = { [tostring(objectId)] = true }
+        if objectId == "PawHome_LitterBox" then want.Bustub01_v01 = true end
+        local targetObj = eachEntity(inzoi.EB2EntityType.GameObject, function(item)
+            local ok, id, site = pcall(function()
+                return tostring(item:GetObjectTableId()), tostring(item:GetLocatedSiteDtId())
+            end)
+            return ok and want[id] and site == home
+        end)
+        if not targetObj then return nil end
+        local okLoc, loc = pcall(function() return targetObj:GetLocation() end)
+        if not okLoc or not loc then return nil end
+        local okRot, rot = pcall(function() return targetObj:GetRotation() end)
+        local yaw = (okRot and rot and tonumber(rot.Yaw)) or 0
+        local x, y, z = tonumber(loc.X) or 0, tonumber(loc.Y) or 0, (tonumber(loc.Z) or 0) + 3
+        local cat = p.cats[eid]
+        if not cat then p.homeCats(); cat = p.cats[eid] end
+        if cat then
+            pcall(function()
+                local cLoc = cat:GetLocation()
+                cLoc.X, cLoc.Y, cLoc.Z = x, y, z
+                local cRot = cat:GetRotation()
+                cRot.Pitch, cRot.Yaw, cRot.Roll = 0, yaw, 0
+                cat:SetLocationAndRotationOnlySimul(cLoc, cRot)
+            end)
+        end
+        if p.report then
+            p.report(string.format("moveCatToObject %s -> %s at (%.1f, %.1f, %.1f)", tostring(eid), tostring(objectId), x, y, z))
+        end
+        return x, y, z, yaw
     end
 
     -- UNVERIFIED: FB2Actor:GetHouseholdEntityId, FB2EntityManager:FindHousehold, Currency component.
@@ -443,6 +480,21 @@ function Platform.b1(opts)
         call(actor, "SetActorScale3D", v)
         local now = call(actor, "GetActorScale3D")
         return math.abs(now.X - scale) < 0.001
+    end
+
+    function p.setLocation(actor, x, y, z)
+        local v = call(actor, "GetActorLocation")
+        v.X, v.Y, v.Z = x, y, z
+        call(actor, "K2_SetActorLocation", v, false, nil, true)
+        local now = call(actor, "GetActorLocation")
+        return math.abs(now.X - x) < 1 and math.abs(now.Y - y) < 1
+    end
+
+    function p.setYaw(actor, yaw)
+        local r = call(actor, "GetActorRotation")
+        r.Pitch, r.Yaw, r.Roll = 0, yaw, 0
+        call(actor, "K2_SetActorRotation", r, true)
+        return true
     end
 
     local function vat(actor)

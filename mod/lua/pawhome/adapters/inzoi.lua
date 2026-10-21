@@ -18,7 +18,8 @@
 -- Looks (option a of docs/research/walking-cat.md): the cat cannot walk, but it can play the
 -- nine animations baked into it and be shown smaller as a kitten. The B1 cat binding does
 -- that on the cat's actor; this side decides what and when and sends it to the cat's entity:
---   "pawhome:anim"  "<sequence>|<seconds>|<sequence to return to>"   (seconds 0 = a loop)
+--   "pawhome:anim"  "<sequence>|<seconds>|<sequence to return to>|<force 1 or empty>|<loop restart seconds>"
+--                   (seconds 0 = a loop; the last two fields are optional)
 --   "pawhome:scale" "<scale>"
 -- The B1 side answers "pawhome:cat_begin" whenever the cat's actor (re)appears.
 --
@@ -45,6 +46,7 @@ local ModKit = {
     BACKUP_EVERY_SECONDS = 30,   -- at most one backup copy to the relay per 30 real seconds
     WELCOME = "PawHome_WelcomeCat",
     SEND_AWAY = "PawHome_SendAway",
+    PLACE_LITTER = "PawHome_PlaceLitterBox",
     GIFT_PREFIX = "PawHome_Gift_",
     -- The care the player gives from the cat's own interaction menu (all vanilla interactions
     -- except the first two, which the mod appends to the menu in bridge.js).
@@ -52,6 +54,7 @@ local ModKit = {
         Object_Void_Cat_Dev = "feed", Giving_Snack_To_Cat = "feed", Giving_Catnip_Candy_To_Cat = "feed",
         Object_Void_Cat_Tickle = "play", Playing_Toy_With_Cat = "play",
         Petting_Cat = "cuddle",
+        PawHome_CleanLitter = "clean_litter",
     },
     -- our entry interactions (rows added by mod/ui/bridge.js) -> where the shop opens
     OPEN = {
@@ -190,6 +193,12 @@ function ModKit.new(platform, opts)
     function a.homeObjects(hid, watched)
         if not platform.homeObjects then return {} end
         return platform.homeObjects(watched) or {}
+    end
+
+    function a.placeLitterBox(householdId)
+        local zoi = target()
+        if zoi == nil or not platform.atHome(zoi) then return false end
+        return platform.enqueue(zoi, zoi, ModKit.PLACE_LITTER) == true
     end
 
     local function persistRefs()
@@ -332,8 +341,13 @@ function ModKit.new(platform, opts)
         local seq = Anim.sequences[key]
         if not seq then return false end
         local back = backKey and Anim.sequences[backKey]
+        -- the last field: seconds after which what the cat ends up showing (this loop, or the loop it
+        -- returns to) is started again
+        local cycleOf = seq.loop and seq or back
+        local cycle = cycleOf and cycleOf.cycle
         platform.send(eid, Wire.channel("anim"),
-            seq.name .. "|" .. tostring(seq.seconds or 0) .. "|" .. (back and back.name or "") .. (force and "|1" or ""))
+            seq.name .. "|" .. tostring(seq.seconds or 0) .. "|" .. (back and back.name or "")
+            .. "|" .. (force and "1" or "") .. (cycle and ("|" .. tostring(cycle)) or ""))
         local st = shownOf(eid)
         if seq.loop then st.base = key elseif back then st.base = backKey end
         -- a game minute is about 2 real seconds at normal speed; B1 also refuses to cut a
@@ -360,6 +374,17 @@ function ModKit.new(platform, opts)
         -- only the game's own interaction on the cat holds this back, not our earlier animation
         if eid == nil or key == nil or a.busy[eid] then return false end
         return sendAnim(eid, key, moodDef(ref).base, true)
+    end
+
+    -- Teleports the cat to an object on its home lot (e.g. PawHome_LitterBox) on both B2 and B1.
+    function a.movePetToObject(ref, objectId)
+        local eid = catOf(ref)
+        if eid == nil or not platform.moveCatToObject then return false end
+        local ok, x, y, z, yaw = pcall(platform.moveCatToObject, eid, objectId)
+        if not ok or type(x) ~= "number" or type(y) ~= "number" or type(z) ~= "number" then return false end
+        platform.send(eid, Wire.channel("teleport"),
+            string.format("%.1f|%.1f|%.1f|%.1f", x, y, z, tonumber(yaw) or 0))
+        return true
     end
 
     -- force: send even if it was sent before (a message to a cat whose actor is not ready
@@ -425,7 +450,7 @@ function ModKit.new(platform, opts)
         local st = shownOf(eid)
         st.scale = nil
         showScale(eid, ref)
-        if a.caps.animate and st.base and free(eid) then sendAnim(eid, st.base) end
+        if a.caps.animate and free(eid) then sendAnim(eid, st.base or moodDef(ref).base) end
     end
 
     -- a game interaction on one of our cats: keep our animations off it meanwhile

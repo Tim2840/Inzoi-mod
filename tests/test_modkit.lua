@@ -655,7 +655,7 @@ T.test("looks: pressing buttons quickly sends every reaction at once, marked as 
     T.truthy(s.adapter.playAnimation(pet.entity, "pet_play"), "the first reaction (12 s) does not hold the second back")
     local anims = sent(s, "anim")
     T.eq(#anims, 2)
-    for _, a in ipairs(anims) do T.truthy(a:find("|1$"), a) end
+    for _, a in ipairs(anims) do T.truthy(a:find("|1|[%d.]+$") or a:find("|1$"), a) end
 end)
 
 T.test("looks: nothing is played on a cat while a game interaction runs on it", function()
@@ -677,12 +677,12 @@ T.test("looks: the idle follows the mood and is not resent while it does not cha
     for _ = 1, 40 do s.w.minute = s.w.minute + 1; s.adapter.tick(10) end
     local anims = sent(s, "anim")
     T.eq(#anims, 1)
-    T.eq(anims[1], Anim.sequences[Anim.moods.angry.base].name .. "|0|")
+    T.eq(anims[1], Anim.sequences[Anim.moods.angry.base].name .. "|0|||" .. tostring(Anim.sequences[Anim.moods.angry.base].cycle))
     s.adapter.petLook(pet.entity, { mood = "asleep", stage = "adult", scale = 1 })
     for _ = 1, 40 do s.w.minute = s.w.minute + 1; s.adapter.tick(10) end
     anims = sent(s, "anim")
     T.eq(#anims, 2)
-    T.eq(anims[2], Anim.sequences[Anim.moods.asleep.base].name .. "|0|")
+    T.eq(anims[2], Anim.sequences[Anim.moods.asleep.base].name .. "|0|||" .. tostring(Anim.sequences[Anim.moods.asleep.base].cycle))
 end)
 
 T.test("looks: every mood and action points at a known animation", function()
@@ -714,6 +714,8 @@ local function fakeCats()
         actorId = function(x) return x.eid end,
         valid = function(x) return x.valid end,
         setScale = function(x, s) x.scale = s; return true end,
+        setLocation = function(x, lx, ly, lz) x.loc = { lx, ly, lz }; return true end,
+        setYaw = function(x, yaw) x.yaw = yaw; return true end,
         playVat = function(x, name)
             if name:find("Walk") then return false end   -- not baked: the game ignores it
             x.anim = name
@@ -771,6 +773,38 @@ T.test("cat B1: a one-shot returns to the sitting idle and is not cut short", fu
     T.eq(a.anim, "ANIM_VoidCat_Sit_Idle_01")
 end)
 
+T.test("cat B1: a loop is started over at its length so the cat never freezes on the last frame", function()
+    local f = fakeCats()
+    local a = f.actor(109546)
+    local plays = 0
+    local play = f.platform.playVat
+    f.platform.playVat = function(x, name) plays = plays + 1; return play(x, name) end
+    f.cats.onBegin(a)
+    f.cats.onMessage(a, "pawhome:anim", "ANIM_VoidCat_Sit_Idle_01|0||1|15")
+    T.eq(plays, 1)
+    for _ = 1, 14 do f.cats.tick(1) end
+    T.eq(plays, 1, "not before the clip ends")
+    for _ = 1, 2 do f.cats.tick(1) end
+    T.eq(plays, 2, "started over")
+    for _ = 1, 15 do f.cats.tick(1) end
+    T.eq(plays, 3, "and again")
+    -- a one-shot resumes the loop it returns to, with its own restart time
+    f.cats.onMessage(a, "pawhome:anim", "ANIM_VoidCat_Eat|8.7|ANIM_VoidCat_Sit_Idle_02|1|43.2")
+    for _ = 1, 10 do f.cats.tick(1) end
+    T.eq(a.anim, "ANIM_VoidCat_Sit_Idle_02")
+    local after = plays
+    for _ = 1, 40 do f.cats.tick(1) end
+    T.eq(plays, after, "not restarted early")
+    for _ = 1, 6 do f.cats.tick(1) end
+    T.eq(plays, after + 1, "restarted after its own length")
+    -- the game's own animation is left alone
+    a.anim = "ANIM_VoidCat_Eat"
+    f.cats.tick(1)
+    local n = plays
+    for _ = 1, 10 do f.cats.tick(1) end
+    T.truthy(plays == n, "no restarts over a game animation")
+end)
+
 T.test("cat B1: an animation the game started blocks ours for a while", function()
     local f = fakeCats()
     local a = f.actor(109546)
@@ -812,4 +846,42 @@ T.test("modkit: our phone and city-cat entries open the shop on the page", funct
     local found = false
     for _, st in ipairs(strays) do if tostring(st.ref) == "89129" then found = true end end
     T.truthy(found, "the cat the player chose to adopt is offered as a stray")
+end)
+
+T.test("modkit: litter box placement and cat teleport-to-litter-box resolve bladder need", function()
+    local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
+    s.w.b2.homeObjects = function() return { "PawHome_LitterBox" } end
+    local movedTo = nil
+    s.w.b2.moveCatToObject = function(eid, objId)
+        movedTo = { eid = eid, obj = objId }
+        return 120.5, -340.0, 15.0, 90.0
+    end
+    T.truthy(s.app:placeLitterBox(77).ok)
+    T.eq(s.w.queued[#s.w.queued].bag, "PawHome_PlaceLitterBox")
+    pet.needs.bladder = 20
+    local ev = { entity_id = 501, target_entity_id = 109546, interaction_bag_id = "PawHome_CleanLitter" }
+    s.adapter.onInteractionStarted(ev)
+    s.adapter.onInteractionFinished(ev)
+    local res = s.app:applyCare()
+    T.eq(#res, 1); T.truthy(res[1].ok)
+    T.eq(pet.needs.bladder, 100)
+    T.truthy(movedTo and movedTo.eid == 109546 and movedTo.obj == "PawHome_LitterBox")
+    local teleports = sent(s, "teleport")
+    T.eq(#teleports, 1)
+    T.eq(teleports[1], "120.5|-340.0|15.0|90.0")
+    local anims = sent(s, "anim")
+    T.truthy(#anims >= 1 and anims[1]:find("ANIM_VoidCat_Take_Food"), "plays litter animation even from game menu")
+end)
+
+T.test("cat B1: teleport message moves the cat actor and reapplies after a stale start", function()
+    local f = fakeCats()
+    local a = f.actor(109546)
+    a.valid = false
+    f.cats.onBegin(a)
+    f.cats.onMessage(a, "pawhome:teleport", "120.5|-340.0|15.0|90.0")
+    T.eq(a.loc, nil, "waits for valid actor")
+    a.valid = true
+    f.cats.tick(2)
+    T.truthy(a.loc and a.loc[1] == 120.5 and a.loc[2] == -340.0 and a.loc[3] == 15.0)
+    T.eq(a.yaw, 90.0)
 end)

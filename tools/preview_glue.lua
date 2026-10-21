@@ -33,6 +33,7 @@ end
 local handlers = {}
 
 function handlers.view() return snapshot() end
+function handlers.placeLitterBox() return snapshot({ result = P.app:placeLitterBox(P.HOUSEHOLD) }) end
 
 function handlers.perform(a)
     return snapshot({ result = P.app:perform(a.petId, P.ZOI, a.action) })

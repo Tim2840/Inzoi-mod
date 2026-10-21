@@ -9,8 +9,12 @@
 -- sitting idle when they end.
 return {
     sequences = {
-        sit1      = { name = "ANIM_VoidCat_Sit_Idle_01", loop = true },
-        sit2      = { name = "ANIM_VoidCat_Sit_Idle_02", loop = true },
+        -- `cycle`: real seconds after which B1 starts a loop again. The game's VAT component has no
+        -- loop switch we know of and a cat that finishes its clip freezes on the last frame (the
+        -- PO saw "a still picture"), so B1 restarts it at the clip's own length (montage rows:
+        -- Sit_Idle_01 15.03 s, a paw washing the face; Sit_Idle_02 43.2 s, tail twitches).
+        sit1      = { name = "ANIM_VoidCat_Sit_Idle_01", loop = true, cycle = 15.03 },
+        sit2      = { name = "ANIM_VoidCat_Sit_Idle_02", loop = true, cycle = 43.2 },
         welcoming = { name = "ANIM_Void_Cat_Welcoming", seconds = 5.7 },
         eat       = { name = "ANIM_VoidCat_Eat", seconds = 8.7 },
         patted    = { name = "ANIM_VoidCat_Being_Patted", seconds = 12.2 },
@@ -26,6 +30,7 @@ return {
         pet_play = "welcoming",
         pet_cuddle = "patted",
         pet_groom = "patted",
+        pet_litter = "takeFood",
         pet_happy = "gift",
         pet_cower = "scared",
         pet_sniff = "takeFood",
@@ -38,7 +43,7 @@ return {
         happy         = { base = "sit1", extra = { { "welcoming", 1 }, { "gift", 1 } } },
         playful       = { base = "sit1", extra = { { "welcoming", 2 }, { "gift", 1 } } },
         energized     = { base = "sit1", extra = { { "welcoming", 1 } } },
-        content       = { base = "sit2", extra = {} },
+        content       = { base = "sit1", extra = { { "welcoming", 1 }, { "patted", 1 } } },
         asleep        = { base = "sit2", extra = {} },
         sad           = { base = "sit2", extra = { { "scared", 1 } } },
         sick          = { base = "sit2", extra = { { "scared", 1 } } },

@@ -45,6 +45,20 @@ function CatB1.new(platform)
         return false
     end
 
+    local function applyPos(cat)
+        if not (cat.pos and cat.actor and platform.valid(cat.actor) and platform.setLocation) then return false end
+        local p = cat.pos
+        local ok, done = pcall(platform.setLocation, cat.actor, p.x, p.y, p.z)
+        if ok and done == true then
+            if p.yaw and platform.setYaw then pcall(platform.setYaw, cat.actor, p.yaw) end
+            log(string.format("teleported %s to (%.1f, %.1f, %.1f)", tostring(cat.eid), p.x, p.y, p.z))
+            cat.pos = nil
+            return true
+        end
+        log("teleport failed on " .. tostring(cat.eid) .. ": " .. tostring(done))
+        return false
+    end
+
     local function blocked(cat)
         if cat.foreignAt and c.t - cat.foreignAt < CatB1.GRACE then return "game" end
         if cat.backAt and c.t < cat.backAt then return "one-shot" end
@@ -84,6 +98,7 @@ function CatB1.new(platform)
         cat.reapply = {}
         for i, s in ipairs(CatB1.REAPPLY) do cat.reapply[i] = c.t + s end
         applyScale(cat)
+        applyPos(cat)
         pcall(platform.sendToSim, cat.eid, Wire.channel("cat_begin"), "")
     end
 
@@ -96,19 +111,31 @@ function CatB1.new(platform)
     -- B1 cat binding on_lua_message, from the B2 adapter.
     function c.onMessage(actor, channel, payload)
         local kind = Wire.kind(channel)
-        if kind ~= "scale" and kind ~= "anim" then return end
+        if kind ~= "scale" and kind ~= "anim" and kind ~= "teleport" then return end
         local cat = catFor(actor)
         if not cat then return end
         if not cat.actor then cat.actor = actor end
+        if kind == "teleport" then
+            local xs, ys, zs, yaws = tostring(payload):match("^([^|]*)|([^|]*)|([^|]*)|?(.*)$")
+            local x, y, z, yaw = tonumber(xs), tonumber(ys), tonumber(zs), tonumber(yaws)
+            if x and y and z then
+                cat.pos = { x = x, y = y, z = z, yaw = yaw }
+                applyPos(cat)
+            end
+            return
+        end
         if kind == "scale" then
             cat.scale = tonumber(payload)
             applyScale(cat)
+        applyPos(cat)
             return
         end
         -- "name|seconds|back" or "name|seconds|back|1": the last field marks a reaction the player just
         -- asked for (a panel button); it is shown at once, whatever else the cat was doing
-        local name, seconds, back, force = tostring(payload):match("^([^|]*)|([^|]*)|([^|]*)|?(.*)$")
+        local name, seconds, back, rest = tostring(payload):match("^([^|]*)|([^|]*)|([^|]*)|?(.*)$")
         if not name or name == "" then return end
+        local force, cycle = tostring(rest):match("^([^|]*)|?(.*)$")
+        cycle = tonumber(cycle)
         local why = force ~= "1" and blocked(cat) or nil
         if why then
             log("skipped " .. name .. " on " .. tostring(cat.eid) .. " (" .. why .. ")")
@@ -121,6 +148,10 @@ function CatB1.new(platform)
             else
                 cat.backAt, cat.back = nil, nil
             end
+            -- the loop on show (this one, or the one the cat returns to) is restarted every `cycle`
+            cat.cycle = cycle and cycle > 0 and cycle or nil
+            cat.cycleName = seconds > 0 and back ~= "" and back or name
+            cat.cycleAt = cat.cycle and (c.t + (seconds > 0 and back ~= "" and seconds or 0) + cat.cycle) or nil
         end
     end
 
@@ -135,6 +166,7 @@ function CatB1.new(platform)
                 if cat.reapply and cat.reapply[1] and c.t >= cat.reapply[1] then
                     table.remove(cat.reapply, 1)
                     applyScale(cat)
+        applyPos(cat)
                 end
                 if poll then
                     local ok, now = pcall(platform.currentVat, cat.actor)
@@ -153,7 +185,20 @@ function CatB1.new(platform)
                 if cat.backAt and c.t >= cat.backAt then
                     local back = cat.back
                     cat.backAt, cat.back = nil, nil
-                    if not blocked(cat) then play(cat, back) end
+                    if not blocked(cat) then
+                        play(cat, back)
+                        if cat.cycle then cat.cycleAt = c.t + cat.cycle end
+                    end
+                end
+                if cat.cycleAt and not cat.backAt and c.t >= cat.cycleAt then
+                    -- a still picture is the worst a cat can do: start the loop over (when the game is
+                    -- not busy with the cat; the next look tries again)
+                    if not blocked(cat) and cat.ours == lower(cat.cycleName) then
+                        play(cat, cat.cycleName)
+                        cat.cycleAt = c.t + cat.cycle
+                    elseif cat.ours ~= lower(cat.cycleName) then
+                        cat.cycleAt = nil
+                    end
                 end
             end
         end

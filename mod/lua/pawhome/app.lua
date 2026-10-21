@@ -152,6 +152,7 @@ function App:perform(petId, zoiId, actionId)
     self:sync()
     if self.suspended then return self:noSave() end
     local result = Care.perform(self.ctx, petId, zoiId, actionId)
+    Engine.looks(self.ctx)
     local notes = Engine.flush(self.ctx)
     result.notifications = notes
     self:save()
@@ -173,6 +174,7 @@ function App:applyCare()
         end
     end
     if #results > 0 then
+        Engine.looks(self.ctx)
         Engine.flush(self.ctx)
         self:save()
     end
@@ -206,8 +208,40 @@ function App:strays(householdId)
     return Api.listStrays(householdId)
 end
 
+function App:placeLitterBox(householdId)
+    self:sync()
+    if self.suspended then return self:noSave() end
+    if not Api.placeLitterBox(householdId) then
+        return { ok = false, reason = "not_home", message = I18n.t("fail.place_litter_failed"), notifications = {} }
+    end
+    Litter.forget(self.ctx)
+    return { ok = true, message = I18n.t("msg.litter_placed"), notifications = {} }
+end
+
+function App:autoLitter(zoiId)
+    self:sync()
+    if self.suspended then return {} end
+    Litter.forget(self.ctx)
+    local results = {}
+    for _, pet in ipairs(Registry.home(self.ctx, nil)) do
+        if pet.needs.bladder <= needsData.bladder.low and Litter.present(self.ctx, pet.household) then
+            local zoi = zoiId or (Api.householdMembers(pet.household)[1]) or 0
+            local r = Care.perform(self.ctx, pet.id, zoi, "clean_litter")
+            if r.ok then results[#results + 1] = r end
+        end
+    end
+    if #results > 0 then
+        Engine.looks(self.ctx)
+        Engine.looks(self.ctx)
+        Engine.flush(self.ctx)
+        self:save()
+    end
+    return results
+end
+
 local function finishAdoption(self, result)
     result.notifications = Engine.flush(self.ctx)
+    Engine.looks(self.ctx)
     Coats.publish(self.ctx)
     self:save()
     return result
@@ -236,6 +270,7 @@ function App:redeem(householdId, zoiId, petId)
     if self.suspended then return self:noSave() end
     local result = Shelter.redeem(self.ctx, householdId, zoiId, petId)
     result.notifications = Engine.flush(self.ctx)
+    Engine.looks(self.ctx)
     Coats.publish(self.ctx)
     self:save()
     return result
@@ -246,6 +281,7 @@ function App:vet(householdId, zoiId, petId)
     if self.suspended then return self:noSave() end
     local result = Illness.vet(self.ctx, householdId, petId)
     result.notifications = Engine.flush(self.ctx)
+    Engine.looks(self.ctx)
     self:save()
     return result
 end

@@ -300,7 +300,13 @@
               icon("cat", { mood: p.mood, coat: p.coat }), p.name)))
         : null,
       petCard(pet, u),
-      pet.status === "home" ? h("div", { class: "card tip" }, h("div", { class: "sub" }, u.tip), noBox ? h("div", { class: "sub", style: "margin-top:4px" }, u.litter_hint) : null) : null,
+      pet.status === "home" ? h("div", { class: "card tip" }, h("div", { class: "sub" }, u.tip),
+        noBox
+          ? [h("div", { class: "sub", style: "margin-top:4px" }, u.litter_hint),
+             h("button", { class: "btn", style: "margin-top:6px;width:100%",
+               onclick: async () => { await call("placeLitterBox", {}); render(); } }, u.place_litter)]
+          : h("button", { class: "btn ghost", style: "margin-top:6px;width:100%",
+              onclick: async () => { await call("perform", { petId: pet.id, action: "clean_litter" }); render(); } }, u.use_litter)) : null,
       traitsCard(pet, view),
       furnitureCard(view));
   }

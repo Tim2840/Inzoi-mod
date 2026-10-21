@@ -116,6 +116,8 @@ PO 的問題：Age of Magic（AOM）模組召喚的貓好像會動，我們能�
 | 6.3 | 遊戲裡的動物物件有 14 種 `/Game/Blueprint/GameObject/Animal/BP_Void_*`：Cat、Fox、Labrador、Raccoon、Rat、Squirrel、Deer、Wolf、Puma、Tiger、Panda、Crocodile、SeaTurtle、BabyTurtle，**全部是 `devOnly` 的遊戲「物件」（Object 列），不是角色**；樣板列（`ObjectTemplate`）沒有任何移動或 AI 欄位 | 已驗證（資料表 `Object`、`ObjectTemplate`） | `data.table_get_all Object` |
 | 6.4 | 目錄裡有 `ANIM_Void_Cat_Walk_F_Montage`／`Run_F_Montage`，但 4.9、4.17 已證實它們沒有烘進貓的 VAT、也沒有打包，載不到 | 已驗證（沿用） | 見 4.9、4.17 |
 | 6.5 | 另有骨架網格的貓：`SKM_CHA_CatB001`、`SKM_Pet_GhostCat`、`SKM_Pet_OP001`（主選單的 lobby 貓 `BP_Pet_Customize_01`，動畫藍圖 `ABP_LobbyCat`），以及 `Mesh_Tiger`／`Mesh_Puma`（`/Game/Characters/Void/Cats/`）。**它們有沒有 Object 列可以用官方路線召喚：沒有找到**；有沒有走路動畫：未驗證 | 資產存在已驗證；可召喚性未驗證 | `asset.search`、Object 全表 |
+| 6.6 | 為什麼 PO 覺得 AOM 的貓待機流暢、我們的貓卻像靜止圖片或一格一格？原因有三：(1) 已廢止的 `feat/vat-walking-cat` 實驗曾呼叫 `StopAnimSquence()` 並鎖定單一格，導致材質 `AutoPlay = 0.0` 時畫面凍住；(2) `UB1AnimToTexComponent:PlayAnimSequence(name, 0)` 本身是流暢 30 FPS 曲線，但**不會自動循環**——`ANIM_VoidCat_Sit_Idle_01`（15.03 秒）或 `Sit_Idle_02`（43.2 秒）播完就停在最後一格；(3) 原先 `content`（滿足）心情預設用幾乎不洗臉的 `sit2` 且 `extra = {}`，加上新召喚的貓在 `onCatMessage("cat_begin")` 時沒有立刻收到首段動畫，最多要等 20 遊戲分鐘才開始播 | 已驗證 | `inzoi_cat_b1.lua`、`inzoi.lua`、`animations.lua` |
+| 6.7 | 解法（`feat/cat-life`）：(1) B1 在每段循環動畫播完瞬間依 `cycle`（`sit1 = 15.03s`、`sit2 = 43.2s`）自動重播 `PlayAnimSequence`，絕不停在最後一格；(2) `onCatMessage("cat_begin")` 與領養完成時立刻送出心情對應的待機循環動畫，零空窗；(3) `content` 心情改用會洗臉張望的 `sit1` 並加入 `welcoming`／`patted` 隨機動作 | 已驗證 | 實機日誌與測試 |
 
 ### 結論（誠實版）
 

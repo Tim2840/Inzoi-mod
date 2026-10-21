@@ -120,6 +120,29 @@ def main():
             json.dumps({"TableId": "ST_InteractionBag_" + code, "Entries": dict(en)}, indent=2, ensure_ascii=False),
             encoding="utf-8")
         print(f"wrote string table ST_InteractionBag_{code} with {len(en)} labels")
+    # Build-mode / object registration patch for PawHome_LitterBox
+    jpatch = root / "non_ufs" / "JsonPatch"
+    jpatch.mkdir(parents=True, exist_ok=True)
+    obj_patch = [{
+        "target": "Object",
+        "operations": [{
+            "method": "Append",
+            "query": "",
+            "value": json.dumps({
+                "ID": "PawHome_LitterBox",
+                "StateVariationId": "Normal",
+                "DevOnly": False,
+                "MultipleSelect": True,
+                "ObjectCategory": "None",
+                "FilterCategory": "Pet",
+                "ObjectTemplateId": "Decoration01_Template",
+                "Asset": "/Game/Blueprint/GameObject/Furniture/BP_Bustub01_v01.BP_Bustub01_v01",
+                "Icon": "/Game/UI/Icon/Object/Bustub01_v01.Bustub01_v01",
+                "Price": 35,
+            }),
+        }],
+    }]
+    (jpatch / "Object_patch.json").write_text(json.dumps(obj_patch, indent=2), encoding="utf-8")
     # mod_manifest.json lists the mod's loose files ("NonAssets"); keep it in step with what we wrote
     manifest_path = root / "mod_manifest.json"
     if manifest_path.is_file():

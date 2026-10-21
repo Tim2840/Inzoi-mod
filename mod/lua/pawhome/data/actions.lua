@@ -21,7 +21,7 @@ return {
     },
     clean_litter = {
         scope = "household", needs = { bladder = 100 }, bond = 0, xp = 0,
-        animation = nil, zoiFunPenalty = true,
+        animation = "pet_litter", zoiFunPenalty = true,
     },
     praise = {
         bond = 1.5, xp = 1.5, shape = 1, animation = "pet_happy",

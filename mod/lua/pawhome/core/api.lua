@@ -192,6 +192,19 @@ function Api.playAnimation(ref, animationId)
     return (call("playAnimation", ref, animationId))
 end
 
+-- Optional. Teleports the pet to an object on its household's lot (e.g. PawHome_LitterBox).
+function Api.movePetToObject(ref, objectId)
+    if ref == nil then return false end
+    local ok, v = call("movePetToObject", ref, objectId)
+    return ok and v == true
+end
+
+-- Optional. Places a litter box in front of the household's Zoi at home.
+function Api.placeLitterBox(householdId)
+    local ok, v = call("placeLitterBox", householdId)
+    return ok and v == true
+end
+
 -- Optional. How the pet should look in the game right now:
 -- look = { mood = moods id, stage = stage id, scale = number }. The adapter decides how
 -- often it shows it (idle animations, size); the engine calls this after every tick.

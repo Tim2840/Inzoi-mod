@@ -259,6 +259,18 @@ T.test("litter: with a box the need runs, can be wanted, and the box can be clea
     T.eq(pet.needs.bladder, 100)
 end)
 
+T.test("litter: placing a litter box and automatic self-use teleport the cat and refill bladder", function()
+    local app, mock, pet = newCat()
+    T.truthy(app:placeLitterBox(1).ok)
+    T.truthy(app:view(1, 101).pets[1].litterBox)
+    pet.needs.bladder = 25
+    local res = app:autoLitter(101)
+    T.eq(#res, 1)
+    T.eq(pet.needs.bladder, 100)
+    T.eq(#mock.teleports, 1)
+    T.eq(mock.teleports[1].object, "PawHome_LitterBox")
+end)
+
 -- ------------------------------------------------------------------ gifts are built by bridge.js
 
 T.test("gifts: bridge.js builds a script and an interaction for every gift object", function()

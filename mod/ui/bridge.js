@@ -111,6 +111,26 @@ const Bridge = (() => {
     ["InteractionBag", "PawHome_SendAway", { ID: "PawHome_SendAway", PostureGroupId: "StandGroup",
       AgingConditionFlags: 504, RepeatCount: 1,
       InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_SendAway", Label: "A" }] }] }],
+    ["Object", "PawHome_LitterBox", { ID: "PawHome_LitterBox", StateVariationId: "Normal",
+      ObjectTemplateId: "Decoration01_Template", ObjectCategory: "None", FilterCategory: "Pet",
+      Asset: "/Game/Blueprint/GameObject/Furniture/BP_Bustub01_v01.BP_Bustub01_v01", DevOnly: false,
+      Icon: "/Game/UI/Icon/Object/Bustub01_v01.Bustub01_v01", Price: 35 }],
+    ["Script", "PawHome_SpawnLitterBox", { ID: "PawHome_SpawnLitterBox", Scripts: [{ IfType: "If", Conditions: [], Executes: [
+      { BaseObject: "Self", Command: "SpawnGameObjectToFront", S1: "Bustub01_v01", S2: "None", F1: 95, F2: 0, Prob: 1 }] }] }],
+    ["Interaction", "PawHome_PlaceLitterBox", { ID: "PawHome_PlaceLitterBox", ActionIdList: ["Self_Pose_CatHeart"],
+      FinishScriptIdList: ["PawHome_SpawnLitterBox"], InteractionSlotUsage: "None", NoneTargetPlayable: true,
+      PostureId: ["Stand"], BodyParts: ["BothHands"] }],
+    ["InteractionBag", "PawHome_PlaceLitterBox", { ID: "PawHome_PlaceLitterBox", GroupId: "Group_Using_SmartPhone",
+      PostureGroupId: "StandGroup", AgingConditionFlags: 504, RepeatCount: 1,
+      InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_PlaceLitterBox", Label: "A" }] }],
+      DisplayInfo: { DisplayTextId: "mod_PawHome_place_litter", Icon: "/Game/UI/Icon/Object/Bustub01_v01.Bustub01_v01",
+        DisplayCategoryTextId: "InteractionBag_DisplayInfo_Self_SmartPhone_Insurance_CurrentState_DisplayCategoryTextId" } }],
+    ["Interaction", "PawHome_CleanLitter", { ID: "PawHome_CleanLitter", ActionIdList: ["Object_Void_Cat_Tickle"],
+      InteractionSlotUsage: "Single", PostureId: ["Stand"], BodyParts: ["BothHands"] }],
+    ["InteractionBag", "PawHome_CleanLitter", { ID: "PawHome_CleanLitter", PostureGroupId: "StandGroup",
+      AgingConditionFlags: 504, RepeatCount: 1,
+      InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_CleanLitter", Label: "A" }] }],
+      DisplayInfo: { DisplayTextId: "mod_PawHome_clean_litter" } }],
   ];
   // The cat's gifts are real items (mod/lua/pawhome/data/keepsakes.lua lists the same ids; a test
   // keeps the lists equal). After a happy moment the mod queues PawHome_Gift_<object> on the Zoi:
@@ -158,7 +178,9 @@ const Bridge = (() => {
     ["DEV_Void_Cat", "Normal", "Petting_Cat"],
     ["DEV_Void_Cat", "Normal", "Giving_Snack_To_Cat"],
     ["DEV_Void_Cat", "Normal", "Giving_Catnip_Candy_To_Cat"],
+    ["DEV_Void_Cat", "Normal", "PawHome_CleanLitter"],
     ["DEV_Void_Cat", "Normal", "PawHome_Adopt"],
+    ["SelfCharacter", "Normal", "PawHome_PlaceLitterBox"],
     ["SelfCharacter", "Normal", "PawHome_ShopPhone"],
   ];
   // The game limits how fast commands may come in (it answers "request limit exceeded" and the

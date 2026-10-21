@@ -129,7 +129,12 @@ function C.perform(ctx, petId, zoiId, actionId, opts)
             if fromGame then ctx.emit(pet, "delight") end
         end
     end
-    if animation and not (fromGame and not (result.keepsake)) then Api.playAnimation(pet.entity, animation) end
+    if actionId == "clean_litter" then
+        Api.movePetToObject(pet.entity, require("pawhome.data.litter").object)
+    end
+    if animation and (actionId == "clean_litter" or not (fromGame and not (result.keepsake))) then
+        Api.playAnimation(pet.entity, animation)
+    end
 
     result.bond = Bond.get(pet, zoiId)
     result.bondLevel = Bond.level(result.bond)

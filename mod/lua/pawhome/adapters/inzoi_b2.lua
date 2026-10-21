@@ -19,7 +19,7 @@ end
 
 local function onHour()
     if R.app then
-        local ok, err = pcall(function() R.app:tick() end)
+        local ok, err = pcall(function() R.app:tick(); R.app:autoLitter(R.platform.possessed()) end)
         if not ok then log("tick failed: " .. tostring(err)) end
     end
 end
@@ -27,6 +27,9 @@ end
 local function onInteraction(p)
     if not (R.adapter and type(p) == "table") then return end
     R.adapter.onInteractionFinished(p)
+    if R.app and p.interaction_bag_id == ModKit.PLACE_LITTER then
+        pcall(function() R.app:autoLitter(R.platform.possessed()) end)
+    end
     if R.app and ModKit.CARE[p.interaction_bag_id] then
         local ok, res = pcall(function() return R.app:applyCare() end)
         if not ok then log("care failed: " .. tostring(res))
