@@ -22,6 +22,7 @@ local function world(opts)
         queued = {},              -- interactions put in the Zoi's queue
         home = true,              -- is the Zoi on the household's lot
         uiState = opts.uiState,   -- what wf.state.pawhome held when the save was loaded
+        catMsgs = {},             -- messages the B2 adapter sent to cat entities
     }
     w.b2 = {
         time = function() return w.day, w.hour, w.minute end,
@@ -98,7 +99,8 @@ end
 local function boot(opts)
     opts = opts or {}
     local w = world(opts)
-    local adapter = ModKit.new(w.b2, { session = opts.session or "S1", spawn = opts.spawn })
+    local adapter = ModKit.new(w.b2, { session = opts.session or "S1", spawn = opts.spawn,
+        animate = opts.animate, scale = opts.scale, random = opts.random })
     local app = assert(App.new(adapter, { seed = 7 }))
     adapter.rpc = function(method, args)
         return Rpc.handle(app, { household = w.household, zoi = w.zoi }, method, args)
@@ -110,7 +112,12 @@ local function boot(opts)
             adapter.tick(10)
             while #w.toClient > 0 do
                 local m = table.remove(w.toClient, 1)
-                relay.onMessage(m[1], m[2], m[3])
+                if m[1] == w.zoi then
+                    relay.onMessage(m[1], m[2], m[3])
+                else
+                    -- sent to a cat's entity: the B1 cat binding's business
+                    w.catMsgs[#w.catMsgs + 1] = { eid = m[1], kind = Wire.kind(m[2]), payload = m[3] }
+                end
             end
             scenario.ui.poll()      -- whichever page is loaded right now
             relay.tick(10)
@@ -441,4 +448,229 @@ T.test("modkit: no backup is offered when the savegame has its own pets or there
     local v = s2.app:view(77, 501)
     T.eq(#v.pets, 1); T.eq(v.backup, nil)
     T.falsy(s2.app:restoreBackup().ok)
+end)
+
+-- ------------------------------------------------------------------ the cat's looks (option a, S2)
+
+local CatB1 = require("pawhome.adapters.inzoi_cat_b1")
+local Anim = require("pawhome.data.animations")
+
+-- A random source that staggers nothing and never picks a one-shot.
+local function calm(a, b)
+    if a == nil then return 0.99 end
+    return a
+end
+
+local function adoptedCat(opts)
+    local s = boot(opts)
+    s.pump()
+    local offers = s.app:offers(77, true)
+    T.truthy(s.app:adoptOffer(77, 501, offers[1].id, "Mimi").ok)
+    s.adapter.onCatBegin(109546, { home = true })
+    return s, s.app.ctx.state.pets[1]
+end
+
+local function sent(s, kind)
+    -- messages sent outside pump() are still waiting in the outbox
+    for i = #s.w.toClient, 1, -1 do
+        local m = s.w.toClient[i]
+        if m[1] ~= s.w.zoi then
+            table.remove(s.w.toClient, i)
+            table.insert(s.w.catMsgs, { eid = m[1], kind = Wire.kind(m[2]), payload = m[3] })
+        end
+    end
+    local out = {}
+    for _, m in ipairs(s.w.catMsgs) do
+        if m.kind == kind and m.eid == 109546 then out[#out + 1] = m.payload end
+    end
+    return out
+end
+
+T.test("looks: a kitten is shown at its stage's size, sent to the cat's entity once", function()
+    local s, pet = adoptedCat({ spawn = true, scale = true })
+    pet.stage = "kitten"
+    s.w.hour = s.w.hour + 1
+    s.pump()
+    local scales = sent(s, "scale")
+    T.eq(scales[#scales], "0.600")
+    local n = #scales
+    s.w.hour = s.w.hour + 1
+    s.pump()
+    T.eq(#sent(s, "scale"), n, "not resent while the size is the same")
+    pet.stage = "adult"
+    s.w.hour = s.w.hour + 1
+    s.pump()
+    scales = sent(s, "scale")
+    T.eq(scales[#scales], "1.000")
+end)
+
+T.test("looks: nothing is sent while the scale and animate caps are off", function()
+    local s, pet = adoptedCat({ spawn = true })
+    pet.stage = "kitten"
+    s.w.hour = s.w.hour + 1
+    s.pump()
+    T.eq(#s.w.catMsgs, 0)
+    T.falsy(s.adapter.playAnimation(pet.entity, "pet_eat"))
+end)
+
+T.test("looks: the size is sent again whenever the cat's actor reappears", function()
+    local s, pet = adoptedCat({ spawn = true, scale = true })
+    pet.stage = "kitten"
+    s.w.hour = s.w.hour + 1
+    s.pump()
+    local n = #sent(s, "scale")
+    s.adapter.onCatMessage(109546, "cat_begin")
+    s.pump()
+    T.eq(#sent(s, "scale"), n + 1)
+    -- a cat that is not ours is left alone
+    s.adapter.onCatBegin(9001, { home = false })
+    s.adapter.onCatMessage(9001, "cat_begin")
+    s.pump()
+    for _, m in ipairs(s.w.catMsgs) do T.eq(m.eid, 109546) end
+end)
+
+T.test("looks: care from the panel plays its animation and returns to the mood's idle", function()
+    local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
+    pet.needs.hunger = 30
+    local r = s.app:perform(pet.id, 501, "feed")
+    T.truthy(r.ok, r.message)
+    s.pump(1)
+    local anims = sent(s, "anim")
+    T.truthy(#anims >= 1)
+    local name, seconds, back = anims[1]:match("^([^|]*)|([^|]*)|(.*)$")
+    T.eq(name, Anim.sequences.eat.name)
+    T.eq(tonumber(seconds), Anim.sequences.eat.seconds)
+    T.truthy(back:find("Sit_Idle"), "returns to a sitting idle")
+end)
+
+T.test("looks: care given with the game's own interaction does not replay an animation", function()
+    local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
+    pet.needs.hunger = 30
+    local ev = { entity_id = 501, target_entity_id = 109546, interaction_bag_id = "Object_Void_Cat_Dev" }
+    s.adapter.onInteractionStarted(ev)
+    s.adapter.onInteractionFinished(ev)
+    local res = s.app:applyCare()
+    T.eq(#res, 1); T.truthy(res[1].ok)
+    T.eq(#sent(s, "anim"), 0)
+end)
+
+T.test("looks: nothing is played on a cat while a game interaction runs on it", function()
+    local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
+    s.adapter.petLook(pet.entity, { mood = "content", stage = "adult", scale = 1 })
+    local ev = { entity_id = 501, target_entity_id = 109546, interaction_bag_id = "Object_Void_Cat_Tickle" }
+    s.adapter.onInteractionStarted(ev)
+    T.falsy(s.adapter.playAnimation(pet.entity, "pet_play"))
+    for _ = 1, 30 do s.w.minute = s.w.minute + 2; s.adapter.tick(10) end
+    T.eq(#sent(s, "anim"), 0)
+    s.adapter.onInteractionEnded(ev)
+    for _ = 1, 30 do s.w.minute = s.w.minute + 2; s.adapter.tick(10) end
+    T.truthy(#sent(s, "anim") >= 1, "the idle comes back after the interaction")
+end)
+
+T.test("looks: the idle follows the mood and is not resent while it does not change", function()
+    local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
+    s.adapter.petLook(pet.entity, { mood = "angry", stage = "adult", scale = 1 })
+    for _ = 1, 40 do s.w.minute = s.w.minute + 1; s.adapter.tick(10) end
+    local anims = sent(s, "anim")
+    T.eq(#anims, 1)
+    T.eq(anims[1], Anim.sequences[Anim.moods.angry.base].name .. "|0|")
+    s.adapter.petLook(pet.entity, { mood = "asleep", stage = "adult", scale = 1 })
+    for _ = 1, 40 do s.w.minute = s.w.minute + 1; s.adapter.tick(10) end
+    anims = sent(s, "anim")
+    T.eq(#anims, 2)
+    T.eq(anims[2], Anim.sequences[Anim.moods.asleep.base].name .. "|0|")
+end)
+
+T.test("looks: every mood and action points at a known animation", function()
+    local actions = require("pawhome.data.actions")
+    for mood, def in pairs(Anim.moods) do
+        T.truthy(Anim.sequences[def.base] and Anim.sequences[def.base].loop, mood .. " base is a loop")
+        for _, e in ipairs(def.extra) do
+            T.truthy(Anim.sequences[e[1]] and Anim.sequences[e[1]].seconds, mood .. " extra is a one-shot")
+        end
+    end
+    for _, id in ipairs(actions.order) do
+        local anim = actions[id].animation
+        if anim then T.truthy(Anim.sequences[Anim.actions[anim]], id) end
+    end
+    for _, mood in ipairs({ "happy", "playful", "energized", "content", "asleep", "sad", "uncomfortable", "tense", "angry", "sick" }) do
+        T.truthy(Anim.moods[mood], mood)
+    end
+end)
+
+-- B1 side, with a fake actor
+local function fakeCats()
+    local f = { actors = {}, toSim = {} }
+    function f.actor(eid)
+        local x = { eid = eid, scale = 1, valid = true, anim = nil }
+        f.actors[eid] = x
+        return x
+    end
+    f.platform = {
+        actorId = function(x) return x.eid end,
+        valid = function(x) return x.valid end,
+        setScale = function(x, s) x.scale = s; return true end,
+        playVat = function(x, name)
+            if name:find("Walk") then return false end   -- not baked: the game ignores it
+            x.anim = name
+            return true
+        end,
+        currentVat = function(x) return x.anim end,
+        sendToSim = function(eid, ch, p) f.toSim[#f.toSim + 1] = { eid, ch, p } end,
+    }
+    f.cats = CatB1.new(f.platform)
+    return f
+end
+
+T.test("cat B1: the size is applied on begin, again after a stale start, and asks B2 for it", function()
+    local f = fakeCats()
+    local a = f.actor(109546)
+    a.valid = false                          -- early reference (research 4.3)
+    f.cats.onBegin(a)
+    T.eq(f.toSim[1][2], "pawhome:cat_begin")
+    f.cats.onMessage(a, "pawhome:scale", "0.600")
+    T.eq(a.scale, 1, "not applied to a stale actor")
+    a.valid = true
+    f.cats.tick(2)
+    T.eq(a.scale, 0.6)
+    -- a respawned actor starts at the game's size and gets ours again
+    local b = f.actor(109546)
+    f.cats.onBegin(b)
+    T.eq(b.scale, 0.6)
+end)
+
+T.test("cat B1: a one-shot returns to the sitting idle and is not cut short", function()
+    local f = fakeCats()
+    local a = f.actor(109546)
+    f.cats.onBegin(a)
+    f.cats.onMessage(a, "pawhome:anim", "ANIM_VoidCat_Eat|8.7|ANIM_VoidCat_Sit_Idle_01")
+    T.eq(a.anim, "ANIM_VoidCat_Eat")
+    f.cats.onMessage(a, "pawhome:anim", "ANIM_VoidCat_Sit_Idle_02|0|")
+    T.eq(a.anim, "ANIM_VoidCat_Eat", "still eating")
+    for _ = 1, 10 do f.cats.tick(1) end
+    T.eq(a.anim, "ANIM_VoidCat_Sit_Idle_01")
+end)
+
+T.test("cat B1: an animation the game started blocks ours for a while", function()
+    local f = fakeCats()
+    local a = f.actor(109546)
+    f.cats.onBegin(a)
+    f.cats.onMessage(a, "pawhome:anim", "ANIM_VoidCat_Sit_Idle_01|0|")
+    f.cats.tick(1)
+    a.anim = "ANIM_Void_Cat_Welcoming"       -- the game's Play interaction
+    f.cats.tick(1)
+    f.cats.onMessage(a, "pawhome:anim", "ANIM_VoidCat_Sit_Idle_02|0|")
+    T.eq(a.anim, "ANIM_Void_Cat_Welcoming")
+    for _ = 1, CatB1.GRACE + 1 do f.cats.tick(1) end
+    f.cats.onMessage(a, "pawhome:anim", "ANIM_VoidCat_Sit_Idle_02|0|")
+    T.eq(a.anim, "ANIM_VoidCat_Sit_Idle_02")
+end)
+
+T.test("cat B1: other mods' messages and unknown kinds are ignored", function()
+    local f = fakeCats()
+    local a = f.actor(109546)
+    f.cats.onBegin(a)
+    f.cats.onMessage(a, "othermod:anim", "ANIM_VoidCat_Eat|8.7|")
+    f.cats.onMessage(a, "pawhome:dance", "x")
+    T.eq(a.anim, nil)
 end)

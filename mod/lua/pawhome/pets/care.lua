@@ -19,7 +19,9 @@ local function onCooldown(ctx, pet, actionId)
     return until_ ~= nil and ctx.now < until_
 end
 
-function C.perform(ctx, petId, zoiId, actionId)
+-- opts.fromGame: the care was given with the game's own interaction, which already
+-- animated the cat; do not play ours on top.
+function C.perform(ctx, petId, zoiId, actionId, opts)
     local pet = Registry.get(ctx, petId)
     if not pet or (pet.status ~= "home" and pet.status ~= "impounded") then return fail(ctx, "no_pet") end
     if pet.status ~= "home" then return fail(ctx, "not_home", { name = pet.name }) end
@@ -84,7 +86,7 @@ function C.perform(ctx, petId, zoiId, actionId)
     end
 
     if def.zoiFunPenalty then Api.addBuff(zoiId, "pawhome_chore", 60) end
-    if def.animation then Api.playAnimation(pet.entity, def.animation) end
+    if def.animation and not (opts and opts.fromGame) then Api.playAnimation(pet.entity, def.animation) end
 
     result.bond = Bond.get(pet, zoiId)
     result.bondLevel = Bond.level(result.bond)

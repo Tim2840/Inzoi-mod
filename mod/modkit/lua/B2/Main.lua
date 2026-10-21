@@ -15,7 +15,8 @@ end
 local M = {}
 
 function M.on_begin()
-    Runtime.start({ spawn = true })
+    -- animate / scale: the cat's looks (verified in game, docs/design/modkit-runtime.md 4)
+    Runtime.start({ spawn = true, animate = true, scale = true })
 end
 
 function M.on_end()

@@ -7,7 +7,9 @@
       { "type": "ObjectTemplate", "key": "DEV_E01_AnimalObjectVoidCatTemplate", "script": "PawHomeBind.Cat" }
     ],
     "B1": [
-      { "type": "Zoi", "key": "ResidenceFamily", "script": "PawHomeBind.ZoiLink" }
+      { "type": "Zoi", "key": "ResidenceFamily", "script": "PawHomeBind.ZoiLink" },
+      { "type": "ObjectTemplate", "key": "DEV_AnimalObjectVoidCatTemplate", "script": "PawHomeBind.Cat" },
+      { "type": "ObjectTemplate", "key": "DEV_E01_AnimalObjectVoidCatTemplate", "script": "PawHomeBind.Cat" }
     ]
   }
 }

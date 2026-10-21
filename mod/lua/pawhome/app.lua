@@ -92,6 +92,9 @@ function App:reload()
     ctx.events = {}
     applyLocale(ctx)
     self.suspended = false
+    -- show the pets' size and mood right away, not only after the first game hour
+    ctx.now = Api.now() or ctx.now
+    if ctx.now then Engine.looks(ctx) end
     return true
 end
 
@@ -156,7 +159,7 @@ function App:applyCare()
     local results = {}
     for _, pet in ipairs(Registry.home(self.ctx, nil)) do
         for _, ev in ipairs(Api.takeCare(pet.entity)) do
-            local r = Care.perform(self.ctx, pet.id, ev.zoi, ev.kind)
+            local r = Care.perform(self.ctx, pet.id, ev.zoi, ev.kind, { fromGame = true })
             r.source = "game"
             r.action = r.action or ev.kind
             results[#results + 1] = r

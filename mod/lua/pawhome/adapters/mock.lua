@@ -99,6 +99,8 @@ function Mock.new(opts)
     function m.entityExists(ref) return m.entities[ref] ~= nil and not m.hidden[ref] end
     function m.despawnPet(ref) m.entities[ref] = nil end
     function m.playAnimation(ref, anim) m.animations[#m.animations + 1] = { ref = ref, anim = anim } end
+    m.looks = {}                        -- ref -> the last look the engine asked for
+    function m.petLook(ref, look) m.looks[ref] = look end
     m.backupOffer = nil                 -- { day, cache } the tests put here
     function m.backup() return m.backupOffer end
     function m.restoreBackup()

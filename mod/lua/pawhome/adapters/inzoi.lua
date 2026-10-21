@@ -15,6 +15,13 @@
 --   platform.homeObjects(watched)        -> object row ids from `watched` found on the home lot (optional)
 --   platform.log(line)                   optional
 --
+-- Looks (option a of docs/research/walking-cat.md): the cat cannot walk, but it can play the
+-- nine animations baked into it and be shown smaller as a kitten. The B1 cat binding does
+-- that on the cat's actor; this side decides what and when and sends it to the cat's entity:
+--   "pawhome:anim"  "<sequence>|<seconds>|<sequence to return to>"   (seconds 0 = a loop)
+--   "pawhome:scale" "<scale>"
+-- The B1 side answers "pawhome:cat_begin" whenever the cat's actor (re)appears.
+--
 -- Saving: B2 cannot write the savegame. The UI keeps the data in wf.state (saved inside the
 -- game's save file) and hands it over after every load; until then slotId() returns nil and
 -- the engine pauses (see core/api.lua). saveSet sends the new value back to the UI.
@@ -26,6 +33,7 @@
 -- binding reports a new cat on the household's lot. Sending a cat away waits the same way.
 local Wire = require("pawhome.adapters.inzoi_wire")
 local Serialize = require("pawhome.core.serialize")
+local Anim = require("pawhome.data.animations")
 
 local ModKit = {
     HELLO_EVERY_SECONDS = 5,
@@ -43,7 +51,9 @@ local ModKit = {
 function ModKit.new(platform, opts)
     opts = opts or {}
     local a = {
-        caps = { spawn = opts.spawn == true, moveStray = false, buffs = false, animate = false },
+        caps = { spawn = opts.spawn == true, moveStray = false, buffs = false,
+                 animate = opts.animate == true, scale = opts.scale == true },
+        random = opts.random or math.random,
         platform = platform,
         session = opts.session or tostring(math.random(100000, 999999)),
         ready = false,
@@ -63,6 +73,9 @@ function ModKit.new(platform, opts)
         sinceBackup = math.huge,
         backupOffer = nil,  -- { day, cache } from the relay when the savegame had no data
         rpc = nil,          -- function(method, args) -> result table
+        looks = {},         -- pet ref -> { mood, stage, scale } from the engine
+        shown = {},         -- cat entity id -> { scale, base, nextIdle, busyUntil }
+        busy = {},          -- cat entity id -> true while a game interaction runs on it
     }
 
     local function log(line)
@@ -234,6 +247,140 @@ function ModKit.new(platform, opts)
         return out
     end
 
+    -- ------------------------------------------------------------ looks
+
+    local function catOf(ref)
+        local eid = resolve(ref)
+        if eid ~= nil and a.cats[eid] ~= nil then return eid end
+        return nil
+    end
+
+    local function refOf(eid)
+        for ref, e in pairs(a.refs) do if e == eid then return ref end end
+        return nil
+    end
+
+    local function shownOf(eid)
+        local st = a.shown[eid]
+        if not st then st = {}; a.shown[eid] = st end
+        return st
+    end
+
+    local function moodDef(ref)
+        local look = a.looks[ref]
+        return Anim.moods[look and look.mood or "content"] or Anim.moods.content
+    end
+
+    local function sendAnim(eid, key, backKey)
+        local seq = Anim.sequences[key]
+        if not seq then return false end
+        local back = backKey and Anim.sequences[backKey]
+        platform.send(eid, Wire.channel("anim"),
+            seq.name .. "|" .. tostring(seq.seconds or 0) .. "|" .. (back and back.name or ""))
+        local st = shownOf(eid)
+        if seq.loop then st.base = key elseif back then st.base = backKey end
+        -- a game minute is about 2 real seconds at normal speed; B1 also refuses to cut a
+        -- one-shot short, so this only keeps B2 from sending in the meantime
+        if seq.seconds then st.busyUntil = a.now() + math.ceil(seq.seconds / 2) + 1 end
+        return true
+    end
+
+    local function sendScale(eid, scale)
+        platform.send(eid, Wire.channel("scale"), string.format("%.3f", scale))
+        shownOf(eid).scale = scale
+    end
+
+    local function free(eid)
+        if a.busy[eid] then return false end
+        local st = a.shown[eid]
+        return not (st and st.busyUntil and a.now() < st.busyUntil)
+    end
+
+    -- care from the panel: the matching one-shot, then back to the mood's sitting idle
+    function a.playAnimation(ref, id)
+        if not a.caps.animate then return false end
+        local eid, key = catOf(ref), Anim.actions[id]
+        if eid == nil or key == nil or not free(eid) then return false end
+        return sendAnim(eid, key, moodDef(ref).base)
+    end
+
+    local function showScale(eid, ref)
+        local look = a.looks[ref]
+        if a.caps.scale and look and look.scale and shownOf(eid).scale ~= look.scale then
+            sendScale(eid, look.scale)
+        end
+    end
+
+    function a.petLook(ref, look)
+        if type(look) ~= "table" then return false end
+        a.looks[ref] = look
+        local eid = catOf(ref)
+        if eid ~= nil then showScale(eid, ref) end
+        return true
+    end
+
+    -- Now and then, each cat at home shows its mood: mostly the sitting idle that suits it,
+    -- sometimes a short reaction. Nothing is sent while the game itself plays on the cat.
+    local function idleStep()
+        if not a.caps.animate then return end
+        local now, cfg = a.now(), Anim.idle
+        for ref in pairs(a.looks) do
+            local eid = catOf(ref)
+            if eid ~= nil and a.cats[eid].home then
+                local st = shownOf(eid)
+                if st.nextIdle == nil then
+                    st.nextIdle = now + a.random(0, cfg.everyMinutes)   -- stagger the cats
+                elseif now >= st.nextIdle and free(eid) then
+                    st.nextIdle = now + cfg.everyMinutes + a.random(-cfg.jitterMinutes, cfg.jitterMinutes)
+                    local def = moodDef(ref)
+                    local pick
+                    if #def.extra > 0 and a.random() < cfg.extraChance then
+                        local total = 0
+                        for _, e in ipairs(def.extra) do total = total + e[2] end
+                        local roll = a.random() * total
+                        for _, e in ipairs(def.extra) do
+                            roll = roll - e[2]
+                            if roll <= 0 then pick = e[1] break end
+                        end
+                        pick = pick or def.extra[#def.extra][1]
+                    end
+                    if pick then sendAnim(eid, pick, def.base)
+                    elseif st.base ~= def.base then sendAnim(eid, def.base) end
+                end
+            end
+        end
+    end
+    a.idleStep = idleStep
+
+    -- The B1 cat binding saw the cat's actor (re)appear: it starts at the game's size and
+    -- animation, so show the pet's look again.
+    function a.onCatMessage(eid, kind)
+        if kind ~= "cat_begin" or a.cats[eid] == nil then return end
+        local ref = refOf(eid)
+        if ref == nil then return end
+        local st = shownOf(eid)
+        st.scale = nil
+        showScale(eid, ref)
+        if a.caps.animate and st.base and free(eid) then sendAnim(eid, st.base) end
+    end
+
+    function a.onInteractionStarted(ev)
+        local eid = ev and tonumber(ev.target_entity_id)
+        if eid ~= nil and a.cats[eid] ~= nil then a.busy[eid] = true end
+    end
+
+    -- canceled / failed / finished: the game leaves the cat in the interaction's last
+    -- pose; the next idle change puts it back on its sitting idle a little later
+    function a.onInteractionEnded(ev)
+        local eid = ev and tonumber(ev.target_entity_id)
+        if eid ~= nil and a.busy[eid] then
+            a.busy[eid] = nil
+            local st = shownOf(eid)
+            st.base = nil
+            st.nextIdle = a.now() + 2
+        end
+    end
+
     -- ------------------------------------------------------------ events from the game
 
     -- B2 binding tick (any binding, real seconds). Says hello every few seconds until the UI
@@ -250,6 +397,7 @@ function ModKit.new(platform, opts)
         if a.sinceQueue >= ModKit.HELLO_EVERY_SECONDS then
             a.sinceQueue = 0
             if a.ready and (#a.pending > 0 or #a.leaving > 0) then a.serviceQueue() end
+            if a.ready then idleStep() end
         end
         a.sinceHello = a.sinceHello + (dt or 0)
         local every = a.ready and ModKit.HELLO_WHEN_READY_SECONDS or ModKit.HELLO_EVERY_SECONDS
@@ -344,10 +492,13 @@ function ModKit.new(platform, opts)
             a.refs[p.ref] = eid
             log("summoned cat " .. tostring(eid) .. " is " .. p.ref)
             persistRefs()
+            showScale(eid, p.ref)
         end
     end
 
-    function a.onCatEnd(eid) a.cats[eid] = nil end
+    function a.onCatEnd(eid)
+        a.cats[eid], a.shown[eid], a.busy[eid] = nil, nil, nil
+    end
 
     -- Summoned cats are not reported by the cat binding, so after our welcome interaction
     -- the home lot is searched for cats we do not know yet.
@@ -362,6 +513,7 @@ function ModKit.new(platform, opts)
 
     -- interaction.finished event: summoned cats, city cats the player met, and care given.
     function a.onInteractionFinished(ev)
+        a.onInteractionEnded(ev)
         if ev and ev.interaction_bag_id == ModKit.WELCOME then
             a.scanHomeCats()
             return

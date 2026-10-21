@@ -58,7 +58,7 @@ function R.start(opts)
         local d, h, m = R.platform.time()
         math.randomseed(d * 1440 + h * 60 + m)
     end)
-    R.adapter = ModKit.new(R.platform, { spawn = opts.spawn })
+    R.adapter = ModKit.new(R.platform, { spawn = opts.spawn, animate = opts.animate, scale = opts.scale })
     local app, err = App.new(R.adapter, { seed = math.random(1, 2^30) })
     if not app then log("engine failed to start: " .. tostring(err)) return end
     R.app = app
@@ -66,6 +66,10 @@ function R.start(opts)
     R.handlers = {
         ["time.hour_changed"] = function() onHour() end,
         ["interaction.finished"] = onInteraction,
+        -- a game interaction on one of our cats: keep our animations off it meanwhile
+        ["interaction.started"] = function(ev) if R.adapter and type(ev) == "table" then R.adapter.onInteractionStarted(ev) end end,
+        ["interaction.canceled"] = function(ev) if R.adapter and type(ev) == "table" then R.adapter.onInteractionEnded(ev) end end,
+        ["interaction.failed"] = function(ev) if R.adapter and type(ev) == "table" then R.adapter.onInteractionEnded(ev) end end,
     }
     for name, fn in pairs(R.handlers) do
         local ok, e = pcall(inzoi.event.on, name, fn)       -- verified 2026-10-20 (B2)
@@ -144,6 +148,16 @@ function R.onCatBegin(owner)
         log("cat " .. tostring(eid) .. " appeared on " .. tostring(info.site) .. ", home=" .. tostring(info.home))
     end
     R.adapter.onCatBegin(eid, info)
+end
+
+-- ObjectTemplate(cat) on_lua_message: "pawhome:cat_begin" from the B1 cat binding.
+function R.onCatMessage(owner, channel, payload)
+    if not ensure() then return end
+    local Wire = require("pawhome.adapters.inzoi_wire")
+    local kind = Wire.kind(channel)
+    if not kind then return end
+    local ok, eid = pcall(function() return owner:GetObjectKey().Value end)
+    if ok and eid then R.adapter.onCatMessage(eid, kind, payload) end
 end
 
 function R.onCatEnd(owner)
