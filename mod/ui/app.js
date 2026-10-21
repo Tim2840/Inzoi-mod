@@ -234,15 +234,29 @@
         h("span", { class: "chip" + (t.known ? "" : " unknown"), title: t.desc || "" }, t.label))));
   }
 
+  // the savegame has no pets but a copy outside it exists (e.g. saved while the UI mod was off)
+  function backupCard(view) {
+    const b = view.backup;
+    if (!b) return null;
+    return h("section", { class: "card backup" },
+      h("div", { class: "section-title" }, icon("cat", { mood: "happy" }), h("span", {}, b.text)),
+      h("button", {
+        class: "btn", style: "width:100%",
+        onclick: async () => { await call("restoreBackup", {}); state.petId = null; render(); },
+      }, view.ui.backup_restore));
+  }
+
   function renderPets(view) {
     const u = view.ui;
     if (view.pets.length === 0) {
-      return h("div", { class: "card empty" }, icon("cat", { mood: "sad" }), h("div", {}, u.no_pets),
-        h("button", { class: "btn", style: "margin-top:10px", onclick: () => { state.tab = "adopt"; render(); } }, u.adopt));
+      return h("div", {}, backupCard(view),
+        h("div", { class: "card empty" }, icon("cat", { mood: "sad" }), h("div", {}, u.no_pets),
+          h("button", { class: "btn", style: "margin-top:10px", onclick: () => { state.tab = "adopt"; render(); } }, u.adopt)));
     }
     const pet = currentPet();
     state.petId = pet.id;
     return h("div", {},
+      backupCard(view),
       view.pets.length > 1
         ? h("div", { class: "chips", style: "margin-bottom:8px" }, view.pets.map((p) =>
             h("button", { class: "chip pet", "aria-pressed": p.id === pet.id, onclick: () => { state.petId = p.id; render(); } },
@@ -354,6 +368,7 @@
       h("button", { class: "btn ghost", onclick: async () => { state.offers = state.strays = null; state.petId = null; await call("reset", { locale: state.snap.view.locale }); render(); } }, "Reset"),
       shell("phone"), shell("pc"), shell("mini"),
       h("button", { class: "btn ghost", onclick: async () => { await call("sicken", { id: "fleas" }); render(); } }, "sick"),
+      h("button", { class: "btn ghost", onclick: async () => { await call("fakeBackup", {}); state.petId = null; render(); } }, "backup"),
       ["CatScratcher01", "CatTower01", "CatWheel01"].map((id) =>
         h("button", { class: "btn ghost", onclick: async () => { await call("toggleFurniture", { id }); render(); } }, id.replace("Cat", "").replace("01", ""))),
       h("button", { class: "btn ghost", onclick: () => openEntry({ shell: "phone", tab: "adopt", stray: "s2" }) }, "cat menu"));

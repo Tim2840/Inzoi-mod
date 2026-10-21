@@ -103,6 +103,20 @@ function handlers.sicken(a)
     return snapshot()
 end
 
+function handlers.restoreBackup()
+    return snapshot({ result = P.app:restoreBackup() })
+end
+
+-- preview only: pretend the savegame lost its pets but a copy outside it survived
+function handlers.fakeBackup()
+    local cache = {}
+    for key, value in pairs(P.mock.store) do cache[key] = value end
+    P.mock.backupOffer = { day = math.floor(P.mock.clock / Util.MINUTES_PER_DAY), cache = cache }
+    P.mock.store = {}
+    P.app:reload()
+    return snapshot()
+end
+
 function handlers.reset(a)
     P.reset(a.locale, a.seed)
     return snapshot()

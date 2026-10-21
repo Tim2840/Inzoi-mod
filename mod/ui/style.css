@@ -155,6 +155,9 @@ img.ico { display: block; width: 24px; height: 24px; flex: none; }
 .away { color: var(--critical); font-weight: 700; }
 .shelter { border: 2px dashed var(--ink); border-radius: 16px; padding: 12px; margin: 4px 0 12px; background: var(--paper-2); }
 
+.backup { background: #fff8d6; }
+.backup .section-title { align-items: flex-start; font-weight: 400; }
+.backup .section-title img.ico { width: 36px; height: 36px; margin-right: 8px; }
 .ill { border: 2px solid var(--ink); border-radius: 16px; padding: 10px 12px; margin: 0 0 12px; background: #e6f2ff; }
 .ill .section-title { margin: 0 0 4px; }
 .furn { display: flex; align-items: flex-start; padding: 6px 0; border-top: 2px dashed var(--line); }
