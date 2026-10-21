@@ -99,6 +99,14 @@ function Mock.new(opts)
     function m.entityExists(ref) return m.entities[ref] ~= nil and not m.hidden[ref] end
     function m.despawnPet(ref) m.entities[ref] = nil end
     function m.playAnimation(ref, anim) m.animations[#m.animations + 1] = { ref = ref, anim = anim } end
+    m.backupOffer = nil                 -- { day, cache } the tests put here
+    function m.backup() return m.backupOffer end
+    function m.restoreBackup()
+        if not m.backupOffer then return false end
+        for key, value in pairs(m.backupOffer.cache) do m.saveSet(key, value) end
+        m.backupOffer = nil
+        return true
+    end
     m.lot = {}                          -- household id -> object row ids on its lot
     function m.homeObjects(hid, watched)
         local want, out = {}, {}

@@ -3,6 +3,10 @@ All notable changes are listed here ([Keep a Changelog](https://keepachangelog.c
 
 ## [Unreleased]
 ### Added
+- Care given with the game's own cat interactions (Give Snack, Play) counts in the engine like the panel's buttons, with the same cooldowns and conditions (verified in game 2026-10-21).
+- Cat furniture: the game's buildable Cat Tower, Cat Scratcher and Cat Wheel on the household's lot slow fun/energy decay; the panel lists them (`data/enrichment.lua`, `docs/research/cat-items.md`).
+- Illness and the vet: upset tummy, cat cold and fleas; illness speeds up some need decay and shows as the "Unwell" mood; recovery with good care or a paid vet visit; never fatal; can be switched off. Save format v3.
+- `tools/game_lock.py` (one game shared by several workers), `tools/mod_log.py` (in-game logs), `tools/ingame_smoke.py` (build, mount, load without saving, check, leave); `docs/roadmap.md` (work lines, owners, dates).
 - Official ModKit route runs in the game (20261019.16318.W): B2 engine, B1 relay and the Paw Home panel; adoption charges the household's money; the adopted cat is summoned at home as a visible DEV_Void_Cat and stays bound to the pet across save and load (`docs/design/modkit-runtime.md`).
 - `tools/build_modkit.py`: assembles the playable mod folder from the repo.
 - ADR 0008: the home pet is a summoned `DEV_Void_Cat` (visible, interactable, persists across save/load, appearance re-randomized on load, removable with `DespawnGameObject`); the PO gives big-direction instructions only.
