@@ -1,18 +1,20 @@
--- Little gifts a cat brings after a happy moment, collected in the household's album.
---   coins: money the household receives each time
+-- Gifts a cat brings after a happy moment. They are real inZOI items: the game's own object
+-- (data/Object row id in `object`) is put in the Zoi's bag by a data script, and the household's
+-- album remembers which kinds it has received. tools/../mod/ui/bridge.js builds the scripts from
+-- the same object ids (a test keeps the two lists equal).
 -- Higher bond levels bring gifts more often and make the rarer ones likelier.
 return {
-    order = { "feather", "yarn", "leaf", "button", "pebble", "bell", "fishbone", "mouse", "flower", "star" },
-    feather  = { rarity = "common", coins = 10 },
-    yarn     = { rarity = "common", coins = 10 },
-    leaf     = { rarity = "common", coins = 10 },
-    button   = { rarity = "common", coins = 10 },
-    pebble   = { rarity = "common", coins = 10 },
-    bell     = { rarity = "uncommon", coins = 30 },
-    fishbone = { rarity = "uncommon", coins = 30 },
-    mouse    = { rarity = "uncommon", coins = 30 },
-    flower   = { rarity = "rare", coins = 80 },
-    star     = { rarity = "rare", coins = 120 },
+    order = { "stone", "catnip", "treat", "toy", "plush", "bouquet", "ribbon", "amethyst", "aquamarine", "emerald" },
+    stone      = { rarity = "common",   object = "CarriableStone01" },
+    catnip     = { rarity = "common",   object = "CatLeaf01" },
+    treat      = { rarity = "common",   object = "CatPuree01" },
+    toy        = { rarity = "common",   object = "CatToy01" },
+    plush      = { rarity = "common",   object = "GiftCatDoll01" },
+    bouquet    = { rarity = "uncommon", object = "GiftBouquet01" },
+    ribbon     = { rarity = "uncommon", object = "CollectionRibbonCoral01" },
+    amethyst   = { rarity = "uncommon", object = "AmethystStone" },
+    aquamarine = { rarity = "rare",     object = "AquamarineStone" },
+    emerald    = { rarity = "rare",     object = "EmeraldStone" },
 
     rarityOrder = { "common", "uncommon", "rare" },
     rarityWeight = { common = 70, uncommon = 25, rare = 5 },

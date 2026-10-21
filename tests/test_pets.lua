@@ -122,6 +122,7 @@ end)
 
 T.test("needs: an empty litter box causes an accident and resets the need", function()
     local app, mock = H.new()
+    mock.lot[1] = { "PawHome_LitterBox" }
     local pet = H.adopt(app, 1, {}, "adult")
     H.setNeeds(pet, 100)
     pet.needs.bladder = 1
@@ -249,7 +250,8 @@ T.test("care: game care is ignored while no savegame is loaded", function()
 end)
 
 T.test("care: one litter box serves every pet in the home", function()
-    local app = H.new()
+    local app, mock = H.new()
+    mock.lot[1] = { "PawHome_LitterBox" }
     local a = H.adopt(app, 1, {}, "adult")
     local b = H.adopt(app, 2, {}, "adult")
     a.needs.bladder = 10; b.needs.bladder = 10
@@ -729,7 +731,8 @@ T.test("settings: validated and applied", function()
 end)
 
 T.test("view: everything the UI needs is localised and complete", function()
-    local app = H.new({ locale = "zh-TW" })
+    local app, mock = H.new({ locale = "zh-TW" })
+    mock.lot[1] = { "PawHome_LitterBox" }
     local pet = H.adopt(app, 1, { "playful" }, "adult")
     local v = app:view(1, 101).pets[1]
     T.eq(#v.needs, 4); T.eq(#v.actions, 8)

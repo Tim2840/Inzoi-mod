@@ -418,6 +418,42 @@ T.test("modkit: city cats the Zoi fed can be adopted as strays; others cannot", 
     T.eq(#s.adapter.listStrays(77), 0, "forgotten after a few days")
 end)
 
+T.test("modkit: care from the cat's own menu counts: pet gently, treats, snack, play", function()
+    local s = boot({ spawn = true })
+    s.pump()
+    local offers = s.app:offers(77, true)
+    T.truthy(s.app:adoptOffer(77, 501, offers[1].id, "Mimi").ok)
+    s.adapter.onCatBegin(109546, { home = true })
+    local pet = s.app.ctx.state.pets[1]
+    pet.want = nil; pet.wantNext = math.huge
+    pet.needs.hunger = 30; pet.needs.fun = 20
+    local kinds = {
+        Petting_Cat = "cuddle", Giving_Snack_To_Cat = "feed", Giving_Catnip_Candy_To_Cat = "feed",
+        Object_Void_Cat_Tickle = "play", Object_Void_Cat_Dev = "feed", Playing_Toy_With_Cat = "play",
+    }
+    for bag, kind in pairs(kinds) do
+        T.eq(ModKit.CARE[bag], kind, bag)
+        s.adapter.onInteractionFinished({ entity_id = 501, target_entity_id = 109546, interaction_bag_id = bag })
+    end
+    local res = s.app:applyCare()
+    T.eq(#res, 6, "every menu interaction became one care event")
+    local cuddles = 0
+    for _, r in ipairs(res) do if r.action == "cuddle" then cuddles = cuddles + 1 end end
+    T.eq(cuddles, 1)
+end)
+
+T.test("modkit: a gift is queued on the Zoi as a tiny interaction that puts the real item in her bag", function()
+    local s = boot({ spawn = false })
+    s.pump()
+    T.truthy(s.adapter.giveItem(77, "CatToy01"))
+    T.eq(#s.w.queued, 1)
+    T.eq(s.w.queued[1].bag, "PawHome_Gift_CatToy01")
+    T.eq(s.w.queued[1].zoi, 501); T.eq(s.w.queued[1].target, 501, "an interaction on herself")
+    s.w.home = false                                -- a gift does not wait for the Zoi to be home
+    T.truthy(s.adapter.giveItem(77, "GiftBouquet01"))
+    T.eq(#s.w.queued, 2)
+end)
+
 T.test("modkit: care given to one of our cats is collected once", function()
     local s = boot({ spawn = true })
     s.pump()
@@ -735,10 +771,10 @@ T.test("cat B1: other mods' messages and unknown kinds are ignored", function()
     T.eq(a.anim, nil)
 end)
 
-T.test("modkit: our phone, computer and city-cat entries open the shop on the page", function()
+T.test("modkit: our phone and city-cat entries open the shop on the page", function()
     local s = boot({ spawn = false })
     s.pump()
-    s.adapter.onInteractionStarted({ interaction_bag_id = "PawHome_ShopPC", entity_id = 501 })
+    s.adapter.onInteractionStarted({ interaction_bag_id = "PawHome_ShopPhone", entity_id = 501 })
     s.adapter.onInteractionStarted({ interaction_bag_id = "PawHome_Adopt", entity_id = 501, target_entity_id = 89129 })
     s.adapter.onInteractionStarted({ interaction_bag_id = "PawHome_ShopPhone", entity_id = 777 })   -- not our Zoi
     s.adapter.onInteractionStarted({ interaction_bag_id = "Self_SmartPhone_Check", entity_id = 501 }) -- not ours
@@ -746,7 +782,7 @@ T.test("modkit: our phone, computer and city-cat entries open the shop on the pa
     s.adapter.onInteractionStarted({ interaction_bag_id = "PawHome_Adopt", entity_id = 501, target_entity_id = 109615 }) -- a home cat
     s.pump(2)
     T.eq(#s.ui.opened, 2)
-    T.eq(s.ui.opened[1].shell, "pc")
+    T.eq(s.ui.opened[1].shell, "phone")
     T.eq(s.ui.opened[2].tab, "adopt"); T.eq(s.ui.opened[2].stray, "cat89129")
     local strays = s.app:strays(77)
     local found = false

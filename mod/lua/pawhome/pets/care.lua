@@ -11,6 +11,7 @@ local Traits = require("pawhome.pets.traits")
 local Training = require("pawhome.pets.training")
 local Wants = require("pawhome.pets.wants")
 local Keepsakes = require("pawhome.pets.keepsakes")
+local Litter = require("pawhome.pets.litter")
 local Util = require("pawhome.core.util")
 
 local C = {}
@@ -52,6 +53,9 @@ function C.perform(ctx, petId, zoiId, actionId, opts)
     if not def or type(def) ~= "table" or actionId == "order" then return fail(ctx, "unknown_action") end
     local refused = C.refusal(pet, actionId)
     if refused then return fail(ctx, refused, { name = pet.name }) end
+    if def.scope == "household" and not Litter.present(ctx, pet.household) then
+        return fail(ctx, "no_litter_box", { name = pet.name })
+    end
 
     local result = { ok = true, petId = pet.id, action = actionId, extra = {} }
     local actionName = ctx.t("actions." .. actionId .. ".name")
@@ -89,8 +93,9 @@ function C.perform(ctx, petId, zoiId, actionId, opts)
     if bond ~= 0 then Bond.add(pet, zoiId, bond) end
     Training.addXp(ctx, pet, zoiId, (def.xp or 0) * (delight and D.xpMul or mul))
 
-    if def.reveal then
+    if def.reveal or (def.peek and #Traits.unrevealed(pet) > 0) then
         local chance = Util.clamp((0.35 + Bond.get(pet, zoiId) / 150) * Traits.scalar(pet, "reveal"), 0.15, 0.95)
+        if def.peek then chance = chance * def.peek end
         if ctx.rng:chance(chance) then
             local id = Traits.revealOne(ctx, pet)
             result.extra.revealed = id
@@ -116,9 +121,9 @@ function C.perform(ctx, petId, zoiId, actionId, opts)
         local gift = Keepsakes.roll(ctx, pet, Bond.level(Bond.get(pet, zoiId)))
         if gift then
             result.keepsake = gift
-            result.message = ctx.t("msg.keepsake", { name = pet.name, item = gift.name, coins = gift.coins })
+            result.message = ctx.t("msg.keepsake", { name = pet.name, item = gift.name })
             animation = "pet_happy"                   -- the cat hands over its gift
-            if fromGame then ctx.emit(pet, "keepsake", { item = gift.name, coins = gift.coins }) end
+            if fromGame then ctx.emit(pet, "keepsake", { item = gift.name }) end
         else
             result.message = ctx.t("msg.delight", { name = pet.name })
             if fromGame then ctx.emit(pet, "delight") end

@@ -14,7 +14,7 @@ return {
         requiresAbove = { energy = 15 }, animation = "pet_play",
     },
     cuddle = {
-        needs = { fun = 12 }, bond = 4, xp = 1, animation = "pet_cuddle",
+        needs = { fun = 12 }, bond = 4, peek = 0.5, xp = 1, animation = "pet_cuddle",
     },
     groom = {
         needs = { fun = 6 }, bond = 2, xp = 2, animation = "pet_groom",

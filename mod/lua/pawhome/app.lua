@@ -11,6 +11,7 @@ local Registry = require("pawhome.pets.registry")
 local Enrichment = require("pawhome.pets.enrichment")
 local Illness = require("pawhome.pets.illness")
 local Wants = require("pawhome.pets.wants")
+local Litter = require("pawhome.pets.litter")
 local Keepsakes = require("pawhome.pets.keepsakes")
 local enrichmentData = require("pawhome.data.enrichment")
 local Engine = require("pawhome.pets.engine")
@@ -284,11 +285,14 @@ local function petView(ctx, pet, zoiId)
     local sleeping = pet.status == "home" and Needs.sleeping(pet, ctx.now)
     local mood = pet.status == "home" and Moods.compute(pet, sleeping) or "sad"
     local needs = {}
+    local hasBox = Litter.present(ctx, pet.household)
     for _, id in ipairs(needsData.order) do
+      if id ~= "bladder" or hasBox then
         needs[#needs + 1] = {
             id = id, label = I18n.t("needs." .. id),
             value = math.floor(pet.needs[id] + 0.5), state = Needs.state(id, pet.needs[id]),
         }
+      end
     end
     local traits = {}
     for _, id in ipairs(pet.traits) do

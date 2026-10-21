@@ -31,7 +31,7 @@ T.test("wants: a cat asks for something that fits its needs and personality", fu
     local app, mock, pet = newCat()
     pet.traits = {}
     pet.needs.hunger = 10; pet.needs.fun = 100; pet.needs.bladder = 100
-    local counts = { feed = 0, play = 0, cuddle = 0, groom = 0, clean_litter = 0 }
+    local counts = { feed = 0, play = 0, cuddle = 0, clean_litter = 0 }
     for _ = 1, 400 do counts[Wants.choose(app.ctx, pet)] = counts[Wants.choose(app.ctx, pet)] + 1 end
     T.gt(counts.feed, counts.cuddle, "a hungry cat mostly wants food")
     T.eq(counts.clean_litter, 0, "litter is fine, so nobody asks for it")
@@ -168,7 +168,7 @@ T.test("keepsakes: data is complete, with names and rarity labels in both langua
     local zh = require("pawhome.localization.zh_TW")
     T.eq(#keepData.order, 10)
     for _, id in ipairs(keepData.order) do
-        T.truthy(keepData[id].coins > 0, id)
+        T.truthy(keepData[id].object:match("^[%w_]+$"), id .. " is a real object row id")
         T.truthy(keepData.rarityWeight[keepData[id].rarity], id)
         T.truthy(en.keepsakes[id] and zh.keepsakes[id], "names for " .. id)
     end
@@ -188,26 +188,26 @@ T.test("keepsakes: a closer bond brings gifts more often and rarer ones", functi
     T.gt(rareShare("best_friend"), rareShare("stranger"))
 end)
 
-T.test("keepsakes: a gift goes into the album and pays coins", function()
-    local app, mock, pet = newCat({ money = 1000 })
-    local before = mock.money[1]
-    local gift = Keepsakes.award(app.ctx, 1, "bell")
-    T.eq(gift.isNew, true); T.eq(gift.name, "Little bell"); T.eq(gift.coins, 30)
-    T.eq(mock.money[1], before + 30)
-    local again = Keepsakes.award(app.ctx, 1, "bell")
+T.test("keepsakes: a gift is a real item for the Zoi and goes into the album", function()
+    local app, mock, pet = newCat()
+    local gift = Keepsakes.award(app.ctx, 1, "toy")
+    T.eq(gift.isNew, true); T.eq(gift.name, "Cat Toy"); T.eq(gift.object, "CatToy01")
+    T.eq(#mock.gifts, 1); T.eq(mock.gifts[1].object, "CatToy01"); T.eq(mock.gifts[1].household, 1)
+    local again = Keepsakes.award(app.ctx, 1, "toy")
     T.eq(again.isNew, false); T.eq(again.count, 2)
+    T.eq(#mock.gifts, 2)
     local album = app:view(1, 101).album
     T.eq(album.total, 10); T.eq(album.owned, 1)
-    local bell
-    for _, it in ipairs(album.items) do if it.id == "bell" then bell = it end end
-    T.eq(bell.count, 2); T.truthy(bell.owned); T.eq(bell.name, "Little bell")
-    for _, it in ipairs(album.items) do if it.id == "star" then T.falsy(it.owned); T.eq(it.name, "???") end end
+    local toy
+    for _, it in ipairs(album.items) do if it.id == "toy" then toy = it end end
+    T.eq(toy.count, 2); T.truthy(toy.owned); T.eq(toy.name, "Cat Toy")
+    for _, it in ipairs(album.items) do if it.id == "emerald" then T.falsy(it.owned); T.eq(it.name, "???") end end
 end)
 
 T.test("keepsakes: the album belongs to the household and survives a save and a restart", function()
     local store = {}
     local app, mock, pet = newCat({ store = store })
-    Keepsakes.award(app.ctx, 1, "feather")
+    Keepsakes.award(app.ctx, 1, "stone")
     app:save()
     local app2 = require("pawhome.app").new(Mock.new({ store = store }), { seed = 1 })
     T.eq(app2:view(1, 101).album.owned, 1)
@@ -215,7 +215,7 @@ T.test("keepsakes: the album belongs to the household and survives a save and a 
 end)
 
 T.test("keepsakes: a happy moment can bring a gift with a message and an animation", function()
-    local app, mock, pet = newCat({ money = 1000 })
+    local app, mock, pet = newCat()
     Bond.add(pet, 101, 90)
     local got
     for _ = 1, 60 do
@@ -228,6 +228,46 @@ T.test("keepsakes: a happy moment can bring a gift with a message and an animati
     local played = false
     for _, a in ipairs(mock.animations) do if a.anim == "pet_happy" then played = true end end
     T.truthy(played, "the cat hands over the gift")
+end)
+
+-- ------------------------------------------------------------------ litter box
+
+T.test("litter: without a litter box the need does not run, is not shown and nobody asks for it", function()
+    local app, mock, pet = newCat()
+    pet.needs.bladder = 50
+    H.advance(app, mock, 6 * 60)
+    T.eq(pet.needs.bladder, 50, "frozen while there is no box")
+    local ids = {}
+    for _, n in ipairs(app:view(1, 101).pets[1].needs) do ids[n.id] = true end
+    T.falsy(ids.bladder); T.truthy(ids.hunger)
+    for _ = 1, 100 do T.truthy(Wants.choose(app.ctx, pet) ~= "clean_litter") end
+    local r = app:perform(pet.id, 101, "clean_litter")
+    T.falsy(r.ok); T.eq(r.reason, "no_litter_box")
+end)
+
+T.test("litter: with a box the need runs, can be wanted, and the box can be cleaned", function()
+    local app, mock, pet = newCat()
+    mock.lot[1] = { "PawHome_LitterBox" }
+    pet.needs.bladder = 20; pet.needs.hunger = 100; pet.needs.fun = 100
+    local seen = false
+    for _ = 1, 60 do if Wants.choose(app.ctx, pet) == "clean_litter" then seen = true end end
+    T.truthy(seen, "a cat with a dirty box asks for it")
+    local before = pet.needs.bladder
+    H.advance(app, mock, 120)
+    T.truthy(pet.needs.bladder < before, "the need drops")
+    T.truthy(app:perform(pet.id, 101, "clean_litter").ok)
+    T.eq(pet.needs.bladder, 100)
+end)
+
+-- ------------------------------------------------------------------ gifts are built by bridge.js
+
+T.test("gifts: bridge.js builds a script and an interaction for every gift object", function()
+    local f = assert(io.open("mod/ui/bridge.js", "r"))
+    local js = f:read("*a")
+    f:close()
+    for _, id in ipairs(keepData.order) do
+        T.truthy(js:find('"' .. keepData[id].object .. '"', 1, true), keepData[id].object .. " is listed in bridge.js")
+    end
 end)
 
 -- ------------------------------------------------------------------ saves

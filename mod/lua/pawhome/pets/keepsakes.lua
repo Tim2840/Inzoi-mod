@@ -21,15 +21,15 @@ function K.pick(ctx, level)
     end)
 end
 
--- Gives the gift to the household: album entry and coins. Returns the result table.
+-- Gives the gift to the household: the real item goes into the Zoi's bag, the album
+-- remembers it. Returns the result table.
 function K.award(ctx, householdId, id)
     local items = album(ctx, householdId)
     local isNew = (items[id] or 0) == 0
     items[id] = (items[id] or 0) + 1
-    local coins = data[id].coins
-    Api.credit(householdId, coins)
+    Api.giveItem(householdId, data[id].object)
     return {
-        id = id, coins = coins, isNew = isNew, rarity = data[id].rarity,
+        id = id, isNew = isNew, rarity = data[id].rarity, object = data[id].object,
         name = ctx.t("keepsakes." .. id), count = items[id],
     }
 end

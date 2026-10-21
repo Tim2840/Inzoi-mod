@@ -15,9 +15,8 @@ return {
     },
     hint = { not_hungry = "Full", too_tired = "Tired" },
     keepsakes = {
-        feather = "Feather", yarn = "Ball of yarn", leaf = "Lucky leaf", button = "Shiny button",
-        pebble = "Smooth pebble", bell = "Little bell", fishbone = "Fish bone", mouse = "Toy mouse",
-        flower = "Pressed flower", star = "Star charm",
+        stone = "Pebble", catnip = "Catnip Candy", treat = "Cat Treat", toy = "Cat Toy", plush = "Cat Doll",
+        bouquet = "Bouquet", ribbon = "Coral Ribbon", amethyst = "Amethyst", aquamarine = "Aquamarine", emerald = "Emerald",
     },
     rarity = { common = "Common", uncommon = "Uncommon", rare = "Rare" },
     furniture = {
@@ -58,7 +57,7 @@ return {
     msg = {
         want_new = "{text}",
         delight = "{name} loved that!",
-        keepsake = "{name} brought you a gift: {item}! (+{coins})",
+        keepsake = "{name} brought you a gift: {item}!",
         backup_restored = "Your pets are back!",
         fell_ill = "{name} isn't feeling well: {illness}.",
         recovered = "{name} has recovered and feels like their old self.",
@@ -86,6 +85,7 @@ return {
         renamed = "Renamed to {name}.",
     },
     fail = {
+        no_litter_box = "There is no litter box at home yet.",
         no_backup = "There is no backup to restore.",
         not_sick = "{name} is healthy.",
         no_pet = "That pet does not exist.",
@@ -108,15 +108,15 @@ return {
     -- l10n/<culture>_mod/PawHome.po under the text id "mod_PawHome_<key>"
     game = {
         shop_phone = "Paw Home pet shop",
-        shop_pc = "Browse the Paw Home pet shop",
         adopt_cat = "Adopt this cat (Paw Home)",
     },
     ui = {
+        litter_hint = "Put a litter box in the house (Build mode, Pet) to look after the litter.",
+        want_hint = "Pick it from the cat's menu",
         album = "Album",
         album_hint = "Little gifts your cats bring after a happy moment.",
         album_unknown = "???",
         album_progress = "{owned} / {total} collected",
-        coat_label = "Coat",
         backup_found = "Found a copy of your pets from day {day}: {names}. This save has none, maybe it was saved while Paw Home was off.",
         backup_restore = "Bring them back",
         vet = "Take to the vet ({fee})",
@@ -142,7 +142,6 @@ return {
         bond = "Bond",
         age = "Age: {days} days",
         unknown_trait = "???",
-        coat = "Coat",
         traits = "Traits",
         training = "Pet Training Lv.{level}",
         impounded = "At the animal shelter",
@@ -160,13 +159,10 @@ return {
         lifescale = "Pet lifespan",
         max_pets_setting = "Max pets per household",
         tagline = "Online pet shop",
-        url = "pawhome.zoi/shop",
         open = "Open Paw Home",
         close = "Close",
         money = "Household funds",
         care = "Care",
         adopt_this = "The cat you just met",
-        view_pc = "Bigger view (computer)",
-        view_phone = "Phone view",
     },
 }

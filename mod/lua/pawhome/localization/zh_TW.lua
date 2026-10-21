@@ -15,9 +15,8 @@ return {
     },
     hint = { not_hungry = "吃飽了", too_tired = "累了" },
     keepsakes = {
-        feather = "羽毛", yarn = "毛線球", leaf = "幸運葉子", button = "亮晶晶的鈕扣",
-        pebble = "圓滑的小石子", bell = "小鈴鐺", fishbone = "魚骨頭", mouse = "玩具老鼠",
-        flower = "押花", star = "星星吊飾",
+        stone = "小石子", catnip = "貓薄荷糖", treat = "貓零食", toy = "貓玩具", plush = "貓娃娃",
+        bouquet = "花束", ribbon = "珊瑚緞帶", amethyst = "紫水晶", aquamarine = "海藍寶", emerald = "祖母綠",
     },
     rarity = { common = "普通", uncommon = "少見", rare = "稀有" },
     furniture = {
@@ -58,7 +57,7 @@ return {
     msg = {
         want_new = "{text}",
         delight = "{name}好開心！",
-        keepsake = "{name}送了你一份禮物：{item}！（+{coins}）",
+        keepsake = "{name}送了你一份禮物：{item}！",
         backup_restored = "寵物回來了！",
         fell_ill = "{name}不太舒服：{illness}。",
         recovered = "{name}康復了，又恢復活力。",
@@ -86,6 +85,7 @@ return {
         renamed = "已改名為 {name}。",
     },
     fail = {
+        no_litter_box = "家裡還沒有貓砂盆。",
         no_backup = "沒有可以還原的備份。",
         not_sick = "{name}很健康。",
         no_pet = "找不到這隻寵物。",
@@ -106,15 +106,15 @@ return {
     },
     game = {
         shop_phone = "毛孩之家寵物店",
-        shop_pc = "逛毛孩之家線上寵物店",
         adopt_cat = "領養這隻貓（毛孩之家）",
     },
     ui = {
+        litter_hint = "在家裡擺一個貓砂盆（建造模式「寵物」分類）才能照顧貓砂。",
+        want_hint = "從貓的互動選單選擇",
         album = "圖鑑",
         album_hint = "貓咪在開心時刻帶給你的小禮物。",
         album_unknown = "？？？",
         album_progress = "已收集 {owned} / {total}",
-        coat_label = "花色",
         backup_found = "找到第 {day} 天的寵物備份：{names}。這個存檔裡沒有寵物資料，可能是在毛孩之家關閉時存的檔。",
         backup_restore = "把牠們找回來",
         vet = "帶去看獸醫（{fee}）",
@@ -140,7 +140,6 @@ return {
         bond = "親密度",
         age = "年齡：{days} 天",
         unknown_trait = "???",
-        coat = "花色",
         traits = "個性",
         training = "寵物訓練 Lv.{level}",
         impounded = "在動物收容所",
@@ -158,13 +157,10 @@ return {
         lifescale = "寵物壽命",
         max_pets_setting = "每戶最多寵物數",
         tagline = "線上寵物店",
-        url = "pawhome.zoi/shop",
         open = "打開毛孩之家",
         close = "關閉",
         money = "家庭資金",
         care = "照顧",
         adopt_this = "剛剛遇到的那隻貓",
-        view_pc = "放大（電腦版）",
-        view_phone = "手機版",
     },
 }

@@ -10,6 +10,7 @@ local Neglect = require("pawhome.pets.neglect")
 local Shelter = require("pawhome.pets.shelter")
 local Illness = require("pawhome.pets.illness")
 local Wants = require("pawhome.pets.wants")
+local Litter = require("pawhome.pets.litter")
 local Moods = require("pawhome.pets.moods")
 local Bond = require("pawhome.pets.bond")
 local Traits = require("pawhome.pets.traits")
@@ -70,6 +71,8 @@ end
 
 -- Furniture at home slows decay, illness speeds it up.
 local function decayMul(ctx, pet, need)
+    -- no litter box on the lot: nobody can clean it, so that need does not run
+    if need == "bladder" and pet.status == "home" and not Litter.present(ctx, pet.household) then return 0 end
     return Enrichment.decayMul(ctx, pet, need) * Illness.decayMul(pet, need)
 end
 
@@ -224,6 +227,7 @@ function E.tick(ctx, now)
     end
     local remaining = math.min(now - last, ctx.cfg.catchupCapHours * 60)
     ctx.enrichment = {}                 -- look at the lots again on every tick
+    Litter.forget(ctx)
     ctx.decayMul = decayMul
 
     -- play the interval forward in chunks; the clock ctx.now follows

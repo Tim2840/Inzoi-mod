@@ -13,7 +13,9 @@
 const Bridge = (() => {
   const inGame = typeof window.inzoi !== "undefined" && !!window.inzoi.cli;
   const SECTION = "bridge";
-  const POLL_MS = 1000;
+  const POLL_FAST_MS = 150;     // while a request is open and for a few seconds after one
+  const POLL_SLOW_MS = 1000;
+  const FAST_FOR_MS = 5000;
   const RPC_TIMEOUT_MS = 20000;
   const STATE_GRACE_MS = 4000;
   const KEEP = 20;
@@ -110,11 +112,25 @@ const Bridge = (() => {
       AgingConditionFlags: 504, RepeatCount: 1,
       InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_SendAway", Label: "A" }] }] }],
   ];
+  // The cat's gifts are real items (mod/lua/pawhome/data/keepsakes.lua lists the same ids; a test
+  // keeps the lists equal). After a happy moment the mod queues PawHome_Gift_<object> on the Zoi:
+  // she strikes the cat-heart pose and the finish script puts the object in her bag.
+  const GIFT_OBJECTS = ["CarriableStone01", "CatLeaf01", "CatPuree01", "CatToy01", "GiftCatDoll01",
+    "GiftBouquet01", "CollectionRibbonCoral01", "AmethystStone", "AquamarineStone", "EmeraldStone"];
+  for (const obj of GIFT_OBJECTS) {
+    const script = "PawHome_GiftScript_" + obj, id = "PawHome_Gift_" + obj;
+    GAME_DATA.push(
+      ["Script", script, { ID: script, Scripts: [{ IfType: "If", Conditions: [], Executes: [
+        { BaseObject: "Self", Command: "AddObjectToBag", S1: obj, S2: "None", F1: 1, F2: 0, Prob: 1 }] }] }],
+      ["Interaction", id, { ID: id, ActionIdList: ["Self_Pose_CatHeart"], FinishScriptIdList: [script],
+        InteractionSlotUsage: "None", NoneTargetPlayable: true, PostureId: ["Stand"], BodyParts: ["BothHands"] }],
+      ["InteractionBag", id, { ID: id, GroupId: "Group_Self_Expression", PostureGroupId: "StandGroup", AgingConditionFlags: 504,
+        RepeatCount: 1, InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: id, Label: "A" }] }] }]);
+  }
   // Shop entries in the game's own menus (docs/research/phone-pc-ui.md). Labels are our text ids
   // (mod_PawHome_*), shipped as l10n/<culture>_mod/PawHome.po by tools/build_modkit.py.
   //  - PawHome_ShopPhone: the Zoi's own menu, "Use smartphone" group; she looks at her phone.
-  //  - PawHome_ShopPC: computers and laptops; she sits down and browses.
-  // While the Zoi does one of them, app.js opens the shop in the matching shell.
+  // While the Zoi does it, app.js opens the shop.
   const SHOP_DATA = [
     ["Interaction", "PawHome_ShopPhone", { ID: "PawHome_ShopPhone", ActionIdList: ["SmartPhone_Check"],
       InteractionSlotUsage: "None", PostureId: ["Stand", "MovingChair_Sit", "Sit"], BodyParts: ["LeftHand"] }],
@@ -123,16 +139,6 @@ const Bridge = (() => {
       InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_ShopPhone", Label: "B" }] }],
       DisplayInfo: { DisplayTextId: "mod_PawHome_shop_phone", Icon: "/Game/UI/Icon/Object/Action_SmartPhone.Action_SmartPhone",
         DisplayCategoryTextId: "InteractionBag_DisplayInfo_Self_SmartPhone_Insurance_CurrentState_DisplayCategoryTextId" } }],
-    ["Interaction", "PawHome_ShopPC", { ID: "PawHome_ShopPC", ActionIdList: ["Computer_Use_Lookup"], InteractionSlotUsage: "None",
-      EnableSlotTags: ["Customer", "Computer"], SpaceTargetFilterId: "TargetConnectedChair",
-      StartScriptIdList: ["Start_Computer_Search_State"], CancelScriptIdList: ["Finish_Computer_State_Search"],
-      FinishScriptIdList: ["Finish_Computer_State_Search"], PostureId: ["MovingChair_Sit", "PicnicTable_Sit", "Sit"], BodyParts: ["BothHands"] }],
-    ["InteractionBag", "PawHome_ShopPC", { ID: "PawHome_ShopPC", PostureGroupId: "StandGroup", AgingConditionFlags: 504, RepeatCount: 1,
-      InteractionVisibleConditionIds: ["DC_PC_Use_Condition", "TargetNotBusinessType"],
-      InteractionEnableConditionIds: ["DC_PC_Use_Condition", "TargetNotBusinessType"],
-      InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_ShopPC", Label: "C" }] }],
-      DisplayInfo: { DisplayTextId: "mod_PawHome_shop_pc",
-        DisplayCategoryTextId: "InteractionBag_DisplayInfo_Computer_Use_Lookup_DisplayCategoryTextId" } }],
   ];
   // PawHome_Adopt: on city cats (DEV_Void_Cat / Level_Void_Cat share this selection set; the
   // B2 adapter ignores it on our own home cats). The Zoi plays with the cat once; at the start
@@ -143,11 +149,17 @@ const Bridge = (() => {
     ["InteractionBag", "PawHome_Adopt", { ID: "PawHome_Adopt", PostureGroupId: "StandGroup", AgingConditionFlags: 504, RepeatCount: 1,
       InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_Adopt", Label: "A" }] }],
       DisplayInfo: { DisplayTextId: "mod_PawHome_adopt_cat" } }]);
+  // The cat's own menu (docs/design/gameplay-v2.md): the game's interactions for cats, with the
+  // game's own names in every language. The mod counts them as care (adapters/inzoi.lua CARE):
+  // Pet Gently = cuddle, Give Treat to Cat / Give Catnip Candy to Cat (need that item in the bag)
+  // = feed. Give Snack and Play are on the cat already. Verified in game 20261019.16318.W
+  // (2026-10-22): they appear on the cat and Pet Gently plays the Zoi and cat animation.
   const SHOP_MENUS = [   // [selection set row, state group, interaction bag]
+    ["DEV_Void_Cat", "Normal", "Petting_Cat"],
+    ["DEV_Void_Cat", "Normal", "Giving_Snack_To_Cat"],
+    ["DEV_Void_Cat", "Normal", "Giving_Catnip_Candy_To_Cat"],
     ["DEV_Void_Cat", "Normal", "PawHome_Adopt"],
     ["SelfCharacter", "Normal", "PawHome_ShopPhone"],
-    ["Computer01", "Normal", "PawHome_ShopPC"],
-    ["Laptop01", "Normal", "PawHome_ShopPC"],
   ];
   (async () => {
     for (const [set, stateGroup, bag] of SHOP_MENUS) {
@@ -234,8 +246,21 @@ const Bridge = (() => {
     }
   }
 
+  let pollTimer = null, polling = false, fastUntil = 0;
+  const pollDelay = () => (waiting.size > 0 || Date.now() < fastUntil ? POLL_FAST_MS : POLL_SLOW_MS);
+  function schedulePoll(ms) {
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = setTimeout(poll, ms);
+  }
+  function wake() {        // something is about to happen: look at the mailbox now and then quickly
+    fastUntil = Date.now() + FAST_FOR_MS;
+    if (!polling) schedulePoll(0);
+  }
+
   let lastPollError = null;
   async function poll() {
+    polling = true;
+    pollTimer = null;
     try {
       const entries = decodeMailbox(await cfgLoad("to_ui"));
       const head = entries.find((e) => e.seq === 0 && e.channel === "epoch");
@@ -257,18 +282,28 @@ const Bridge = (() => {
       const text = "poll failed: " + (err && err.message || JSON.stringify(err));
       if (text !== lastPollError) { lastPollError = text; report(text); }
     } finally {
-      setTimeout(poll, POLL_MS);
+      polling = false;
+      schedulePoll(pollDelay());
     }
   }
   poll();
 
+  // how long a call takes, from pressing the button to the answer (shown in the page log)
+  const rtt = { n: 0, sum: 0, last: 0 };
+  function recordRtt(ms) {
+    rtt.n++; rtt.sum += ms; rtt.last = ms;
+    if (rtt.n % 8 === 1) report("rpc round trip: last " + ms + " ms, average " + Math.round(rtt.sum / rtt.n) + " ms over " + rtt.n + " calls");
+  }
+
   function call(method, args = {}) {
     if (!session || answered !== session) return Promise.reject(new Error("not_ready"));
     const id = nextRpc++;
+    const t0 = Date.now();
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { waiting.delete(id); reject(new Error("timeout")); }, RPC_TIMEOUT_MS);
-      waiting.set(id, { resolve, reject, timer });
-      send("pawhome:rpc", JSON.stringify({ id, method, args })).catch(reject);
+      waiting.set(id, { resolve: (v) => { recordRtt(Date.now() - t0); resolve(v); }, reject, timer });
+      wake();
+      send("pawhome:rpc", JSON.stringify({ id, method, args })).then(wake, reject);
     });
   }
 

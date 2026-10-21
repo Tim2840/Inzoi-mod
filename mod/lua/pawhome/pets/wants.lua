@@ -2,13 +2,15 @@
 -- expires without penalty, and is "met" when the player does that very thing (from the panel
 -- or with the game's own interaction on the cat). See docs/design/gameplay-v2.md.
 local data = require("pawhome.data.wants")
+local Litter = require("pawhome.pets.litter")
 
 local W = {}
 
 local function span(ctx, range) return math.floor(ctx.rng:range(range[1], range[2])) end
 
 -- Can this want come up now? (a full cat is not hungry, a worn-out one does not want to play)
-local function possible(pet, def)
+local function possible(ctx, pet, def)
+    if def.needsLitterBox and not Litter.present(ctx, pet.household) then return false end
     if def.need and def.onlyBelow and pet.needs[def.need] >= def.onlyBelow then return false end
     for need, limit in pairs(def.requiresAbove or {}) do
         if pet.needs[need] < limit then return false end
@@ -30,7 +32,7 @@ end
 function W.choose(ctx, pet)
     local candidates = {}
     for _, id in ipairs(data.order) do
-        if possible(pet, data[id]) then candidates[#candidates + 1] = id end
+        if possible(ctx, pet, data[id]) then candidates[#candidates + 1] = id end
     end
     if #candidates == 0 then return nil end
     return ctx.rng:weighted(candidates, function(id) return weight(pet, id) end)

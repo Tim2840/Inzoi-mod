@@ -79,8 +79,9 @@ function Mock.new(opts)
         m.money[hid] = m.money[hid] - amount
         return true
     end
-    function m.credit(hid, amount)
-        m.money[hid] = (m.money[hid] or 0) + amount
+    m.gifts = {}                        -- { household, object } handed over
+    function m.giveItem(hid, objectId)
+        m.gifts[#m.gifts + 1] = { household = hid, object = objectId }
         return true
     end
     function m.addBuff(zoi, buff, minutes)

@@ -114,10 +114,10 @@ function Api.charge(householdId, amount)
     return ok and v == true
 end
 
--- Gives money to the household (a keepsake's coins). Returns true when it was given.
-function Api.credit(householdId, amount)
-    if amount <= 0 then return true end
-    local ok, v = call("credit", householdId, amount)
+-- Puts one real item (an Object row id) into the bag of the household's Zoi. Returns true when
+-- it was handed over to the game (the Zoi may need a moment to get to it).
+function Api.giveItem(householdId, objectId)
+    local ok, v = call("giveItem", householdId, objectId)
     return ok and v == true
 end
 

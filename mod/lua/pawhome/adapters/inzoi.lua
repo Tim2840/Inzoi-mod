@@ -8,7 +8,6 @@
 --   platform.householdMembers(hid)       -> { zoi ids }
 --   platform.funds(hid)                  -> number
 --   platform.charge(hid, amount)         -> true when the money was taken
---   platform.credit(hid, amount)         -> true when the money was given
 --   platform.send(entityId, channel, payload)        B2 -> B1 message (inzoi.message.send_to_client)
 --   platform.enqueue(zoiId, targetId, interactionBagId) -> true when queued
 --   platform.atHome(zoiId)               -> true when the Zoi is on the household's lot
@@ -46,11 +45,17 @@ local ModKit = {
     BACKUP_EVERY_SECONDS = 30,   -- at most one backup copy to the relay per 30 real seconds
     WELCOME = "PawHome_WelcomeCat",
     SEND_AWAY = "PawHome_SendAway",
-    CARE = { Object_Void_Cat_Dev = "feed", Object_Void_Cat_Tickle = "play" },
+    GIFT_PREFIX = "PawHome_Gift_",
+    -- The care the player gives from the cat's own interaction menu (all vanilla interactions
+    -- except the first two, which the mod appends to the menu in bridge.js).
+    CARE = {
+        Object_Void_Cat_Dev = "feed", Giving_Snack_To_Cat = "feed", Giving_Catnip_Candy_To_Cat = "feed",
+        Object_Void_Cat_Tickle = "play", Playing_Toy_With_Cat = "play",
+        Petting_Cat = "cuddle",
+    },
     -- our entry interactions (rows added by mod/ui/bridge.js) -> where the shop opens
     OPEN = {
         PawHome_ShopPhone = { shell = "phone" },
-        PawHome_ShopPC = { shell = "pc" },
         PawHome_Adopt = { shell = "phone", tab = "adopt" },   -- on a city cat
     },
 }
@@ -72,6 +77,7 @@ function ModKit.new(platform, opts)
         refs = {},          -- placeholder ref -> entity id
         pending = {},       -- list of { ref, at, household, queued }
         leaving = {},       -- cat entity ids to send away once the Zoi is home
+        gifts = {},         -- gift interactions waiting for the Zoi: { household, bag }
         nextPending = 1,
         cats = {},          -- entity id -> { home = bool, site = id }
         met = {},           -- entity id -> game minute the possessed Zoi last cared for it
@@ -174,7 +180,13 @@ function ModKit.new(platform, opts)
     function a.householdMembers(hid) return platform.householdMembers(hid) or {} end
     function a.funds(hid) return platform.funds(hid) or 0 end
     function a.charge(hid, amount) return platform.charge(hid, amount) == true end
-    function a.credit(hid, amount) return platform.credit ~= nil and platform.credit(hid, amount) == true end
+    -- a gift item: a tiny self interaction (row PawHome_Gift_<object id>, added by mod/ui/bridge.js)
+    -- whose finish script puts the object in the Zoi's bag; queued like the summon interaction
+    function a.giveItem(hid, objectId)
+        a.gifts[#a.gifts + 1] = { household = hid, bag = ModKit.GIFT_PREFIX .. tostring(objectId) }
+        a.serviceQueue()
+        return true
+    end
     function a.homeObjects(hid, watched)
         if not platform.homeObjects then return {} end
         return platform.homeObjects(watched) or {}
@@ -256,7 +268,11 @@ function ModKit.new(platform, opts)
     -- Starts the summon / goodbye interactions that wait for the Zoi to be at home.
     function a.serviceQueue()
         local zoi = target()
-        if zoi == nil or not platform.atHome(zoi) then return end
+        if zoi == nil then return end
+        for i = #a.gifts, 1, -1 do                     -- a gift does not wait for the Zoi to be home
+            if platform.enqueue(zoi, zoi, a.gifts[i].bag) then table.remove(a.gifts, i) end
+        end
+        if not platform.atHome(zoi) then return end
         for _, p in ipairs(a.pending) do
             if not p.queued and platform.enqueue(zoi, zoi, ModKit.WELCOME) then
                 p.queued, p.at = true, a.now()
@@ -445,7 +461,7 @@ function ModKit.new(platform, opts)
         a.sinceQueue = (a.sinceQueue or 0) + (dt or 0)
         if a.sinceQueue >= ModKit.HELLO_EVERY_SECONDS then
             a.sinceQueue = 0
-            if a.ready and (#a.pending > 0 or #a.leaving > 0) then a.serviceQueue() end
+            if a.ready and (#a.pending > 0 or #a.leaving > 0 or #a.gifts > 0) then a.serviceQueue() end
             if a.ready then idleStep() end
         end
         a.sinceHello = a.sinceHello + (dt or 0)
