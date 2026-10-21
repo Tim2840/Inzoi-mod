@@ -3,3 +3,6 @@ __pycache__/
 
 # Claude Code local permissions (per machine)
 .claude/settings.local.json
+
+# per-worker git worktrees created by Claude Code
+.claude/worktrees/
