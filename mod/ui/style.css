@@ -44,7 +44,7 @@ button { cursor: pointer; }
 #resize-handle { display: none; }
 .app { flex: 1; min-height: 0; display: flex; }
 
-.pw-x { width: 30px; height: 30px; padding: 0; border: 0; background: none; border-radius: 15px; }
+.pw-x { width: 30px; height: 30px; padding: 0; margin-left: 6px; border: 0; background: none; border-radius: 15px; }
 .pw-x .ico { width: 30px; height: 30px; }
 
 /* phone: a pink case with cat ears around a cream screen */

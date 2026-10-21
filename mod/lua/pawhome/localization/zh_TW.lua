@@ -143,5 +143,7 @@ return {
         money = "家庭資金",
         care = "照顧",
         adopt_this = "剛剛遇到的那隻貓",
+        view_pc = "放大（電腦版）",
+        view_phone = "手機版",
     },
 }

@@ -122,17 +122,24 @@
     render();
   }
 
-  let closeBtn = null, deco = null;
+  let closeBtn = null, swapBtn = null, deco = null;
   function renderChrome() {
     const u = ui();
     if (!closeBtn) {
+      // switch between the phone and the bigger computer layout
+      swapBtn = h("button", { class: "pw-x", onclick: () => setShell(state.shell === "pc" ? "phone" : "pc") });
       closeBtn = h("button", { class: "pw-x", onclick: () => setShell("mini") }, icon("close"));
+      titleButtons.appendChild(swapBtn);
       titleButtons.appendChild(closeBtn);
       deco = h("div", { class: "pw-deco" });
       titleBar.insertBefore(deco, titleBar.firstChild);
     }
     closeBtn.setAttribute("title", u.close || "");
     closeBtn.setAttribute("aria-label", u.close || "");
+    const swapLabel = state.shell === "pc" ? u.view_phone : u.view_pc;
+    swapBtn.setAttribute("title", swapLabel || "");
+    swapBtn.setAttribute("aria-label", swapLabel || "");
+    setChildren(swapBtn, icon(state.shell === "pc" ? "phone" : "computer"));
     if (state.shell === "phone") {
       setChildren(deco,
         h("div", { class: "pw-ears" },

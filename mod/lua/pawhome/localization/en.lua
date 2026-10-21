@@ -145,5 +145,7 @@ return {
         money = "Household funds",
         care = "Care",
         adopt_this = "The cat you just met",
+        view_pc = "Bigger view (computer)",
+        view_phone = "Phone view",
     },
 }
