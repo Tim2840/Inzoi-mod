@@ -48,11 +48,11 @@ function handlers.strays()
         local stage = s.stage or "adult"
         out[i] = { id = s.id, stage = stage, stageLabel = I18n.t("stages." .. stage) }
     end
-    return snapshot({ strays = out })
+    return snapshot({ strays = out, coats = P.app:coats() })
 end
 
 function handlers.adoptOffer(a)
-    return snapshot({ result = P.app:adoptOffer(P.HOUSEHOLD, P.ZOI, a.offerId, a.name) })
+    return snapshot({ result = P.app:adoptOffer(P.HOUSEHOLD, P.ZOI, a.offerId, a.name, a.coat) })
 end
 
 function handlers.redeem(a)
@@ -60,7 +60,7 @@ function handlers.redeem(a)
 end
 
 function handlers.adoptStray(a)
-    return snapshot({ result = P.app:adoptStray(P.HOUSEHOLD, P.ZOI, a.strayId, a.name) })
+    return snapshot({ result = P.app:adoptStray(P.HOUSEHOLD, P.ZOI, a.strayId, a.name, a.coat) })
 end
 
 function handlers.setSetting(a)

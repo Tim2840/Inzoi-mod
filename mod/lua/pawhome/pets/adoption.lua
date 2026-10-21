@@ -4,6 +4,7 @@ local Api = require("pawhome.core.api")
 local Registry = require("pawhome.pets.registry")
 local Traits = require("pawhome.pets.traits")
 local Bond = require("pawhome.pets.bond")
+local Coats = require("pawhome.pets.coats")
 local Util = require("pawhome.core.util")
 local names = require("pawhome.data.names")
 
@@ -44,6 +45,7 @@ local function newOffer(ctx, taken)
         stage = stage,
         traits = Traits.generate(ctx),
         appearanceSeed = ctx.rng:int(1, 999999),
+        coat = Coats.random(ctx),
         fee = ctx.cfg.shelterFee,
     }
 end
@@ -77,7 +79,14 @@ local function finish(ctx, pet, zoiId, startBond)
     return { ok = true, petId = pet.id, message = ctx.t("msg.adopted", { name = pet.name }) }
 end
 
-function A.adoptOffer(ctx, householdId, zoiId, offerId, name)
+-- coat: optional, the coat the player picked (data/coats.lua id); defaults to the offer's own.
+local function pickCoat(ctx, coat, default)
+    if coat == nil or coat == "" then return default or Coats.random(ctx) end
+    if not Coats.valid(coat) then return nil end
+    return coat
+end
+
+function A.adoptOffer(ctx, householdId, zoiId, offerId, name, coat)
     if limitReached(ctx, householdId) then return fail(ctx, "max_pets", { limit = ctx.cfg.maxPetsPerHousehold }) end
     local entry = ctx.state.offers[tostring(householdId)]
     local offer, index
@@ -87,11 +96,13 @@ function A.adoptOffer(ctx, householdId, zoiId, offerId, name)
     if not offer then return fail(ctx, "no_offer") end
     local petName = A.cleanName(ctx, name or offer.name)
     if not petName then return fail(ctx, "bad_name") end
+    local petCoat = pickCoat(ctx, coat, offer.coat)
+    if not petCoat then return fail(ctx, "bad_coat") end
     if Api.funds(householdId) < offer.fee then return fail(ctx, "no_funds", { fee = offer.fee }) end
 
     local entity
     if Api.caps().spawn then
-        entity = Api.spawnPet(householdId, { appearanceSeed = offer.appearanceSeed, stage = offer.stage })
+        entity = Api.spawnPet(householdId, { appearanceSeed = offer.appearanceSeed, stage = offer.stage, coat = petCoat })
         if entity == nil then return fail(ctx, "spawn_failed") end
     end
     if not Api.charge(householdId, offer.fee) then
@@ -103,13 +114,13 @@ function A.adoptOffer(ctx, householdId, zoiId, offerId, name)
     for _, id in ipairs(offer.traits) do revealed[id] = true end
     local pet = Registry.create(ctx, {
         name = petName, household = householdId, stage = offer.stage, traits = offer.traits,
-        revealed = revealed, entity = entity, appearance = offer.appearanceSeed,
+        revealed = revealed, entity = entity, appearance = offer.appearanceSeed, coat = petCoat,
     })
     table.remove(entry.list, index)
     return finish(ctx, pet, zoiId, 25)
 end
 
-function A.adoptStray(ctx, householdId, zoiId, strayId, name)
+function A.adoptStray(ctx, householdId, zoiId, strayId, name, coat)
     if limitReached(ctx, householdId) then return fail(ctx, "max_pets", { limit = ctx.cfg.maxPetsPerHousehold }) end
     local stray
     for _, s in ipairs(Api.listStrays(householdId)) do
@@ -118,6 +129,9 @@ function A.adoptStray(ctx, householdId, zoiId, strayId, name)
     if not stray then return fail(ctx, "no_stray") end
     local petName = A.cleanName(ctx, name)
     if not petName then return fail(ctx, "bad_name") end
+    -- the game re-rolls a city cat's coat at every load, so the adopter picks the one it keeps
+    local petCoat = pickCoat(ctx, coat, nil)
+    if not petCoat then return fail(ctx, "bad_coat") end
     local fee = ctx.cfg.strayFee
     if Api.funds(householdId) < fee then return fail(ctx, "no_funds", { fee = fee }) end
 
@@ -126,7 +140,7 @@ function A.adoptStray(ctx, householdId, zoiId, strayId, name)
     if caps.moveStray then
         entity = Api.bringStray(stray.ref, householdId)
     elseif caps.spawn then
-        entity = Api.spawnPet(householdId, { appearance = stray.appearance, stage = stray.stage })
+        entity = Api.spawnPet(householdId, { appearance = stray.appearance, stage = stray.stage, coat = petCoat })
     end
     if (caps.moveStray or caps.spawn) and entity == nil then return fail(ctx, "spawn_failed") end
     if not Api.charge(householdId, fee) then
@@ -136,7 +150,7 @@ function A.adoptStray(ctx, householdId, zoiId, strayId, name)
 
     local pet = Registry.create(ctx, {
         name = petName, household = householdId, stage = stray.stage or "adult",
-        traits = Traits.generate(ctx), revealed = {}, entity = entity, appearance = stray.appearance,
+        traits = Traits.generate(ctx), revealed = {}, entity = entity, appearance = stray.appearance, coat = petCoat,
     })
     return finish(ctx, pet, zoiId, 10)
 end

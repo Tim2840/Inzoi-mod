@@ -2,6 +2,7 @@ return {
     mod = { name = "Paw Home" },
     needs = { hunger = "Hunger", energy = "Energy", fun = "Fun", bladder = "Litter" },
     stages = { kitten = "Kitten", adult = "Adult", elder = "Elder" },
+    coats = { orange_tabby = "Orange tabby", brown_tabby = "Brown tabby", calico = "Calico", tuxedo = "Tuxedo" },
     illness = {
         upset_tummy = { name = "Upset Tummy", desc = "Went hungry for too long. Tires and gets bored faster. Recovers with good care, or see the vet." },
         cold        = { name = "Cat Cold", desc = "Exhausted and caught a chill. Tires much faster. Recovers with rest and care, or see the vet." },
@@ -82,6 +83,7 @@ return {
         no_funds = "Not enough money (need {fee}).",
         no_offer = "That pet is no longer available.",
         bad_name = "Names must be 1-24 characters.",
+        bad_coat = "That coat is not available.",
         no_stray = "That stray cat can't be found.",
         spawn_failed = "Could not bring the pet home. Try again near your home.",
         no_save = "No savegame is loaded yet.",
@@ -122,6 +124,7 @@ return {
         bond = "Bond",
         age = "Age: {days} days",
         unknown_trait = "???",
+        coat = "Coat",
         traits = "Traits",
         training = "Pet Training Lv.{level}",
         impounded = "At the animal shelter",
