@@ -206,6 +206,21 @@ const Icons = (() => {
       + `<ellipse cx="27" cy="27" rx="5.2" ry="4.2" ${s(C.cream, 1.8)}/>`
       + `<circle cx="21.5" cy="20.5" r="2" ${s(C.cream, 1.6)}/><circle cx="25.2" cy="18" r="2" ${s(C.cream, 1.6)}/>`
       + `<circle cx="29.2" cy="18" r="2" ${s(C.cream, 1.6)}/><circle cx="32.8" cy="20.5" r="2" ${s(C.cream, 1.6)}/>`,
+    plush: `<ellipse cx="24" cy="30" rx="13" ry="12" ${s("#f3c9a0")}/>`
+      + `<circle cx="24" cy="15" r="9" ${s("#f3c9a0")}/><circle cx="16.5" cy="8.5" r="3.6" ${s("#f3c9a0", 2)}/>`
+      + `<circle cx="31.5" cy="8.5" r="3.6" ${s("#f3c9a0", 2)}/><circle cx="20.8" cy="14" r="1.4" fill="${INK}"/>`
+      + `<circle cx="27.2" cy="14" r="1.4" fill="${INK}"/><ellipse cx="24" cy="17.6" rx="2" ry="1.4" fill="#f2738c"/>`
+      + `<path d="M24 24 V28" ${line(1.6)}/>`,
+    ribbon: `<path d="M24 24 Q10 6 6 17 Q4 28 24 24 Z" ${s(C.pink)}/><path d="M24 24 Q38 6 42 17 Q44 28 24 24 Z" ${s(C.pink)}/>`
+      + `<path d="M24 26 L14 43 L21 39 L24 45 Z" ${s("#f27fa8", 2.2)}/><path d="M24 26 L34 43 L27 39 L24 45 Z" ${s("#f27fa8", 2.2)}/>`
+      + `<circle cx="24" cy="24" r="4.4" ${s("#f27fa8", 2.2)}/>`,
+    amethyst: `<path d="M24 5 L38 17 L33 41 H15 L10 17 Z" ${s("#b794e8")}/>`
+      + `<path d="M10 17 H38 M24 5 L19 17 L24 41 M24 5 L29 17 L24 41" ${line(1.6)}/><path d="M16 14 L20 10" ${line(2, "#f1e6ff")}/>`,
+    aquamarine: `<path d="M24 5 L38 17 L33 41 H15 L10 17 Z" ${s("#8fdcf0")}/>`
+      + `<path d="M10 17 H38 M24 5 L19 17 L24 41 M24 5 L29 17 L24 41" ${line(1.6)}/><path d="M16 14 L20 10" ${line(2, "#eafcff")}/>`,
+    emerald: `<path d="M16 6 H32 L41 15 V33 L32 42 H16 L7 33 V15 Z" ${s("#5fcf95")}/>`
+      + `<path d="M15 15 H33 V33 H15 Z" ${line(1.8)}/><path d="M16 6 L15 15 M32 6 L33 15 M41 15 L33 15 M7 15 L15 15" ${line(1.4)}/>`
+      + `<path d="M12 12 L16 9" ${line(2, "#e2ffee")}/>`,
     mystery: `<rect x="9" y="9" width="30" height="30" rx="8" ${s("#d8cdbf")}/>`
       + `<path d="M18.5 20 Q18.5 13.5 24 13.5 Q29.5 13.5 29.5 19 Q29.5 22.5 24 25 V28" ${line(3)}/>`
       + `<circle cx="24" cy="33.5" r="2" fill="${INK}"/>`,
@@ -214,6 +229,8 @@ const Icons = (() => {
   const ALIAS = {
     feed: "food", hunger: "food", fun: "play", bladder: "litter", clean_litter: "litter",
     bond: "heart", money: "coin", pets: "cat", stray: "cat",
+    // keepsake ids (real items the game knows) drawn with the cat-gift art
+    stone: "pebble", catnip: "leaf", treat: "fishbone", toy: "mouse", bouquet: "flower",
   };
 
   // the phone case's cat ear (64 x 44); "ear-r" is the mirror image

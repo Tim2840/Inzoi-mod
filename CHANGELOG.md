@@ -3,6 +3,13 @@ All notable changes are listed here ([Keep a Changelog](https://keepachangelog.c
 
 ## [Unreleased]
 ### Added
+- Cat Moments (`docs/design/gameplay-v2.md`): cats have wants (feed, play, cuddle, clean the litter) shown as a thought bubble; meeting a want is a happy moment (needs, bond and training gain more, the cat reacts at once). No cooldowns; repeating one action gives less each time (`data/care.lua`). Save format v5 (`album`).
+- Keepsakes: a happy moment can make the cat bring a gift, which is a real game item (stone, catnip candy, cat treat, cat toy, plush, bouquet, ribbon, amethyst, aquamarine, emerald) put in the Zoi's bag with a data script (`PawHome_Gift_*`, verified in game 2026-10-22: the cat treat made "Give Treat to Cat" usable). Keepsake album tab in the panel.
+- Care from the cat's own interaction menu: Pet Gently, Give Treat, Give Catnip Candy (vanilla bags appended to `DEV_Void_Cat`) count like Give Snack and Play; the panel only shows mood, needs and the album (verified in game 2026-10-22).
+- Litter now needs a litter box on the lot (`PawHome_LitterBox`, engine side done and tested). Without a box the litter need does not decay and is hidden. The box object itself still has to be modelled in ModKit (not done).
+- Smaller, phone-only panel (300x540) with a small draggable launcher; the computer layout and shop computer entry are gone.
+- Faster buttons: the relay polls four times a second and the page answers within about 0.3 s (measured in game 2026-10-22); the game data setup is paced so the game's request limit no longer drops rows; a late-starting page asks B2 to say hello at once.
+- Menu labels for our own interactions are written as `StringTableExport/mod_ST_InteractionBag_<code>.json` (unverified: needs a game restart; labels showed as raw ids before).
 - `tools/make_release.py` builds the installable folder and zip; `docs/packaging.md` (format, open decisions, steps) and a bilingual `docs/player-guide.md`.
 - Fixed coat: the four game coats (orange tabby, brown tabby, calico, tuxedo) are chosen when adopting and kept in the pet's data (save format v4); the B1 side sets the cat's `Color Tex` whenever the cat's actor appears and retries if the material is not ready. Coat buttons in the adoption cards, own coat-coloured cat icons. Verified in game 2026-10-22 (summon, leaving the lot and returning); reloading a saved game not yet verified.
 - The home cat looks alive without walking: care from the panel plays the matching baked animation, the cat shows a mood-dependent sitting idle (now and then a short reaction such as hissing when angry), never over the game's own Play / Give Snack animations; kittens are shown at 0.6 size, elders at 0.95 (`data/animations.lua`, `data/stages.lua`; verified in game 2026-10-21).
@@ -26,6 +33,8 @@ All notable changes are listed here ([Keep a Changelog](https://keepachangelog.c
 - `scripts/smoke-t1.ps1` (automated T1 run, writes `docs/qa/results/`) and `docs/qa/smoke-checklist.md` (T2 steps and evidence).
 - Optional adapter function `saveGetBackup(key, n)`: when the current save cannot be read, the mod restores the newest readable older generation instead of starting fresh.
 ### Changed
+- Coats are random now and cannot be chosen: the adoption cards show the cat's coat but have no coat buttons.
+- Gifts no longer pay coins; actions have no cooldown.
 - A cat that is missing from the world is replaced at most once per game hour, the old reference is despawned first (no duplicates), and after five failures in a row the pet is left alone until the next game day.
 - CI also runs the tests on Windows.
 
