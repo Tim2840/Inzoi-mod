@@ -304,9 +304,11 @@ function ModKit.new(platform, opts)
         return sendAnim(eid, key, moodDef(ref).base)
     end
 
-    local function showScale(eid, ref)
+    -- force: send even if it was sent before (a message to a cat whose actor is not ready
+    -- yet is lost, e.g. right after a summon; the idle timer repeats the size now and then)
+    local function showScale(eid, ref, force)
         local look = a.looks[ref]
-        if a.caps.scale and look and look.scale and shownOf(eid).scale ~= look.scale then
+        if a.caps.scale and look and look.scale and (force or shownOf(eid).scale ~= look.scale) then
             sendScale(eid, look.scale)
         end
     end
@@ -322,7 +324,6 @@ function ModKit.new(platform, opts)
     -- Now and then, each cat at home shows its mood: mostly the sitting idle that suits it,
     -- sometimes a short reaction. Nothing is sent while the game itself plays on the cat.
     local function idleStep()
-        if not a.caps.animate then return end
         local now, cfg = a.now(), Anim.idle
         for ref in pairs(a.looks) do
             local eid = catOf(ref)
@@ -330,8 +331,13 @@ function ModKit.new(platform, opts)
                 local st = shownOf(eid)
                 if st.nextIdle == nil then
                     st.nextIdle = now + a.random(0, cfg.everyMinutes)   -- stagger the cats
+                    showScale(eid, ref, true)
+                elseif now >= st.nextIdle and not a.caps.animate then
+                    st.nextIdle = now + cfg.everyMinutes
+                    showScale(eid, ref, true)
                 elseif now >= st.nextIdle and free(eid) then
                     st.nextIdle = now + cfg.everyMinutes + a.random(-cfg.jitterMinutes, cfg.jitterMinutes)
+                    showScale(eid, ref, true)
                     local def = moodDef(ref)
                     local pick
                     if #def.extra > 0 and a.random() < cfg.extraChance then

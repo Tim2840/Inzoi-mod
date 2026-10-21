@@ -486,17 +486,17 @@ local function sent(s, kind)
     return out
 end
 
-T.test("looks: a kitten is shown at its stage's size, sent to the cat's entity once", function()
+T.test("looks: a kitten is shown at its stage's size, repeated now and then for late actors", function()
     local s, pet = adoptedCat({ spawn = true, scale = true })
     pet.stage = "kitten"
     s.w.hour = s.w.hour + 1
     s.pump()
     local scales = sent(s, "scale")
     T.eq(scales[#scales], "0.600")
-    local n = #scales
-    s.w.hour = s.w.hour + 1
-    s.pump()
-    T.eq(#sent(s, "scale"), n, "not resent while the size is the same")
+    for _ = 1, 60 do s.w.minute = s.w.minute + 1; s.adapter.tick(10) end
+    scales = sent(s, "scale")
+    T.gt(#scales, 1, "sent again by the idle timer")
+    for _, v in ipairs(scales) do T.eq(v, "0.600") end
     pet.stage = "adult"
     s.w.hour = s.w.hour + 1
     s.pump()
