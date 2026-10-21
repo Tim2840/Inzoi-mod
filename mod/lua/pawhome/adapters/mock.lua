@@ -99,6 +99,26 @@ function Mock.new(opts)
     function m.entityExists(ref) return m.entities[ref] ~= nil and not m.hidden[ref] end
     function m.despawnPet(ref) m.entities[ref] = nil end
     function m.playAnimation(ref, anim) m.animations[#m.animations + 1] = { ref = ref, anim = anim } end
+    m.lot = {}                          -- household id -> object row ids on its lot
+    function m.homeObjects(hid, watched)
+        local want, out = {}, {}
+        for _, id in ipairs(watched or {}) do want[id] = true end
+        for _, id in ipairs(m.lot[hid] or {}) do
+            if want[id] then out[#out + 1] = id end
+        end
+        return out
+    end
+    m.care = {}
+    function m.giveCare(ref, kind, zoi)
+        local list = m.care[ref] or {}
+        list[#list + 1] = { kind = kind, zoi = zoi }
+        m.care[ref] = list
+    end
+    function m.takeCare(ref)
+        local list = m.care[ref] or {}
+        m.care[ref] = nil
+        return list
+    end
 
     return m
 end

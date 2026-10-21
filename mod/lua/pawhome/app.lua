@@ -7,6 +7,9 @@ local Log = require("pawhome.core.log")
 local Rng = require("pawhome.core.rng")
 local Util = require("pawhome.core.util")
 local Registry = require("pawhome.pets.registry")
+local Enrichment = require("pawhome.pets.enrichment")
+local Illness = require("pawhome.pets.illness")
+local enrichmentData = require("pawhome.data.enrichment")
 local Engine = require("pawhome.pets.engine")
 local Care = require("pawhome.pets.care")
 local Adoption = require("pawhome.pets.adoption")
@@ -138,6 +141,27 @@ function App:perform(petId, zoiId, actionId)
     return result
 end
 
+-- Applies care given through the game's own interactions on our cats. Cooldowns and
+-- conditions still apply: feeding a full cat again gives nothing. Returns the results.
+function App:applyCare()
+    self:sync()
+    if self.suspended then return {} end
+    local results = {}
+    for _, pet in ipairs(Registry.home(self.ctx, nil)) do
+        for _, ev in ipairs(Api.takeCare(pet.entity)) do
+            local r = Care.perform(self.ctx, pet.id, ev.zoi, ev.kind)
+            r.source = "game"
+            r.action = r.action or ev.kind
+            results[#results + 1] = r
+        end
+    end
+    if #results > 0 then
+        Engine.flush(self.ctx)
+        self:save()
+    end
+    return results
+end
+
 function App:offers(householdId, refresh)
     self:sync()
     if self.suspended then return {} end
@@ -185,6 +209,15 @@ function App:redeem(householdId, zoiId, petId)
     self:sync()
     if self.suspended then return self:noSave() end
     local result = Shelter.redeem(self.ctx, householdId, zoiId, petId)
+    result.notifications = Engine.flush(self.ctx)
+    self:save()
+    return result
+end
+
+function App:vet(householdId, zoiId, petId)
+    self:sync()
+    if self.suspended then return self:noSave() end
+    local result = Illness.vet(self.ctx, householdId, petId)
     result.notifications = Engine.flush(self.ctx)
     self:save()
     return result
@@ -261,7 +294,25 @@ local function petView(ctx, pet, zoiId)
         needs = needs, traits = traits,
         bond = math.floor(bond + 0.5), bondLevel = Bond.level(bond), bondLabel = I18n.t("bond." .. Bond.level(bond)),
         actions = acts,
+        illness = Illness.view(ctx, pet),
     }
+end
+
+-- Cat furniture on the lot and what each piece does, for the panel.
+local function furnitureView(householdId)
+    local out = {}
+    for _, id in ipairs(Enrichment.pieces(householdId)) do
+        local effects = {}
+        for _, need in ipairs(needsData.order) do
+            local r = enrichmentData.items[id][need]
+            if r then
+                effects[#effects + 1] = I18n.t("furniture.effect",
+                    { need = I18n.t("needs." .. need), pct = math.floor(r * 100 + 0.5) })
+            end
+        end
+        out[#out + 1] = { id = id, name = I18n.t("furniture." .. id), effects = effects }
+    end
+    return out
 end
 
 function App:view(householdId, zoiId)
@@ -287,6 +338,7 @@ function App:view(householdId, zoiId)
         pets = pets,
         noSave = self.suspended,
         training = { level = level, label = I18n.t("ui.training", { level = level }) },
+        furniture = (householdId ~= nil and not self.suspended) and furnitureView(householdId) or {},
         settings = Util.copy(ctx.cfg),
     }
 end

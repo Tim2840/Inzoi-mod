@@ -6,6 +6,7 @@ local M = {}
 
 function M.compute(pet, sleeping)
     if sleeping then return "asleep" end
+    if pet.illness then return "sick" end
     local n = pet.needs
     local hungerBad = n.hunger < needsData.hunger.critical
     local litterBad = n.bladder < needsData.bladder.critical

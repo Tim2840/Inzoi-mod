@@ -2,9 +2,18 @@ return {
     mod = { name = "毛孩之家" },
     needs = { hunger = "飢餓", energy = "精力", fun = "娛樂", bladder = "貓砂" },
     stages = { kitten = "幼貓", adult = "成貓", elder = "老貓" },
+    illness = {
+        upset_tummy = { name = "腸胃不適", desc = "餓太久了。比較容易累、容易無聊。好好照顧會自己好，也可以看獸醫。" },
+        cold        = { name = "貓感冒", desc = "累壞又著涼。精力掉得快很多。休息和照顧會好，也可以看獸醫。" },
+        fleas       = { name = "跳蚤", desc = "又癢又煩躁，容易無聊。只有獸醫能處理。" },
+    },
+    furniture = {
+        CatScratcher01 = "貓抓板", CatTower01 = "貓跳台", CatWheel01 = "貓滾輪",
+        effect = "{need}下降慢 {pct}%",
+    },
     moods = {
         happy = "開心", playful = "愛玩", energized = "精力充沛", content = "滿足",
-        asleep = "睡覺中", sad = "難過", uncomfortable = "不舒服", tense = "緊張", angry = "生氣",
+        asleep = "睡覺中", sad = "難過", uncomfortable = "不舒服", tense = "緊張", angry = "生氣", sick = "不舒服",
     },
     bond = { stranger = "陌生", acquainted = "認識", friend = "朋友", best_friend = "摯友" },
     habits = { scratch = "抓家具", knock = "打翻東西", counter = "跳上流理台" },
@@ -34,6 +43,9 @@ return {
         get_to_know  = { name = "認識牠", desc = "了解這隻寵物的個性。" },
     },
     msg = {
+        fell_ill = "{name}不太舒服：{illness}。",
+        recovered = "{name}康復了，又恢復活力。",
+        vet_cured = "獸醫治好了{name}，沒事了！",
         adopted = "{name} 加入了你的家庭！",
         grew_up = "{name} 長大了，變成{stage}。",
         died = "{name} 安詳地離開了。謝謝牠陪伴的快樂時光。",
@@ -57,6 +69,7 @@ return {
         renamed = "已改名為 {name}。",
     },
     fail = {
+        not_sick = "{name}很健康。",
         no_pet = "找不到這隻寵物。",
         not_home = "{name} 不在家。",
         unknown_action = "未知的動作。",
@@ -79,8 +92,13 @@ return {
         adopt_cat = "領養這隻貓（毛孩之家）",
     },
     ui = {
+        vet = "帶去看獸醫（{fee}）",
+        illness = "寵物會生病",
+        sick = "不舒服",
         title = "毛孩之家",
         pets = "寵物",
+        furniture = "家裡的貓家具",
+        furniture_none = "家裡還沒有貓家具。擺上貓跳台、貓抓板或貓滾輪（建造模式「寵物」分類），貓會更開心。",
         cooldown = "{min} 分鐘",
         no_strays = "附近目前沒有流浪貓。",
         no_save = "載入存檔後才會看到你的寵物。",

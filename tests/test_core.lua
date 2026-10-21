@@ -167,6 +167,18 @@ T.test("storage: settings added in newer releases are filled in", function()
     T.eq(state.settings.agingEnabled, true)
 end)
 
+T.test("storage: a v2 save loads as v3 with the illness settings filled in", function()
+    local mock = Mock.new()
+    Api.use(mock)
+    mock.store[Storage.KEY] = Serialize.encode({ version = 2, nextPetId = 2, settings = { vetFee = 99 },
+        pets = { { id = 1, name = "Old", status = "home", bond = {}, flags = {} } } })
+    local state, how = Storage.load()
+    T.eq(how, "loaded"); T.eq(state.version, 3)
+    T.eq(state.settings.illnessEnabled, true)
+    T.eq(state.settings.vetFee, 99, "an existing value is kept")
+    T.eq(state.pets[1].illness, nil)
+end)
+
 T.test("storage: a v1 save (run-away pets) is migrated to the shelter model", function()
     local mock = Mock.new()
     Api.use(mock)
@@ -179,7 +191,7 @@ T.test("storage: a v1 save (run-away pets) is migrated to the shelter model", fu
         },
     })
     local state, how = Storage.load()
-    T.eq(how, "loaded"); T.eq(state.version, 2)
+    T.eq(how, "loaded"); T.eq(state.version, Storage.VERSION)
     T.eq(state.settings.animalControl, false, "the old toggle should carry over")
     T.eq(state.settings.neglectRunaway, nil)
     T.eq(state.settings.lifeScale, 2)

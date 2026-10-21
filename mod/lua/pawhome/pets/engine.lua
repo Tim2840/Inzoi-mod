@@ -8,10 +8,12 @@ local Needs = require("pawhome.pets.needs")
 local Aging = require("pawhome.pets.aging")
 local Neglect = require("pawhome.pets.neglect")
 local Shelter = require("pawhome.pets.shelter")
+local Illness = require("pawhome.pets.illness")
 local Moods = require("pawhome.pets.moods")
 local Bond = require("pawhome.pets.bond")
 local Traits = require("pawhome.pets.traits")
 local Util = require("pawhome.core.util")
+local Enrichment = require("pawhome.pets.enrichment")
 local needsData = require("pawhome.data.needs")
 local habits = require("pawhome.data.habits")
 local moodData = require("pawhome.data.moods")
@@ -25,6 +27,7 @@ local CHUNK = 60  -- minutes
 local IMPORTANT = {
     adopted = true, grew_up = true, died = true, neglect_warning = true,
     impounded = true, redeemable = true, redeemed = true, rehomed = true, skill_up = true,
+    fell_ill = true, recovered = true, vet_cured = true,
 }
 
 local function stageLabel(ctx, pet) return ctx.t("stages." .. pet.stage) end
@@ -64,6 +67,11 @@ local function needAlerts(ctx, pet, sleeping)
     if pet.needs.fun < needsData.fun.low then ctx.emit(pet, "bored") end
 end
 
+-- Furniture at home slows decay, illness speeds it up.
+local function decayMul(ctx, pet, need)
+    return Enrichment.decayMul(ctx, pet, need) * Illness.decayMul(pet, need)
+end
+
 local function simulateChunk(ctx, pet, minutes)
     if pet.status == "impounded" then
         Shelter.step(ctx, pet)
@@ -81,6 +89,7 @@ local function simulateChunk(ctx, pet, minutes)
     Neglect.step(ctx, pet, minutes)
     if pet.status ~= "home" then return end
 
+    Illness.step(ctx, pet, minutes)
     misbehave(ctx, pet, sleeping, minutes)
     needAlerts(ctx, pet, sleeping)
 end
@@ -172,6 +181,7 @@ function E.rebase(ctx, delta)
         shiftTimes(pet.notified, delta)
         if pet.impoundedAt then pet.impoundedAt = pet.impoundedAt + delta end
         if pet.diedAt then pet.diedAt = pet.diedAt + delta end
+        if pet.illness then pet.illness.since = pet.illness.since + delta end
         if pet.adoptedAt then pet.adoptedAt = pet.adoptedAt + delta end
         if pet.lastMisbehavior then pet.lastMisbehavior.at = pet.lastMisbehavior.at + delta end
         if pet.presence then
@@ -193,6 +203,8 @@ function E.tick(ctx, now)
         return {}
     end
     local remaining = math.min(now - last, ctx.cfg.catchupCapHours * 60)
+    ctx.enrichment = {}                 -- look at the lots again on every tick
+    ctx.decayMul = decayMul
 
     -- play the interval forward in chunks; the clock ctx.now follows
     local start = now - remaining

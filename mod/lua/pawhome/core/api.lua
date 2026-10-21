@@ -146,6 +146,20 @@ function Api.despawnPet(ref)
     return (call("despawnPet", ref))
 end
 
+-- Object row ids found on the household's lot, limited to `watched` (a list of row ids).
+function Api.homeObjects(householdId, watched)
+    local ok, v = call("homeObjects", householdId, watched)
+    return ok and type(v) == "table" and v or {}
+end
+
+-- Care the player gave the pet in the game itself (e.g. the game's own feed/play
+-- interactions on the cat), since the last call: { { kind = actionId, zoi = zoiId }, ... }.
+function Api.takeCare(ref)
+    if ref == nil then return {} end
+    local ok, v = call("takeCare", ref)
+    return ok and type(v) == "table" and v or {}
+end
+
 function Api.playAnimation(ref, animationId)
     if ref == nil then return false end
     return (call("playAnimation", ref, animationId))
