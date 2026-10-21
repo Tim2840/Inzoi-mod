@@ -104,3 +104,21 @@ B1 綁 `ObjectTemplate`（兩個貓範本）、`Component`（`B1AnimToTexCompone
 | d. 等 KRAFTON 出寵物系統或打包走路動畫 | — | 不在我們控制 |
 
 S2（幼貓長大）：可以用 B1 `SetActorScale3D` 依年齡設縮放（幼貓約 0.6）。要做的話還要確認：讀檔或 actor 重生後要不要重設（B2 `SetScale` 是否會帶到畫面，未驗證；保守作法是 B1 每次 `on_begin` 依引擎資料重設）、互動點（`InteractionSlot_M` 在貓前方 90 cm）不隨縮放移動時 Zoi 的位置是否自然（未驗證）。
+
+## 第 6 節：Age of Magic 的貓為什麼看起來會動？（2026-10-22，桌面研究）
+
+PO 的問題：Age of Magic（AOM）模組召喚的貓好像會動，我們能不能也召喚會動的貓？
+
+| # | 發現 | 狀態 | 依據 |
+|---|---|---|---|
+| 6.1 | AOM 的介面套件是加密的（IZUI 標頭），Lua 也是打包的；依專案規矩不解密、不讀。所以**看不到它怎麼召喚**，只能從公開資料和遊戲本身推論 | 已驗證（檔案狀態） | 檔案標頭 |
+| 6.2 | 同作者的 Witchcraft 模組公開的 JSON 補丁裡，使用魔寵（familiar）的互動只是重用 `VoidCat_Tickle`＋`Character_VoidCat_Tickle`（Zoi 與貓各一段動畫），沒有任何移動指令；33 筆相關補丁都一樣 | 已驗證 | 補丁內容 |
+| 6.3 | 遊戲裡的動物物件有 14 種 `/Game/Blueprint/GameObject/Animal/BP_Void_*`：Cat、Fox、Labrador、Raccoon、Rat、Squirrel、Deer、Wolf、Puma、Tiger、Panda、Crocodile、SeaTurtle、BabyTurtle，**全部是 `devOnly` 的遊戲「物件」（Object 列），不是角色**；樣板列（`ObjectTemplate`）沒有任何移動或 AI 欄位 | 已驗證（資料表 `Object`、`ObjectTemplate`） | `data.table_get_all Object` |
+| 6.4 | 目錄裡有 `ANIM_Void_Cat_Walk_F_Montage`／`Run_F_Montage`，但 4.9、4.17 已證實它們沒有烘進貓的 VAT、也沒有打包，載不到 | 已驗證（沿用） | 見 4.9、4.17 |
+| 6.5 | 另有骨架網格的貓：`SKM_CHA_CatB001`、`SKM_Pet_GhostCat`、`SKM_Pet_OP001`（主選單的 lobby 貓 `BP_Pet_Customize_01`，動畫藍圖 `ABP_LobbyCat`），以及 `Mesh_Tiger`／`Mesh_Puma`（`/Game/Characters/Void/Cats/`）。**它們有沒有 Object 列可以用官方路線召喚：沒有找到**；有沒有走路動畫：未驗證 | 資產存在已驗證；可召喚性未驗證 | `asset.search`、Object 全表 |
+
+### 結論（誠實版）
+
+- **AOM 的貓真的會走嗎：無法證實。** 看不到它的程式，公開資料裡沒有任何移動指令。我的推測（未驗證）：它用的是和我們同一個 `DEV_Void_Cat`，「會動」多半是貓的待機動畫（呼吸、尾巴、換姿勢）與互動動畫，不是位移。
+- **我們能召喚會走的貓嗎：目前沒有路。** 召喚得到的是靜態物件加 VAT 動畫，沒有走路段；骨架貓沒有可召喚的 Object 列。
+- **還沒試過、可以試的方向**（需要遊戲與 PO 同意）：(a) 召喚 `DEV_Void_Labrador`／`Fox`／`Raccoon`／`Squirrel`／`Rat` 看它們的 VAT 有幾段動畫（有沒有走路）；(b) 在 B1 用 `UE.UObject.Load` 試載 `SKM_CHA_CatB001` 與 `/Game/Characters/Pets/Anims/` 的動畫，看是否打包。兩項都是唯讀探測，不改存檔。
