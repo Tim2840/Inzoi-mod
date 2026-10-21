@@ -13,7 +13,11 @@
   const TABS = [["pets", "cat"], ["adopt", "adopt"], ["settings", "settings"]];
   const SIZE = { phone: [380, 760], pc: [960, 620], mini: [88, 88] };
 
-  const params = new URLSearchParams(location.search);
+  // (no URLSearchParams in the game's browser)
+  const param = (name) => {
+    const m = (location.search || "").match(new RegExp("[?&]" + name + "=([^&]*)"));
+    return m ? decodeURIComponent(m[1]) : null;
+  };
   const state = {
     snap: null, tab: "pets", petId: null, offers: null, strays: null, busy: false,
     shell: null, lastOpen: "phone", focusStray: null,
@@ -132,8 +136,8 @@
     if (state.shell === "phone") {
       setChildren(deco,
         h("div", { class: "pw-ears" },
-          h("img", { class: "pw-ear l", src: Icons.url("ear"), alt: "", draggable: "false" }),
-          h("img", { class: "pw-ear r", src: Icons.url("ear-r"), alt: "", draggable: "false" })),
+          icon("ear", { cls: "pw-ear l" }),
+          icon("ear-r", { cls: "pw-ear r" })),
         h("div", { class: "pw-case-top" }));
       setChildren(titleText,
         h("span", { class: "pw-clock" }, (state.snap && state.snap.time) || ""),
@@ -489,35 +493,33 @@
       openEntry({ shell: e.shell, tab: e.tab, stray: e.tab === "adopt" && target != null ? "cat" + target : null });
     });
   }
-  // the Lua side may ask to open the shop too ("pawhome:open" with a JSON entry)
+  // The Lua side opens the shop with "pawhome:open" (a JSON entry such as {"shell":"pc"}),
+  // e.g. when the Zoi starts our phone or computer interaction (bridge.js SHOP_DATA).
   if (Bridge.onOpen) Bridge.onOpen((e) => openEntry(e || {}));
 
-  // Entries through the game's own menus: our interactions (GAME_DATA in bridge.js) send the
-  // Zoi to her phone or to a computer; while she does that, the shop opens in the matching shell.
-  const ENTRY_BAGS = { PawHome_ShopPhone: { shell: "phone" }, PawHome_ShopPC: { shell: "pc" } };
-  const ENTRY_POLL_MS = 1500;
-  let possessed = null, possessedAt = 0, lastBag = null;
-  const data = (r) => (r && typeof r.data === "object" && r.data) || r || {};
-  async function watchEntries() {
-    try {
-      if (!possessed || Date.now() - possessedAt > 10000) {
-        possessed = data(await window.inzoi.cli.execute("entity.get_possessed", {})).entity_id || null;
-        possessedAt = Date.now();
-      }
-      if (possessed) {
-        const cur = data(await window.inzoi.cli.execute("interaction.get_current", { entity_id: possessed }));
-        const bag = cur.playing === false ? null : cur.interaction_bag_id || null;
-        if (bag !== lastBag) {
-          lastBag = bag;
-          if (ENTRY_BAGS[bag]) openEntry(ENTRY_BAGS[bag]);
-        }
-      }
-    } catch (e) { possessed = null; } finally { setTimeout(watchEntries, ENTRY_POLL_MS); }
-  }
-  if (!Bridge.preview && window.inzoi && window.inzoi.cli) watchEntries();
+  // Keep the launcher's mood and alert badge (and open needs bars) current. Skipped while the
+  // player types a name, so a refresh never wipes an input.
+  const REFRESH_MS = 20000;
+  setInterval(async () => {
+    const typing = document.activeElement && /INPUT|SELECT/.test(document.activeElement.tagName);
+    if (!state.snap || state.busy || typing || Bridge.preview) return;
+    if (await call("view", {})) render();
+  }, REFRESH_MS);
+
+
+  // The game's browser does not pass the page font on to form controls (font-family: inherit
+  // has no effect there), so copy the body's font to them.
+  try {
+    const ff = window.getComputedStyle(document.body).fontFamily;
+    if (ff) {
+      const st = document.createElement("style");
+      st.textContent = "button, input, select, option { font-family: " + ff + "; }";
+      document.head.appendChild(st);
+    }
+  } catch (e) { /* keep the default */ }
 
   // start: in the game as the launcher once window.js has restored its saved window state
-  const startShell = Bridge.preview ? (SIZE[params.get("shell")] ? params.get("shell") : "phone") : "mini";
+  const startShell = Bridge.preview ? (SIZE[param("shell")] ? param("shell") : "phone") : "mini";
   function start(tries) {
     if (document.body && document.body.style.visibility === "hidden" && tries > 0) {
       setTimeout(() => start(tries - 1), 150);

@@ -116,10 +116,10 @@ const Bridge = (() => {
   //  - PawHome_ShopPC: computers and laptops; she sits down and browses.
   // While the Zoi does one of them, app.js opens the shop in the matching shell.
   const SHOP_DATA = [
-    ["Interaction", "PawHome_ShopPhone", { ID: "PawHome_ShopPhone", ActionIdList: ["Stand", "Self_SmartPhone_Insurance_CurrentState"],
-      InteractionSlotUsage: "None", PostureId: ["Stand", "Stand"], BodyParts: ["BothHands"] }],
+    ["Interaction", "PawHome_ShopPhone", { ID: "PawHome_ShopPhone", ActionIdList: ["SmartPhone_Check"],
+      InteractionSlotUsage: "None", PostureId: ["Stand", "MovingChair_Sit", "Sit"], BodyParts: ["LeftHand"] }],
     ["InteractionBag", "PawHome_ShopPhone", { ID: "PawHome_ShopPhone", GroupId: "Group_Using_SmartPhone", PostureGroupId: "StandGroup",
-      AgingConditionFlags: 480, RepeatCount: 1,
+      AgingConditionFlags: 504, RepeatCount: 1,
       InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_ShopPhone", Label: "B" }] }],
       DisplayInfo: { DisplayTextId: "mod_PawHome_shop_phone", Icon: "/Game/UI/Icon/Object/Action_SmartPhone.Action_SmartPhone",
         DisplayCategoryTextId: "InteractionBag_DisplayInfo_Self_SmartPhone_Insurance_CurrentState_DisplayCategoryTextId" } }],

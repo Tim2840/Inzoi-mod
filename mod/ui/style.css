@@ -30,7 +30,8 @@ html, body { margin: 0; }
 body { color: var(--ink); font-size: 15px; line-height: 1.4; }
 button, input, select { font-family: inherit; font-size: inherit; color: inherit; }
 button { cursor: pointer; }
-img.ico { display: block; width: 24px; height: 24px; flex: none; }
+.ico { display: block; width: 24px; height: 24px; flex: none; }
+.ico svg { display: block; width: 100%; height: 100%; }
 
 /* ------------------------------------------------------------------ window shells */
 #app-root { position: absolute; display: flex; flex-direction: column; overflow: hidden; color: var(--ink); }
@@ -44,16 +45,17 @@ img.ico { display: block; width: 24px; height: 24px; flex: none; }
 .app { flex: 1; min-height: 0; display: flex; }
 
 .pw-x { width: 30px; height: 30px; padding: 0; border: 0; background: none; border-radius: 15px; }
-.pw-x img.ico { width: 30px; height: 30px; }
+.pw-x .ico { width: 30px; height: 30px; }
 
 /* phone: a pink case with cat ears around a cream screen */
 #app-root.pw-phone { width: 380px; height: 760px; background: transparent; }
 .pw-phone #title-bar { height: 76px; background: transparent; }
+.pw-phone .pw-deco { position: absolute; left: 0; top: 0; width: 380px; height: 76px; }
 .pw-phone .pw-ears { position: absolute; left: 0; top: 0; width: 380px; height: 40px; }
 .pw-phone .pw-ear { position: absolute; top: 0; width: 80px; height: 55px; }
 .pw-phone .pw-ear.l { left: 26px; }
 .pw-phone .pw-ear.r { right: 26px; }
-.pw-phone .pw-case-top { position: absolute; left: 0; right: 0; top: 30px; bottom: 0; background: var(--case);
+.pw-phone .pw-case-top { position: absolute; left: 0; top: 30px; width: 380px; height: 46px; background: var(--case);
                          border: 3px solid var(--ink); border-bottom: 0; border-radius: 46px 46px 0 0; }
 .pw-phone #title-text { position: relative; height: 46px; margin-top: 30px; padding: 0 30px; font-size: 13px; font-weight: 700; }
 .pw-phone .pw-clock { width: 80px; }
@@ -73,10 +75,10 @@ img.ico { display: block; width: 24px; height: 24px; flex: none; }
 .pw-pc .pw-dots i { display: block; width: 14px; height: 14px; border-radius: 7px; border: 2px solid var(--ink); margin-right: 6px; }
 .pw-pc .pw-tab { display: flex; align-items: center; height: 38px; margin-top: 12px; padding: 0 16px 0 10px; background: var(--bg);
                  border: 3px solid var(--ink); border-bottom: 0; border-radius: 14px 14px 0 0; font-weight: 700; margin-right: 14px; }
-.pw-pc .pw-tab img.ico { width: 26px; height: 26px; margin-right: 6px; }
+.pw-pc .pw-tab .ico { width: 26px; height: 26px; margin-right: 6px; }
 .pw-pc .pw-url { flex: 1; display: flex; align-items: center; height: 30px; padding: 0 12px; background: var(--paper);
                  border: 2px solid var(--line); border-radius: 15px; color: var(--muted); font-size: 13px; margin-right: 12px; }
-.pw-pc .pw-url img.ico { width: 18px; height: 18px; margin-right: 6px; }
+.pw-pc .pw-url .ico { width: 18px; height: 18px; margin-right: 6px; }
 .pw-pc .app { flex-direction: row; }
 
 /* launcher: a round sticker with Mochi; the window shrinks to it */
@@ -84,10 +86,10 @@ img.ico { display: block; width: 24px; height: 24px; flex: none; }
 .pw-mini #title-bar { display: none; }
 .pw-launch { position: relative; width: 80px; height: 80px; margin: 2px; padding: 0; border-radius: 40px; background: var(--peach);
              border: 3px solid var(--ink); box-shadow: 0 5px 0 rgba(74, 47, 35, 0.35); display: flex; align-items: center; justify-content: center; }
-.pw-launch img.ico { width: 60px; height: 60px; }
+.pw-launch .ico { width: 60px; height: 60px; }
 .pw-launch .pw-badge { position: absolute; right: -2px; top: -2px; width: 26px; height: 26px; border-radius: 13px; background: var(--paper);
                        border: 3px solid var(--ink); display: flex; align-items: center; justify-content: center; }
-.pw-launch .pw-badge img.ico { width: 18px; height: 18px; }
+.pw-launch .pw-badge .ico { width: 18px; height: 18px; }
 .pw-launch .pw-badge.alert { background: var(--critical); }
 
 /* ------------------------------------------------------------------ screen parts */
@@ -98,24 +100,24 @@ img.ico { display: block; width: 24px; height: 24px; flex: none; }
 .pw-brand span { font-size: 12px; color: var(--muted); }
 .pw-coins { display: flex; align-items: center; padding: 4px 12px 4px 6px; background: var(--paper); border: 2px solid var(--ink);
             border-radius: 18px; font-weight: 700; box-shadow: 0 3px 0 var(--shadow); }
-.pw-coins img.ico { width: 24px; height: 24px; margin-right: 4px; }
+.pw-coins .ico { width: 24px; height: 24px; margin-right: 4px; }
 
 .pw-body { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 14px 14px; }
 
 .pw-tabs { flex: none; display: flex; padding: 8px 10px 10px; background: var(--paper); border-top: 3px solid var(--ink); }
 .pw-tabs .tab { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 4px 2px; margin: 0 3px; border: 0;
                 background: none; border-radius: 16px; color: var(--muted); font-size: 12px; font-weight: 700; }
-.pw-tabs .tab img.ico { width: 34px; height: 34px; margin-bottom: 2px; }
+.pw-tabs .tab .ico { width: 34px; height: 34px; margin-bottom: 2px; }
 .pw-tabs .tab[aria-selected="true"] { background: var(--peach-2); color: var(--ink); }
 
 .pw-side { flex: none; width: 214px; display: flex; flex-direction: column; padding: 16px 12px; background: var(--paper-2);
            border-right: 3px solid var(--ink); }
 .pw-side .pw-logo { display: flex; align-items: center; margin-bottom: 18px; }
-.pw-side .pw-logo img.ico { width: 56px; height: 56px; margin-right: 8px; }
+.pw-side .pw-logo .ico { width: 56px; height: 56px; margin-right: 8px; }
 .pw-nav { flex: 1; display: flex; flex-direction: column; }
 .pw-nav .tab { display: flex; align-items: center; padding: 8px 10px; margin-bottom: 8px; border: 2px solid transparent;
                background: none; border-radius: 16px; font-weight: 700; color: var(--muted); text-align: left; }
-.pw-nav .tab img.ico { width: 34px; height: 34px; margin-right: 10px; }
+.pw-nav .tab .ico { width: 34px; height: 34px; margin-right: 10px; }
 .pw-nav .tab[aria-selected="true"] { background: var(--paper); border-color: var(--ink); color: var(--ink); box-shadow: 0 3px 0 var(--shadow); }
 .pw-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .pw-main .pw-title { flex: none; display: flex; align-items: center; padding: 16px 18px 8px; }
@@ -126,10 +128,10 @@ img.ico { display: block; width: 24px; height: 24px; flex: none; }
 .card { background: var(--paper); border: 2px solid var(--ink); border-radius: 22px; padding: 14px; margin-bottom: 14px;
         box-shadow: 0 4px 0 var(--shadow); }
 .empty { color: var(--muted); text-align: center; padding: 22px 12px; display: flex; flex-direction: column; align-items: center; }
-.empty img.ico { width: 72px; height: 72px; margin-bottom: 8px; }
+.empty .ico { width: 72px; height: 72px; margin-bottom: 8px; }
 .sub { color: var(--muted); font-size: 13px; }
 .section-title { display: flex; align-items: center; margin: 4px 0 10px; font-size: 14px; font-weight: 700; }
-.section-title img.ico { width: 26px; height: 26px; margin-right: 6px; }
+.section-title .ico { width: 26px; height: 26px; margin-right: 6px; }
 .section-title .grow { flex: 1; }
 
 .pw-cols { display: flex; flex-direction: column; }
@@ -142,13 +144,13 @@ img.ico { display: block; width: 24px; height: 24px; flex: none; }
         padding: 2px 10px; border-radius: 14px; font-size: 13px; margin: 0 6px 6px 0; }
 .chip.unknown { color: var(--muted); border-style: dashed; }
 .chip.pet { cursor: pointer; font-weight: 700; padding-left: 4px; }
-.chip.pet img.ico { width: 24px; height: 24px; margin-right: 4px; }
+.chip.pet .ico { width: 24px; height: 24px; margin-right: 4px; }
 .chip.pet[aria-pressed="true"] { background: var(--peach-2); border-color: var(--ink); }
 
 .pet-head { display: flex; align-items: center; margin-bottom: 12px; }
 .avatar { width: 84px; height: 84px; border-radius: 42px; background: var(--peach-2); border: 2px solid var(--ink);
           display: flex; align-items: center; justify-content: center; flex: none; margin-right: 12px; }
-.avatar img.ico { width: 68px; height: 68px; }
+.avatar .ico { width: 68px; height: 68px; }
 .pet-head h2 { margin: 0; font-size: 22px; line-height: 1.2; }
 .mood { display: inline-block; margin-top: 4px; padding: 2px 10px; border-radius: 12px; background: var(--paper-2);
         border: 2px solid var(--line); font-size: 13px; font-weight: 700; }
@@ -157,15 +159,15 @@ img.ico { display: block; width: 24px; height: 24px; flex: none; }
 
 .backup { background: #fff8d6; }
 .backup .section-title { align-items: flex-start; font-weight: 400; }
-.backup .section-title img.ico { width: 36px; height: 36px; margin-right: 8px; }
+.backup .section-title .ico { width: 36px; height: 36px; margin-right: 8px; }
 .ill { border: 2px solid var(--ink); border-radius: 16px; padding: 10px 12px; margin: 0 0 12px; background: #e6f2ff; }
 .ill .section-title { margin: 0 0 4px; }
 .furn { display: flex; align-items: flex-start; padding: 6px 0; border-top: 2px dashed var(--line); }
 .section-title + .furn { border-top: 0; }
-.furn img.ico { width: 40px; height: 40px; margin-right: 10px; }
+.furn .ico { width: 40px; height: 40px; margin-right: 10px; }
 .furn b { display: block; margin-bottom: 4px; }
 .need { display: flex; align-items: center; margin-bottom: 9px; font-size: 14px; }
-.need img.ico { width: 30px; height: 30px; margin-right: 8px; }
+.need .ico { width: 30px; height: 30px; margin-right: 8px; }
 .need .lbl { width: 62px; flex: none; font-weight: 700; }
 .bar { flex: 1; height: 14px; background: var(--paper-2); border: 2px solid var(--ink); border-radius: 7px; overflow: hidden; }
 .bar i { display: block; height: 100%; border-radius: 5px; background: var(--mint); }
@@ -173,7 +175,7 @@ img.ico { display: block; width: 24px; height: 24px; flex: none; }
 .need[data-state="critical"] .bar i { background: var(--critical); }
 .need .val { width: 34px; flex: none; text-align: right; color: var(--muted); font-weight: 700; }
 .bond { display: flex; align-items: center; margin-top: 4px; }
-.bond img.ico { width: 30px; height: 30px; margin-right: 8px; }
+.bond .ico { width: 30px; height: 30px; margin-right: 8px; }
 .bond .lbl { flex: none; margin-right: 8px; font-weight: 700; font-size: 14px; }
 .bond .bar i { background: var(--rose); }
 
@@ -181,7 +183,7 @@ img.ico { display: block; width: 24px; height: 24px; flex: none; }
 .act { width: 25%; padding: 0 4px; margin-bottom: 8px; border: 0; background: none; }
 .act .tile { display: flex; flex-direction: column; align-items: center; padding: 8px 2px 6px; border: 2px solid var(--ink);
              background: var(--paper); border-radius: 16px; box-shadow: 0 3px 0 var(--shadow); min-height: 78px; }
-.act img.ico { width: 38px; height: 38px; }
+.act .ico { width: 38px; height: 38px; }
 .act .lbl { font-size: 12px; font-weight: 700; text-align: center; margin-top: 2px; }
 .act .cd { font-size: 11px; color: var(--muted); }
 .act:hover .tile { background: var(--peach-2); }
@@ -191,14 +193,14 @@ img.ico { display: block; width: 24px; height: 24px; flex: none; }
 .offer { display: flex; flex-direction: column; }
 .offer .who { display: flex; align-items: center; margin-bottom: 8px; }
 .offer .who .avatar { width: 60px; height: 60px; border-radius: 30px; }
-.offer .who .avatar img.ico { width: 48px; height: 48px; }
+.offer .who .avatar .ico { width: 48px; height: 48px; }
 .offer h3 { margin: 0; font-size: 17px; }
 .offer .row { display: flex; align-items: center; margin-top: 8px; }
 .offer input[type="text"] { flex: 1; min-width: 0; background: var(--paper-2); border: 2px solid var(--ink); border-radius: 12px;
                             padding: 7px 10px; margin-right: 8px; }
 .offer.focus { border-color: var(--rose); box-shadow: 0 4px 0 var(--rose); }
 .fee { display: flex; align-items: center; color: var(--muted); font-size: 13px; margin-top: 8px; font-weight: 700; }
-.fee img.ico { width: 22px; height: 22px; margin-right: 4px; }
+.fee .ico { width: 22px; height: 22px; margin-right: 4px; }
 
 .btn { border: 2px solid var(--ink); border-radius: 14px; padding: 7px 16px; font-weight: 700; background: var(--peach);
        color: var(--ink); box-shadow: 0 3px 0 rgba(74, 47, 35, 0.35); }
@@ -227,7 +229,7 @@ img.ico { display: block; width: 24px; height: 24px; flex: none; }
 .toasts { position: absolute; left: 0; right: 0; bottom: 84px; display: flex; flex-direction: column; align-items: center; pointer-events: none; z-index: 5; }
 .toast { display: flex; align-items: center; max-width: 86%; margin-top: 6px; background: var(--ink); color: var(--bg); padding: 8px 14px 8px 8px;
          border-radius: 18px; font-size: 14px; }
-.toast img.ico { width: 26px; height: 26px; margin-right: 6px; }
+.toast .ico { width: 26px; height: 26px; margin-right: 6px; }
 .toast.err { background: var(--critical); color: #ffffff; }
 .pw-pc .toasts { bottom: 20px; }
 .pw-mini .toasts { display: none; }

@@ -188,16 +188,16 @@ const Icons = (() => {
     }
     return cache[k];
   }
-  // <img> element; decorative unless a label is given
+  // Inline <svg> in a <span class="ico">; decorative unless a label is given.
+  // In the game's browser inline SVG and .svg files render, but SVG data: URLs do not
+  // (verified in game 20261019.16318.W, 2026-10-21), so the page never uses url() for icons.
   function img(name, opts) {
     const o = opts || {};
-    const el = document.createElement("img");
-    const u = url(name, o.mood);
-    if (u) el.src = u;
+    const el = document.createElement("span");
     el.className = "ico" + (o.cls ? " " + o.cls : "");
-    el.setAttribute("alt", o.label || "");
-    if (!o.label) el.setAttribute("aria-hidden", "true");
-    el.setAttribute("draggable", "false");
+    el.innerHTML = markup(name, o.mood) || "";
+    if (o.label) { el.setAttribute("role", "img"); el.setAttribute("aria-label", o.label); }
+    else el.setAttribute("aria-hidden", "true");
     return el;
   }
   const names = () => Object.keys(ICONS).concat(["cat"]);
