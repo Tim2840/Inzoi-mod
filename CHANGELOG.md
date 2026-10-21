@@ -3,6 +3,7 @@ All notable changes are listed here ([Keep a Changelog](https://keepachangelog.c
 
 ## [Unreleased]
 ### Added
+- `tools/make_release.py` builds the installable folder and zip; `docs/packaging.md` (format, open decisions, steps) and a bilingual `docs/player-guide.md`.
 - Fixed coat: the four game coats (orange tabby, brown tabby, calico, tuxedo) are chosen when adopting and kept in the pet's data (save format v4); the B1 side sets the cat's `Color Tex` whenever the cat's actor appears and retries if the material is not ready. Coat buttons in the adoption cards, own coat-coloured cat icons. Verified in game 2026-10-22 (summon, leaving the lot and returning); reloading a saved game not yet verified.
 - The home cat looks alive without walking: care from the panel plays the matching baked animation, the cat shows a mood-dependent sitting idle (now and then a short reaction such as hissing when angry), never over the game's own Play / Give Snack animations; kittens are shown at 0.6 size, elders at 0.95 (`data/animations.lua`, `data/stages.lua`; verified in game 2026-10-21).
 - "Online pet shop" redesign: one UI in three shells (cat-eared phone, browser-style computer window, round launcher with Mochi the mascot), own SVG icon set (`mod/ui/icons.js`, sheet `mod/ui/icons.html`), vet button, illness toggle, cat-furniture card, backup-restore card. Launcher and phone view verified in game; icons are inline SVG because SVG `data:` URLs do not render there (`docs/research/phone-pc-ui.md`).
