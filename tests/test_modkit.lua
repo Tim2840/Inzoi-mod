@@ -898,3 +898,19 @@ T.test("cat B1: teleport message moves the cat actor and reapplies after a stale
     T.truthy(a.loc and a.loc[1] == 120.5 and a.loc[2] == -340.0 and a.loc[3] == 15.0)
     T.eq(a.yaw, 90.0)
 end)
+
+T.test("platform: a called cat lands on the floor under the Zoi, not at her body centre", function()
+    local Platform = require("pawhome.adapters.inzoi_platform")
+    -- seen in game 2026-10-22: Zoi Z 158.0, floor 75.3; the cat floated when put at 158
+    local z, how = Platform.floorUnderZoi(158.0, nil, nil, nil)
+    T.truthy(math.abs(z - 75.3) < 5, "default half height lands near the floor: " .. z)
+    T.eq(how, "default half height")
+    T.eq(select(1, Platform.floorUnderZoi(158.0, 75.3, 88, 80)), 75.3)        -- the game's floor first
+    T.eq(select(1, Platform.floorUnderZoi(158.0, nil, 88, 80)), 70.0)          -- then its half height
+    T.eq(select(1, Platform.floorUnderZoi(158.0, nil, nil, 76.0)), 76.0)       -- then the cat's own floor
+    -- a floating cat (Z 158) or one on another storey is not trusted as the floor
+    T.eq(select(2, Platform.floorUnderZoi(158.0, nil, nil, 158.0)), "default half height")
+    T.eq(select(2, Platform.floorUnderZoi(158.0, nil, nil, -250.0)), "default half height")
+    -- nonsense answers from the game are ignored
+    T.eq(select(2, Platform.floorUnderZoi(158.0, 900, 0, nil)), "default half height")
+end)

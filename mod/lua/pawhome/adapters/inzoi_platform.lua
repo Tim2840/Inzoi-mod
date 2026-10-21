@@ -22,6 +22,28 @@ end
 
 local function quote(s) return '"' .. tostring(s):gsub('"', "'") .. '"' end
 
+-- A Zoi's location is the middle of her body (capsule centre), not her feet: seen 2026-10-22,
+-- Zoi at Z 158.0 standing on a floor at Z 75.3, so a cat put at the Zoi's Z floated ~83 cm up.
+-- Picks the floor height under a Zoi from what the game could tell us, best first:
+--   nodeFloor  FB2CharacterMovementComponent:GetCurrentNodeFloorZ (UNVERIFIED out-param shape)
+--   halfHeight FB2CharacterMovementComponent.HalfHeight            (UNVERIFIED)
+--   catZ       the cat's own Z before the move (it stands on a floor), if on the same storey
+-- and falls back to the observed capsule half height. Returns z, how.
+Platform.ZOI_HALF_HEIGHT = 83
+function Platform.floorUnderZoi(zoiZ, nodeFloor, halfHeight, catZ)
+    local guess = zoiZ - Platform.ZOI_HALF_HEIGHT
+    if type(nodeFloor) == "number" and nodeFloor <= zoiZ and nodeFloor >= zoiZ - 200 then
+        return nodeFloor, "node floor"
+    end
+    if type(halfHeight) == "number" and halfHeight > 20 and halfHeight < 200 then
+        return zoiZ - halfHeight, "half height"
+    end
+    if type(catZ) == "number" and math.abs(catZ - guess) < 60 then
+        return catZ, "cat floor"
+    end
+    return guess, "default half height"
+end
+
 -- ---------------------------------------------------------------- B2 (simulation thread)
 
 function Platform.b2(opts)
@@ -204,10 +226,25 @@ function Platform.b2(opts)
         local dist = 90
         local x = (tonumber(loc.X) or 0) + math.cos(rad) * dist
         local y = (tonumber(loc.Y) or 0) + math.sin(rad) * dist
-        local z = tonumber(loc.Z) or 0
+        local zoiZ = tonumber(loc.Z) or 0
         local catYaw = (zoiYaw + 180) % 360
         local cat = p.cats[eid]
         if not cat then p.homeCats(); cat = p.cats[eid] end
+        -- the Zoi's location is her body centre: find the floor under her feet
+        local nodeFloor, halfHeight, catZ
+        pcall(function()
+            local mc = character:GetMovementComponent()
+            local okH, h = pcall(function() return mc.HalfHeight end)
+            if okH then halfHeight = tonumber(h) end
+            local okF, a, b = pcall(function() return mc:GetCurrentNodeFloorZ(0) end)
+            if okF then nodeFloor = (type(b) == "number" and b) or (type(a) == "number" and a) or nil end
+        end)
+        if cat then pcall(function() catZ = tonumber(cat:GetLocation().Z) end) end
+        local z, how = Platform.floorUnderZoi(zoiZ, nodeFloor, halfHeight, catZ)
+        if p.report then
+            p.report(string.format("floor under zoi: %.1f via %s (zoi %.1f, node %s, half %s, cat %s)",
+                z, how, zoiZ, tostring(nodeFloor), tostring(halfHeight), tostring(catZ)))
+        end
         if cat then
             pcall(function()
                 local cLoc = cat:GetLocation()
