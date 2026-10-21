@@ -18,7 +18,7 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 ENGINE = REPO / "mod" / "lua" / "pawhome"
 BINDINGS = REPO / "mod" / "modkit" / "lua"
 B2_SKIP = {"ue4ss.lua", "ue4ss_probe.lua", "mock.lua"}
-B1_FILES = ["inzoi_wire.lua", "inzoi_relay.lua", "inzoi_platform.lua", "inzoi_b1.lua"]
+B1_FILES = ["inzoi_wire.lua", "inzoi_relay.lua", "inzoi_platform.lua", "inzoi_b1.lua", "inzoi_cat_b1.lua"]
 
 
 def resolve_vars(text, css):

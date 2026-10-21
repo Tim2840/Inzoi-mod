@@ -142,6 +142,21 @@ local function moodBuffs(ctx, pet)
     end
 end
 
+-- Tells the adapter how each pet at home should look (mood idle, size by life stage).
+function E.looks(ctx)
+    for _, pet in ipairs(ctx.state.pets) do
+        if pet.status == "home" and pet.entity ~= nil then
+            local stage
+            for _, s in ipairs(stagesData) do if s.id == pet.stage then stage = s end end
+            Api.petLook(pet.entity, {
+                mood = Moods.compute(pet, Needs.sleeping(pet, ctx.now)),
+                stage = pet.stage,
+                scale = stage and stage.scale or 1,
+            })
+        end
+    end
+end
+
 -- Turns queued events into player-visible notifications.
 function E.flush(ctx)
     local out = {}
@@ -222,6 +237,7 @@ function E.tick(ctx, now)
         ensurePresent(ctx, pet)
         moodBuffs(ctx, pet)
     end
+    E.looks(ctx)
     return E.flush(ctx)
 end
 

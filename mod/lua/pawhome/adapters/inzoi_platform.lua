@@ -355,6 +355,53 @@ function Platform.b1(opts)
         p.cfgSave("log", "b1", Wire.escape(table.concat(p.logLines, "\n")))
     end
 
+    -- The cat's actor (B1 ObjectTemplate binding owner, BP_Void_Cat). AActor's reflected
+    -- functions are callable from B1 Lua although the LuaLS files do not list them; they are
+    -- looked up by name so the static analyser does not reject the file. All of these were
+    -- seen working in 20261019.16318.W on 2026-10-21 (docs/research/walking-cat.md 4.2-4.14).
+    local function call(obj, name, ...)
+        local fn = obj[name]
+        if fn == nil then error("no method " .. name) end
+        return fn(obj, ...)
+    end
+
+    function p.actorId(actor)
+        local id = actor:GetEntityId()
+        if type(id) ~= "number" and id ~= nil then id = id.Value end
+        return tonumber(id)
+    end
+
+    -- A reference taken while the actor is being set up reports a zero scale (4.3).
+    function p.valid(actor)
+        local ok, s = pcall(call, actor, "GetActorScale3D")
+        return ok and s ~= nil and s.X > 0
+    end
+
+    function p.setScale(actor, scale)
+        local v = call(actor, "GetActorScale3D")
+        v.X, v.Y, v.Z = scale, scale, scale
+        call(actor, "SetActorScale3D", v)
+        local now = call(actor, "GetActorScale3D")
+        return math.abs(now.X - scale) < 0.001
+    end
+
+    local function vat(actor)
+        return call(actor, "GetComponentByClass", inzoi.UB1AnimToTexComponent)
+    end
+
+    function p.currentVat(actor)
+        local anim = vat(actor).Animation
+        if anim == nil then return nil end
+        return tostring(call(anim, "GetName"))
+    end
+
+    -- An unknown name is ignored by the game; success means the cat now plays `name`.
+    function p.playVat(actor, name)
+        call(vat(actor), "PlayAnimSequence", name, 0)
+        local now = p.currentVat(actor)
+        return now ~= nil and now:lower() == tostring(name):lower()
+    end
+
     return p
 end
 

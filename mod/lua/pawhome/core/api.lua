@@ -5,10 +5,10 @@
 --   required: now, saveGet, saveSet
 --   optional: notify, householdMembers, funds, charge, addBuff, listStrays,
 --             bringStray, spawnPet, entityExists, despawnPet,
---             playAnimation, locale, logSink,
+--             playAnimation, petLook, locale, logSink,
 --             slotId, subscribe   (see below: the savegame slot the player is in),
 --             saveGetBackup       (older generations of a save, see below)
---   caps: { spawn = bool, moveStray = bool, animate = bool, buffs = bool }
+--   caps: { spawn = bool, moveStray = bool, animate = bool, buffs = bool, scale = bool }
 local Log = require("pawhome.core.log")
 
 local Api = { adapter = nil }
@@ -176,6 +176,14 @@ end
 function Api.playAnimation(ref, animationId)
     if ref == nil then return false end
     return (call("playAnimation", ref, animationId))
+end
+
+-- Optional. How the pet should look in the game right now:
+-- look = { mood = moods id, stage = stage id, scale = number }. The adapter decides how
+-- often it shows it (idle animations, size); the engine calls this after every tick.
+function Api.petLook(ref, look)
+    if ref == nil then return false end
+    return (call("petLook", ref, look))
 end
 
 return Api

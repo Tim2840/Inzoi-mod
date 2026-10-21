@@ -48,7 +48,10 @@ UI ──wf.state──▶ 遊戲存檔（UIMD 區塊）
 | `listStrays` | 城市貓綁定＋`interaction.finished` | 綁定與事件已驗證 |
 | `takeCare` | 原版「給零食」（`Object_Void_Cat_Dev`→feed）、「玩」（`Object_Void_Cat_Tickle`→play）結束時記錄，引擎立刻以面板按鈕相同的規則套用 | ✅ 已驗證（2026-10-21）：給零食→`not_hungry`（照規則拒絕），玩→寵物 1 成功 |
 | `bringStray` | 不支援（`caps.moveStray = false`） | 實測做不到 |
-| `addBuff` / `playAnimation` | 暫不支援 | — |
+| `addBuff` | 暫不支援 | — |
+| `playAnimation`（`caps.animate`） | 面板照顧動作 → `data/animations.lua` 的 VAT 段落 → `send_to_client(貓實體, "pawhome:anim", "段落|秒數|回到的坐姿")` → B1 貓綁定（`PawHomeBind/Cat.lua` → `adapters/inzoi_cat_b1.lua`）以 `UB1AnimToTexComponent:PlayAnimSequence` 播放，一次性動畫播完回到心情的坐姿待機。原版互動（玩／給零食）給的照顧**不再另播**（遊戲已經播過） | ✅ 已驗證（2026-10-21，朴恩珠存檔、不存檔）：面板「抱抱」→ `ANIM_VoidCat_Being_Patted`，12 秒後回 `ANIM_VoidCat_Sit_Idle_01`（B1 日誌） |
+| 心情待機（`petLook`＋閒置計時） | 引擎每次 tick 與讀檔後呼叫 `Api.petLook(貓, {mood, stage, scale})`；adapter 約每 20 遊戲分鐘（±10）依心情送坐姿待機，偶爾（25%）送一次性反應（開心→歡迎／送禮、生氣→哈氣、緊張／難過／生病→受驚）。遊戲互動進行中（`interaction.started` 到結束事件）不送；B1 另外在偵測到不是自己播的動畫後 15 秒內不播、自己的一次性動畫不被打斷 | ✅ 坐姿待機已驗證；「玩」結束後恢復待機、「給零食」期間 B1 擋下（`skipped … (game)`）已驗證。一次性反應走同一路徑，未在畫面上逐一看過 |
+| 幼貓尺寸（`caps.scale`） | `data/stages.lua` 的 `scale`（幼貓 0.6、成貓 1.0、老貓 0.95）→ `"pawhome:scale"` → B1 `SetActorScale3D`。B1 在 `on_begin`、其後 1.5 秒與 5 秒各套一次（初期 actor 參考會失效）；B2 隨閒置計時每約 20 遊戲分鐘重送一次（召喚當下 B1 actor 可能還沒好，訊息會遺失） | ✅ 已驗證：召喚的幼貓 109980 縮成 0.6（B1 日誌 `size 0.6`，截圖），Zoi「給零食」時蹲在幼貓前、位置自然。讀檔／actor 重生後的 `cat_begin` 重套路徑未在遊戲裡跑過（重送計時會補上） |
 
 ### 實測得到的限制
 - 遊戲的實體查詢只收 `FB1EntityId`，不收數字，也沒有建構方式：一律從遊戲物件取得（`GetEntityId()`、`GetHouseholdEntityId()`、`GetObjectKey()`），找不到時以 `GetAllEntities(類型)` 搜尋（TArray，`Num()`，索引從 1）。
