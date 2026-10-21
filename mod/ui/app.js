@@ -104,8 +104,9 @@
     return [Math.max(0, Math.min(p[0], W - w)), Math.max(0, Math.min(p[1], H - hgt))];
   }
   function defaultPos(shell) {
-    const [, H] = viewport();
-    return shell === "mini" ? [24, Math.round(H * 0.4)] : [24, 24];
+    // right side, below the game's top bar and clear of its left-hand task list; the phone opens to the launcher's left
+    const [W, H] = viewport();
+    return shell === "mini" ? [Math.max(0, W - 150), Math.round(H * 0.2)] : [Math.max(0, W - 460), 24];
   }
   // the phone opens next to the launcher, on the side with room
   function besideLauncher(m) {

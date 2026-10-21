@@ -130,6 +130,7 @@ button { cursor: pointer; }
 .thought { display: flex; align-items: center; margin: 0 0 9px; padding: 5px 10px 5px 6px; background: var(--rose-2); border: 2px solid var(--rose);
            border-radius: 15px; font-weight: 700; font-size: 12px; }
 .thought .ico { width: 28px; height: 28px; margin-right: 7px; }
+.thought > div { flex: 1; min-width: 0; }
 
 .backup { background: #fff8d6; }
 .backup .section-title { align-items: flex-start; font-weight: 400; }
