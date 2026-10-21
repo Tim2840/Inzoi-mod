@@ -161,27 +161,48 @@ const Bridge = (() => {
     ["DEV_Void_Cat", "Normal", "PawHome_Adopt"],
     ["SelfCharacter", "Normal", "PawHome_ShopPhone"],
   ];
-  (async () => {
-    for (const [set, stateGroup, bag] of SHOP_MENUS) {
-      const r = await cli("data.table_get", { alias: "ObjectSelectionSet", row: set }).catch(() => null);
-      if (!r || !r.success || JSON.stringify(r).indexOf('"' + bag + '"') >= 0) continue;   // missing set, or added already
-      SHOP_DATA.push(["menu", set, { query: `ObjectSelectionSet[Id=${set}].SelectionSets[StateGroupId=${stateGroup}].InteractionBagList`, value: bag }]);
-    }
-    for (const [alias, id, row] of GAME_DATA.concat(SHOP_DATA)) {
-      if (alias === "menu") {
-        const r = await cli("data.patch", { method: "Append", query: row.query, value: row.value }).catch((e) => e);
-        if (!r || !r.success) report("menu " + id + " failed: " + JSON.stringify(r));
-        continue;
-      }
-      // table_get rejects when the row does not exist yet
-      const exists = await cli("data.table_get", { alias, row: id }).then((r) => !!(r && r.success), () => false);
-      if (exists) continue;                                     // already added this session
+  // The game limits how fast commands may come in (it answers "request limit exceeded" and the
+  // rows after that are lost; seen 2026-10-22 with about 90 quick calls). So the setup is paced and
+  // a refused call is tried again. Appending a row whose id exists REPLACES it (verified), so rows
+  // need no existence check; only the menu lists do, because a list append just adds an entry.
+  const PACE_MS = 110, RETRIES = 6;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function paced(id, params) {
+    for (let attempt = 0; ; attempt++) {
+      await sleep(PACE_MS);
       try {
-        const r = await cli("data.patch", { method: "Append", query: alias, value: JSON.stringify(row) });
-        if (!r || !r.success) report("data.patch " + alias + "/" + id + " failed: " + JSON.stringify(r));
-      } catch (err) { report("data.patch " + alias + "/" + id + " threw: " + JSON.stringify(err)); }
+        return await cli(id, params);
+      } catch (err) {
+        if (attempt >= RETRIES) throw err;
+        await sleep(300 * (attempt + 1));
+      }
     }
-    report("game data ready");
+  }
+  (async () => {
+    const menus = [];
+    const known = {};                                           // selection set -> its JSON text
+    for (const [set, stateGroup, bag] of SHOP_MENUS) {
+      if (!(set in known)) {
+        const r = await paced("data.table_get", { alias: "ObjectSelectionSet", row: set }).catch(() => null);
+        known[set] = r && r.success ? JSON.stringify(r) : null;
+      }
+      if (known[set] === null || known[set].indexOf('"' + bag + '"') >= 0) continue;     // missing set, or there already
+      menus.push([set, { query: `ObjectSelectionSet[Id=${set}].SelectionSets[StateGroupId=${stateGroup}].InteractionBagList`, value: bag }]);
+    }
+    let failed = 0;
+    for (const [alias, id, row] of GAME_DATA.concat(SHOP_DATA)) {
+      try {
+        const r = await paced("data.patch", { method: "Append", query: alias, value: JSON.stringify(row) });
+        if (!r || !r.success) { failed++; report("data.patch " + alias + "/" + id + " failed: " + JSON.stringify(r)); }
+      } catch (err) { failed++; report("data.patch " + alias + "/" + id + " threw: " + JSON.stringify(err)); }
+    }
+    for (const [set, m] of menus) {
+      try {
+        const r = await paced("data.patch", { method: "Append", query: m.query, value: m.value });
+        if (!r || !r.success) { failed++; report("menu " + set + " " + m.value + " failed: " + JSON.stringify(r)); }
+      } catch (err) { failed++; report("menu " + set + " " + m.value + " threw: " + JSON.stringify(err)); }
+    }
+    report("game data ready (" + (GAME_DATA.length + SHOP_DATA.length) + " rows, " + menus.length + " menu entries, " + failed + " failed)");
   })();
 
   const epoch = String(Math.floor(Math.random() * 900000) + 100000);
@@ -246,6 +267,14 @@ const Bridge = (() => {
     }
   }
 
+  // A page that starts (or is reloaded) in the middle of a game missed the hello B2 sent earlier and
+  // would wait up to a minute for the next one; this asks B2 to say it again at once.
+  function wakeB2() {
+    outbox.push({ seq: nextSeq++, channel: "pawhome:wake", payload: "-|" });
+    while (outbox.length > KEEP) outbox.shift();
+    cfgSave("to_sim", encodeMailbox([{ seq: 0, channel: "epoch", payload: epoch }, ...outbox])).catch(() => {});
+  }
+
   let pollTimer = null, polling = false, fastUntil = 0;
   const pollDelay = () => (waiting.size > 0 || Date.now() < fastUntil ? POLL_FAST_MS : POLL_SLOW_MS);
   function schedulePoll(ms) {
@@ -270,6 +299,7 @@ const Bridge = (() => {
         relayEpoch = ep;
         lastSeen = entries.reduce((m, e) => Math.max(m, e.seq), 0);
         skipBefore = true;
+        wakeB2();
       } else if (ep !== relayEpoch) {
         relayEpoch = ep;
         lastSeen = 0;

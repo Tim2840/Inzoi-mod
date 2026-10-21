@@ -531,6 +531,7 @@ function ModKit.new(platform, opts)
     -- B2 Zoi binding on_lua_message(self, owner, channel, payload).
     function a.onMessage(channel, payload)
         local kind = Wire.kind(channel)
+        if kind == "wake" then a.sinceHello = math.huge return end   -- a page just started: hello now
         if kind ~= "state" and kind ~= "rpc" and kind ~= "backup_data" then return end
         local session, _, data = a.assembler.add(payload)
         if data == nil then return end

@@ -329,6 +329,7 @@ local function petView(ctx, pet, zoiId)
         actions = acts,
         illness = Illness.view(ctx, pet),
         want = want,
+        litterBox = hasBox,
     }
 end
 

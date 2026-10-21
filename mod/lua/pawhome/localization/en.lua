@@ -111,6 +111,7 @@ return {
         adopt_cat = "Adopt this cat (Paw Home)",
     },
     ui = {
+        tip = "Click your cat in the world to pet it, play with it or give it treats. Its mood and needs show here.",
         litter_hint = "Put a litter box in the house (Build mode, Pet) to look after the litter.",
         want_hint = "Pick it from the cat's menu",
         album = "Album",

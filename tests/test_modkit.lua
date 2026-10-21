@@ -88,6 +88,13 @@ local function fakeUi(w, state)
             send("pawhome:state", Wire.toJson(ui.state))
         end
     end
+    function ui.wake()
+        ui.outbox[#ui.outbox + 1] = { seq = ui.nextSeq, channel = "pawhome:wake", payload = "-|" }
+        ui.nextSeq = ui.nextSeq + 1
+        local entries = { { seq = 0, channel = "epoch", payload = ui.epoch } }
+        for _, e in ipairs(ui.outbox) do entries[#entries + 1] = e end
+        w.cfg["bridge/to_sim"] = Wire.encodeMailbox(entries)
+    end
     function ui.call(method, args)
         local id = ui.nextRpc
         ui.nextRpc = id + 1
@@ -365,6 +372,23 @@ T.test("modkit: a cat adopted away from home is summoned when the Zoi gets home"
     s.pump(1)
     T.eq(s.w.queued[1].bag, ModKit.WELCOME, "summoned once home")
     T.eq(#s.w.queued, 1)
+end)
+
+T.test("modkit: a page that starts late asks B2 to say hello at once instead of waiting a minute", function()
+    local s = boot({ spawn = false })
+    s.pump()                                          -- connected; the next hello is a minute away
+    local hellos = 0
+    local send = s.w.b2.send
+    s.w.b2.send = function(eid, ch, payload)
+        if ch == "pawhome:hello" then hellos = hellos + 1 end
+        return send(eid, ch, payload)
+    end
+    s.adapter.sinceHello = 0                          -- it has just said hello
+    s.pump(1)
+    T.eq(hellos, 0, "quiet while nothing is asked")
+    s.ui.wake()
+    s.pump(2)                                         -- the relay passes it on, then B2 answers
+    T.truthy(hellos >= 1, "hello right after the wake message")
 end)
 
 T.test("modkit: a summon that never shows up is given up after a while so the engine retries", function()

@@ -31,6 +31,10 @@ def load(mod, key):
 
 
 def main(argv):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
     keys, tail, mod = [], 40, DEFAULT_MOD
     i = 0
     while i < len(argv):
