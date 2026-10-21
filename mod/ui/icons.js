@@ -169,17 +169,68 @@ const Icons = (() => {
       + `<ellipse cx="24" cy="25" rx="3.4" ry="2.8" fill="${C.peach}"/><circle cx="20.4" cy="21" r="1.4" fill="${C.peach}"/>`
       + `<circle cx="23" cy="19.4" r="1.4" fill="${C.peach}"/><circle cx="25.6" cy="19.4" r="1.4" fill="${C.peach}"/>`
       + `<circle cx="27.6" cy="21" r="1.4" fill="${C.peach}"/><path d="M21.5 39.5 H26.5" ${line(2)}/>`,
-    computer: `<rect x="5" y="7" width="38" height="26" rx="4" ${s(C.sky)}/>`
-      + `<rect x="9" y="11" width="30" height="18" rx="2" fill="${C.cream}"/>`
-      + `<ellipse cx="24" cy="22" rx="3.4" ry="2.8" fill="${C.peach}"/><circle cx="20.4" cy="18" r="1.4" fill="${C.peach}"/>`
-      + `<circle cx="23" cy="16.4" r="1.4" fill="${C.peach}"/><circle cx="25.6" cy="16.4" r="1.4" fill="${C.peach}"/>`
-      + `<circle cx="27.6" cy="18" r="1.4" fill="${C.peach}"/>`
-      + `<path d="M20 33 L18.5 40 H29.5 L28 33" ${s(C.steel)}/>`,
+    // ---- keepsakes: the little gifts a cat brings (album)
+    feather: `<path d="M10 41 Q10 18 36 7 Q42 26 24 37 Q17 41 10 41 Z" ${s("#c6b3f0")}/>`
+      + `<path d="M10 41 Q22 24 35 10" ${line(2)}/><path d="M17 31 L24 33 M21 25 L29 27 M26 19 L33 21" ${line(1.6)}/>`,
+    yarn: `<circle cx="22" cy="23" r="15" ${s(C.pink)}/>`
+      + `<path d="M9 19 Q22 27 35 15 M8 26 Q22 33 36 22 M12 12 Q24 19 33 10" ${line(1.8)}/>`
+      + `<path d="M31 35 Q40 36 38 42 Q36 46 43 44" ${line(2.4)}/>`,
+    leaf: `<path d="M9 39 Q5 13 37 8 Q43 37 14 40 Z" ${s(C.leaf)}/>`
+      + `<path d="M9 39 Q22 25 36 11" ${line(2)}/><path d="M18 31 L16 24 M25 25 L24 18 M30 19 L34 19" ${line(1.6)}/>`,
+    button: `<circle cx="24" cy="24" r="17" ${s(C.sky)}/>`
+      + `<circle cx="24" cy="24" r="11" fill="none" stroke="${INK}" stroke-width="1.6"/>`
+      + `<circle cx="20.5" cy="21" r="2" fill="${INK}"/><circle cx="27.5" cy="21" r="2" fill="${INK}"/>`
+      + `<circle cx="20.5" cy="28" r="2" fill="${INK}"/><circle cx="27.5" cy="28" r="2" fill="${INK}"/>`,
+    pebble: `<path d="M7 31 Q5 19 17 15 Q33 9 41 23 Q45 36 31 38 Q12 42 7 31 Z" ${s("#d9d2e3")}/>`
+      + `<path d="M15 22 Q19 18 24 18" ${line(2, "#ffffff")}/><circle cx="31" cy="30" r="1.5" fill="#b9b0c8"/>`,
+    bell: `<circle cx="24" cy="8.5" r="3.5" ${s(C.honey, 2)}/>`
+      + `<path d="M11 33 Q11 13 24 12 Q37 13 37 33 Z" ${s(C.honey)}/>`
+      + `<path d="M8 34 H40" ${line(3)}/><circle cx="24" cy="38.5" r="3.4" ${s(C.amber, 2)}/>`
+      + `<path d="M17 24 Q18 18 22 16" ${line(2, "#fff4cf")}/>`,
+    fishbone: `<path d="M9 24 H35" ${line(2.6)}/>`
+      + `<path d="M15 24 L11 14 M22 24 L18 12 M29 24 L25 14 M15 24 L11 34 M22 24 L18 36 M29 24 L25 34" ${line(2.2)}/>`
+      + `<path d="M35 18 Q44 20 44 24 Q44 28 35 30 Q31 24 35 18 Z" ${s(C.paper)}/>`
+      + `<path d="M9 24 L3 17 L3 31 Z" ${s(C.paper, 2)}/><circle cx="40" cy="22.5" r="1.3" fill="${INK}"/>`,
+    mouse: `<path d="M12 33 Q8 41 3 40" ${line(2.4)}/>`
+      + `<ellipse cx="23" cy="29" rx="15" ry="10.5" ${s("#cfd6e6")}/>`
+      + `<circle cx="31" cy="17" r="5.5" ${s(C.blush, 2)}/><circle cx="38" cy="22" r="4.6" ${s(C.blush, 2)}/>`
+      + `<circle cx="34" cy="28" r="1.7" fill="${INK}"/><circle cx="39.5" cy="31" r="1.9" fill="#f2738c"/>`,
+    flower: `<path d="M24 28 V43" ${line(2.6)}/><path d="M24 36 Q31 31 36 35" ${line(2.2)}/>`
+      + `<circle cx="24" cy="10.5" r="6.2" ${s(C.pink, 2)}/><circle cx="35.5" cy="18" r="6.2" ${s(C.pink, 2)}/>`
+      + `<circle cx="31.5" cy="30" r="6.2" ${s(C.pink, 2)}/><circle cx="16.5" cy="30" r="6.2" ${s(C.pink, 2)}/>`
+      + `<circle cx="12.5" cy="18" r="6.2" ${s(C.pink, 2)}/><circle cx="24" cy="22" r="6" ${s(C.honey, 2)}/>`,
+    star: `<path d="M24 3 V8" ${line(2.4)}/><circle cx="24" cy="5" r="2.6" ${s(C.honey, 1.6)}/>`
+      + `<path d="${star(24, 28, 17, 7.6)}" ${s("#ffd166")}/><path d="M19 24 L23 22" ${line(2, "#fff6d6")}/>`,
+    album: `<rect x="8" y="6" width="32" height="36" rx="5" ${s(C.peach)}/>`
+      + `<path d="M13 6 V42" ${line(2)}/>`
+      + `<ellipse cx="27" cy="27" rx="5.2" ry="4.2" ${s(C.cream, 1.8)}/>`
+      + `<circle cx="21.5" cy="20.5" r="2" ${s(C.cream, 1.6)}/><circle cx="25.2" cy="18" r="2" ${s(C.cream, 1.6)}/>`
+      + `<circle cx="29.2" cy="18" r="2" ${s(C.cream, 1.6)}/><circle cx="32.8" cy="20.5" r="2" ${s(C.cream, 1.6)}/>`,
+    plush: `<ellipse cx="24" cy="30" rx="13" ry="12" ${s("#f3c9a0")}/>`
+      + `<circle cx="24" cy="15" r="9" ${s("#f3c9a0")}/><circle cx="16.5" cy="8.5" r="3.6" ${s("#f3c9a0", 2)}/>`
+      + `<circle cx="31.5" cy="8.5" r="3.6" ${s("#f3c9a0", 2)}/><circle cx="20.8" cy="14" r="1.4" fill="${INK}"/>`
+      + `<circle cx="27.2" cy="14" r="1.4" fill="${INK}"/><ellipse cx="24" cy="17.6" rx="2" ry="1.4" fill="#f2738c"/>`
+      + `<path d="M24 24 V28" ${line(1.6)}/>`,
+    ribbon: `<path d="M24 24 Q10 6 6 17 Q4 28 24 24 Z" ${s(C.pink)}/><path d="M24 24 Q38 6 42 17 Q44 28 24 24 Z" ${s(C.pink)}/>`
+      + `<path d="M24 26 L14 43 L21 39 L24 45 Z" ${s("#f27fa8", 2.2)}/><path d="M24 26 L34 43 L27 39 L24 45 Z" ${s("#f27fa8", 2.2)}/>`
+      + `<circle cx="24" cy="24" r="4.4" ${s("#f27fa8", 2.2)}/>`,
+    amethyst: `<path d="M24 5 L38 17 L33 41 H15 L10 17 Z" ${s("#b794e8")}/>`
+      + `<path d="M10 17 H38 M24 5 L19 17 L24 41 M24 5 L29 17 L24 41" ${line(1.6)}/><path d="M16 14 L20 10" ${line(2, "#f1e6ff")}/>`,
+    aquamarine: `<path d="M24 5 L38 17 L33 41 H15 L10 17 Z" ${s("#8fdcf0")}/>`
+      + `<path d="M10 17 H38 M24 5 L19 17 L24 41 M24 5 L29 17 L24 41" ${line(1.6)}/><path d="M16 14 L20 10" ${line(2, "#eafcff")}/>`,
+    emerald: `<path d="M16 6 H32 L41 15 V33 L32 42 H16 L7 33 V15 Z" ${s("#5fcf95")}/>`
+      + `<path d="M15 15 H33 V33 H15 Z" ${line(1.8)}/><path d="M16 6 L15 15 M32 6 L33 15 M41 15 L33 15 M7 15 L15 15" ${line(1.4)}/>`
+      + `<path d="M12 12 L16 9" ${line(2, "#e2ffee")}/>`,
+    mystery: `<rect x="9" y="9" width="30" height="30" rx="8" ${s("#d8cdbf")}/>`
+      + `<path d="M18.5 20 Q18.5 13.5 24 13.5 Q29.5 13.5 29.5 19 Q29.5 22.5 24 25 V28" ${line(3)}/>`
+      + `<circle cx="24" cy="33.5" r="2" fill="${INK}"/>`,
   };
   // aliases used by the engine's ids
   const ALIAS = {
     feed: "food", hunger: "food", fun: "play", bladder: "litter", clean_litter: "litter",
     bond: "heart", money: "coin", pets: "cat", stray: "cat",
+    // keepsake ids (real items the game knows) drawn with the cat-gift art
+    stone: "pebble", catnip: "leaf", treat: "fishbone", toy: "mouse", bouquet: "flower",
   };
 
   // the phone case's cat ear (64 x 44); "ear-r" is the mirror image

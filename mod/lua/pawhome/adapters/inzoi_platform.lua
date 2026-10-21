@@ -237,6 +237,33 @@ function Platform.b2(opts)
         return false
     end
 
+    -- Gives money (a keepsake's coins). Same SetCurrency(id) path as charge, which is verified;
+    -- the income reason and the positive amount are UNVERIFIED. True only when the balance rose.
+    local creditReported = false
+    function p.credit(hid, amount)
+        local w, owner
+        local okW = pcall(function() w, owner = wallet(hid) end)
+        if not okW or not w then return false end
+        local function balance()
+            local a, b = w:GetCurrency(owner)
+            return tonumber(type(b) == "number" and b or a)
+        end
+        local before = balance()
+        if not before then return false end
+        local ok, err = pcall(function()
+            local id = inzoi.FB2City.GetCurrencyId()
+            return w:SetCurrency(id, before + amount, inzoi.EB1TransactionReason.IncomeDefault, owner, false, owner)
+        end)
+        local after = balance()
+        if after and after >= before + amount then
+            if not creditReported and p.report then p.report("credit via SetCurrency(id): " .. before .. " -> " .. after) end
+            creditReported = true
+            return true
+        end
+        if p.report then p.report("credit failed: " .. tostring(ok) .. "/" .. tostring(err) .. " balance " .. tostring(after)) end
+        return false
+    end
+
     -- Verified: inzoi.message.send_to_client(number entity id, channel, payload) reaches the
     -- B1 Zoi/ResidenceFamily binding of that entity (2026-10-21, rounds 6-7).
     function p.send(eid, channel, payload)

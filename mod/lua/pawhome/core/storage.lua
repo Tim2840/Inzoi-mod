@@ -7,7 +7,7 @@ local Log = require("pawhome.core.log")
 local defaults = require("pawhome.data.settings")
 local coats = require("pawhome.data.coats")
 
-local Storage = { KEY = "pawhome.save", VERSION = 4, BACKUP_GENERATIONS = 3 }
+local Storage = { KEY = "pawhome.save", VERSION = 5, BACKUP_GENERATIONS = 3 }
 
 function Storage.default()
     return {
@@ -16,6 +16,7 @@ function Storage.default()
         pets = {},
         zoi = {},            -- zoiId -> { petTraining = xp }
         offers = {},         -- householdId -> { day = n, list = {...} }
+        album = {},          -- householdId -> { keepsakeId = count }
         settings = Util.copy(defaults),
         rng = nil,
         lastTick = nil,
@@ -64,6 +65,12 @@ migrations[3] = function(state)
             if offer.coat == nil then offer.coat = pick(offer.id) end
         end
     end
+    return state
+end
+
+-- v4 -> v5: the keepsake album (state.album). A pet's want / recent-care fields start empty.
+migrations[4] = function(state)
+    state.album = state.album or {}
     return state
 end
 
@@ -121,6 +128,7 @@ function Storage.load()
     migrated.pets = migrated.pets or {}
     migrated.zoi = migrated.zoi or {}
     migrated.offers = migrated.offers or {}
+    migrated.album = migrated.album or {}
     return migrated, how
 end
 

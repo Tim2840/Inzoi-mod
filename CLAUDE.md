@@ -22,7 +22,7 @@ inZOI 目前沒有寵物系統。本模組照 The Sims 4《貓狗成群》的玩
 | 部分 | 狀態 |
 |---|---|
 | 寵物引擎 `mod/lua/pawhome/` | ✅ 領養、需求、心情、成長老死、照顧、生病與獸醫、貓家具加成、疏於照顧與贖回、固定花色、存檔備援；199 項離線測試全過；已在遊戲 B2 執行 |
-| 介面 `mod/ui/`（繁中／英文） | ✅ 可愛風寵物店（手機／電腦／啟動鈕三種外觀）、自製 SVG 圖示、花色選擇；啟動鈕與手機版面已在遊戲內驗證，電腦版面與選單入口文字待驗證 |
+| 介面 `mod/ui/`（繁中／英文） | ✅ 玩法 v2（`docs/design/gameplay-v2.md`）：只有手機版面（300×540）與可拖曳小啟動鈕，面板只顯示心情／需求／小要求／收藏圖鑑；照顧改走貓的遊戲互動選單；禮物是真物品；花色隨機。啟動鈕與手機版面、選單照顧、禮物入背包已在遊戲內驗證；自訂選單文字、面板拖曳待驗證；貓砂盆物件待 PO 開 ModKit 製作 |
 | `adapters/inzoi*.lua`（官方 ModKit） | ✅ 時間、存檔握手、家戶、金錢、召喚與綁定家貓、送走貓、遊戲原生照顧計入、動畫與縮放、花色（B1 設材質貼圖）已實測；逐項狀態見 `docs/design/modkit-runtime.md` 第 4 節 |
 | `mod/ui/bridge.js` 的遊戲內傳輸 | ✅ 已實測（B2 ⇄ B1 ⇄ `uimod.cfg_*` ⇄ UI，`wf.state` 存檔）；每次載入以 `data.patch` 加入遊戲資料 |
 | 會走動的貓 | ❌ 結案：遊戲的貓是 VAT 動畫，沒有走路動畫，滑行不可接受（`docs/research/walking-cat.md`）。貓依心情播 9 段原版坐姿類動畫 |
@@ -34,7 +34,7 @@ inZOI 目前沒有寵物系統。本模組照 The Sims 4《貓狗成群》的玩
 
 1. 專用測試存檔：用遊戲新開一個專用存檔，之後才能測「存檔→讀檔」（花色、寵物綁定）。**複製存檔不能隔離**，見規矩 14。
 2. 打包與乾淨安裝測試（需要 PO 開 ModKit）；發佈要 PO 同意。
-3. 待驗證：手機／電腦／城市貓的互動選單入口文字、貓的小反應動畫、電腦版面。
+3. 待驗證：自訂互動選單文字（`StringTableExport`，需重啟遊戲）、面板拖曳、城市貓選單入口；貓砂盆物件（ModKit＋Blender，需 PO 開 ModKit）。
 開發版模組：`Documents\inZOI\Mods\InGame\PawHomeDev_A5BI7C`，用 `py -I tools/build_modkit.py <該資料夾>` 產生；遊戲內測試用 `tools/ingame_smoke.py`、`tools/ui_rpc.py`、`tools/mod_log.py`，一個遊戲同時只能一個人用（`tools/game_lock.py`）。
 遊戲內測試用 `tools/game_mcp.py`（遊戲 MCP 的 JSON-RPC 呼叫器）；探勘用 ModKit 專案 `PawHome_Probe_DBA66034`（不進 repo）。
 

@@ -10,6 +10,9 @@ local Util = require("pawhome.core.util")
 local Registry = require("pawhome.pets.registry")
 local Enrichment = require("pawhome.pets.enrichment")
 local Illness = require("pawhome.pets.illness")
+local Wants = require("pawhome.pets.wants")
+local Litter = require("pawhome.pets.litter")
+local Keepsakes = require("pawhome.pets.keepsakes")
 local enrichmentData = require("pawhome.data.enrichment")
 local Engine = require("pawhome.pets.engine")
 local Care = require("pawhome.pets.care")
@@ -282,11 +285,14 @@ local function petView(ctx, pet, zoiId)
     local sleeping = pet.status == "home" and Needs.sleeping(pet, ctx.now)
     local mood = pet.status == "home" and Moods.compute(pet, sleeping) or "sad"
     local needs = {}
+    local hasBox = Litter.present(ctx, pet.household)
     for _, id in ipairs(needsData.order) do
+      if id ~= "bladder" or hasBox then
         needs[#needs + 1] = {
             id = id, label = I18n.t("needs." .. id),
             value = math.floor(pet.needs[id] + 0.5), state = Needs.state(id, pet.needs[id]),
         }
+      end
     end
     local traits = {}
     for _, id in ipairs(pet.traits) do
@@ -299,13 +305,15 @@ local function petView(ctx, pet, zoiId)
     end
     local bond = zoiId and Bond.get(pet, zoiId) or Bond.best(pet)
     local acts = {}
+    local want = Wants.view(ctx, pet)
     for _, id in ipairs(actions.order) do
-        local cd = pet.cooldowns[id]
-        local wait = (cd and cd > ctx.now) and math.ceil(cd - ctx.now) or 0
+        local refusal = pet.status == "home" and Care.refusal(pet, id) or nil
         acts[#acts + 1] = {
             id = id, label = I18n.t("actions." .. id .. ".name"),
             desc = I18n.t("actions." .. id .. ".desc"),
-            ready = pet.status == "home" and wait == 0, cooldown = wait,
+            ready = pet.status == "home" and refusal == nil,
+            hint = refusal and I18n.t("hint." .. refusal) or "",       -- "Full" / "Tired" under the button
+            wanted = want ~= nil and want.id == id and refusal == nil,  -- the cat is asking for this one
         }
     end
     return {
@@ -320,6 +328,8 @@ local function petView(ctx, pet, zoiId)
         bond = math.floor(bond + 0.5), bondLevel = Bond.level(bond), bondLabel = I18n.t("bond." .. Bond.level(bond)),
         actions = acts,
         illness = Illness.view(ctx, pet),
+        want = want,
+        litterBox = hasBox,
     }
 end
 
@@ -392,6 +402,7 @@ function App:view(householdId, zoiId)
         training = { level = level, label = I18n.t("ui.training", { level = level }) },
         furniture = (householdId ~= nil and not self.suspended) and furnitureView(householdId) or {},
         backup = self:backupInfo(),
+        album = Keepsakes.view(ctx, householdId),
         settings = Util.copy(ctx.cfg),
     }
 end

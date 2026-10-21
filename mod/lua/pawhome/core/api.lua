@@ -114,6 +114,13 @@ function Api.charge(householdId, amount)
     return ok and v == true
 end
 
+-- Puts one real item (an Object row id) into the bag of the household's Zoi. Returns true when
+-- it was handed over to the game (the Zoi may need a moment to get to it).
+function Api.giveItem(householdId, objectId)
+    local ok, v = call("giveItem", householdId, objectId)
+    return ok and v == true
+end
+
 function Api.addBuff(zoiId, buffId, durationMinutes)
     return (call("addBuff", zoiId, buffId, durationMinutes))
 end

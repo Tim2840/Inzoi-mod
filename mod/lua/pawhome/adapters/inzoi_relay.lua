@@ -12,7 +12,7 @@
 -- r.onCoats(text), set by the owner, receives the coat list B2 sends (pawhome:coats).
 local Wire = require("pawhome.adapters.inzoi_wire")
 
-local Relay = { SECTION = "bridge", OUT = "to_ui", IN = "to_sim", POLL_SECONDS = 2, KEEP = 40,
+local Relay = { SECTION = "bridge", OUT = "to_ui", IN = "to_sim", POLL_SECONDS = 0.25, KEEP = 40,
     BACKUP_SECTION = "backup" }
 
 function Relay.new(platform, opts)

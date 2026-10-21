@@ -10,15 +10,16 @@
 **毛孩之家**替 inZOI 補上養貓：領養一隻貓、照顧牠、看牠長大。
 
 ### 開始
-1. 進入遊戲後，畫面左側有一顆圓形的 **Mochi 貓咪按鈕**，按下去打開寵物店面板（手機版面）。
-2. 到「領養」分頁，挑一隻貓、**選花色**（橘虎斑、棕虎斑、三花、賓士貓）、取名字、按確認，費用由家戶扣款。
+1. 進入遊戲後，畫面右側有一顆小小的 **Mochi 貓咪按鈕**（可以拖到喜歡的位置），按下去打開寵物店面板（手機版面，也可以拖動）。
+2. 到「領養」分頁，挑一隻貓（花色是隨機的）、取名字、按確認，費用由家戶扣款。
 3. 你控制的 Zoi 在家時，貓會出現在她面前；不在家的話會等她回家再出現。
 
 ### 照顧
 - **需求**：飢餓、精力（睡覺時自動恢復）、玩樂、貓砂。心情由需求決定。
-- 在面板按「餵食、陪玩、擁抱、梳毛、清貓砂、稱讚、責罵、了解牠」，每個動作有冷卻時間，貓會播放對應的動作。
-- 直接對貓用遊戲原本的「給零食」和「玩」也會算進去，規則跟面板按鈕一樣。
-- 貓會依心情換不同的坐姿，面板照顧時會播放對應的動作。**貓不會走動**：遊戲本身沒有貓的走路動畫。
+- **直接點貓**，用遊戲的互動選單：溫柔撫摸、給零食、給貓零食、給貓薄荷糖、玩。Zoi 和貓會播放互動動畫，沒有冷卻時間，但同一個動作連續做效果會遞減。
+- 面板顯示心情、需求、親密度，以及貓的**小要求**（對話泡泡）。滿足牠的要求會有「開心時刻」，效果加倍，貓有機會**送你一個小禮物**（真的遊戲物品，會進背包），並收進面板的**收藏圖鑑**。
+- 貓砂需要家裡有**貓砂盆**才會用到（貓砂盆物件還在製作中）。
+- 貓會依心情換不同的坐姿。**貓不會走動**：遊戲本身沒有貓的走路動畫。
 - 幼貓體型較小，長大後變成成貓；老了會變老貓，**最後會安詳離世**（設定頁可以關掉老化）。
 - 家裡擺**貓跳台、貓抓板、貓滾輪**（建造模式 →「寵物」分類），貓的玩樂和精力下降會變慢，面板會列出效果。
 
@@ -31,8 +32,8 @@
 - 為了預防這種情況，模組會在存檔以外另存一份備份，讀到沒有寵物資料的存檔時，面板上會問你要不要把寵物找回來。
 
 ### 測試中
-- 手機、電腦、對城市貓的互動選單入口：選單項目能加入，但顯示的文字還在確認。
-- 面板的電腦版面（標題列切換）。貓偶爾做出的小反應（打招呼、哈氣）。
+- 手機、對城市貓的互動選單入口，以及我們自己加的互動項目：選單項目能加入，但顯示的文字還在確認。
+- 小禮物自動給出的流程、面板拖曳、貓砂盆。
 
 ### 限制
 - 目前只有貓；每戶預設 1 隻，設定頁可調到 4 隻。
@@ -45,15 +46,16 @@
 **Paw Home** adds cats to inZOI: adopt one, take care of it, watch it grow up.
 
 ### Getting started
-1. In game, a round **Mochi the cat button** sits on the left side of the screen. Press it to open the pet shop panel (phone layout).
-2. On the **Adopt** tab pick a cat, **choose its coat** (orange tabby, brown tabby, calico, tuxedo), name it and confirm. The fee is paid from the household's funds.
+1. In game, a small **Mochi the cat button** sits on the right side of the screen (drag it where you like). Press it to open the pet shop panel (phone layout, also draggable).
+2. On the **Adopt** tab pick a cat (its coat is random), name it and confirm. The fee is paid from the household's funds.
 3. If your Zoi is home the cat appears in front of her; otherwise it waits until she gets home.
 
 ### Care
 - **Needs:** hunger, energy (recovers while asleep), fun and litter. Mood follows the needs.
-- Use the panel's buttons: feed, play, cuddle, groom, clean the litter, praise, scold, get to know. Each has a cooldown and the cat plays a matching animation.
-- The game's own **Give Snack** and **Play** on the cat count too, with the same rules as the panel.
-- Depending on its mood the cat sits in different poses, and the panel's care actions play a matching animation. **Cats do not walk around:** the game has no walking animation for them.
+- **Click the cat** and use the game's own interaction menu: Pet Gently, Give Snack, Give Treat, Give Catnip Candy, Play. The Zoi and the cat play a paired animation. There are no cooldowns, but doing the same thing over and over helps less each time.
+- The panel shows mood, needs, bond and the cat's **wants** (thought bubble). Meeting a want is a **happy moment**: bigger gains, and the cat may **bring you a small gift** (a real game item, it goes in your bag) that is added to the panel's **keepsake album**.
+- The litter need only matters when the house has a **litter box** (the box object is still being made).
+- Depending on its mood the cat sits in different poses. **Cats do not walk around:** the game has no walking animation for them.
 - Kittens are smaller and grow into adults, then elders, and **eventually pass away peacefully** (aging can be switched off in settings).
 - Put a **cat tower, scratcher or wheel** in the house (Build mode → Pet category): fun and energy drop more slowly. The panel lists the effect.
 
@@ -66,8 +68,8 @@
 - As a safety net the mod keeps a second copy outside the savegame; when you load a save with no pet data, the panel offers to bring your pets back.
 
 ### Still in testing
-- The phone, computer and "adopt this cat" entries in the game's interaction menus: the entries can be added, their displayed text is still being checked.
-- The panel's computer layout (switch in the title bar), and the cat's occasional small reactions (greeting, hissing).
+- The phone and "adopt this cat" entries and our own interactions in the game's menus: the entries can be added, their displayed text is still being checked.
+- Gifts given automatically, dragging the panel, the litter box.
 
 ### Limits
 - Cats only; one per household by default, up to four in settings.

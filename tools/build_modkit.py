@@ -58,6 +58,11 @@ def to_po(entries):
     return "".join('msgctxt "%s"\nmsgid "%s"\nmsgstr "%s"\n\n' % (k, esc(v), esc(v)) for k, v in entries)
 
 
+def mod_code(root):
+    """The 8-character code ModKit appends to a mod's folder name (PawHome_ABCD1234 -> ABCD1234)."""
+    return root.name.rsplit("_", 1)[-1] if "_" in root.name else "PAWHOME"
+
+
 def main():
     if len(sys.argv) != 2:
         print(__doc__)
@@ -104,12 +109,23 @@ def main():
         po.parent.mkdir(parents=True, exist_ok=True)
         po.write_text(to_po(entries), encoding="utf-8")
         print(f"wrote {len(entries)} labels to {po.relative_to(root)}")
+    # The game reads the labels of a mod's own text ids from non_ufs/StringTableExport/mod_ST_<table>_<code>.json
+    # (the layout published mods such as the Witchcraft mod ship). English is the base text.
+    en = game_strings().get("en", [])
+    if en:
+        code = mod_code(root)
+        table = root / "non_ufs" / "StringTableExport"
+        table.mkdir(parents=True, exist_ok=True)
+        (table / ("mod_ST_InteractionBag_%s.json" % code)).write_text(
+            json.dumps({"TableId": "ST_InteractionBag_" + code, "Entries": dict(en)}, indent=2, ensure_ascii=False),
+            encoding="utf-8")
+        print(f"wrote string table ST_InteractionBag_{code} with {len(en)} labels")
     # mod_manifest.json lists the mod's loose files ("NonAssets"); keep it in step with what we wrote
     manifest_path = root / "mod_manifest.json"
     if manifest_path.is_file():
         manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
         files = sorted("/" + p.relative_to(root).as_posix()
-                       for sub in ("lua", "ui", "l10n") if (root / sub).is_dir()
+                       for sub in ("lua", "ui", "l10n", "non_ufs") if (root / sub).is_dir()
                        for p in (root / sub).rglob("*") if p.is_file())
         manifest["NonAssets"] = files
         manifest_path.write_text(json.dumps(manifest, indent="\t", ensure_ascii=False), encoding="utf-8")

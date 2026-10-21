@@ -88,6 +88,13 @@ local function fakeUi(w, state)
             send("pawhome:state", Wire.toJson(ui.state))
         end
     end
+    function ui.wake()
+        ui.outbox[#ui.outbox + 1] = { seq = ui.nextSeq, channel = "pawhome:wake", payload = "-|" }
+        ui.nextSeq = ui.nextSeq + 1
+        local entries = { { seq = 0, channel = "epoch", payload = ui.epoch } }
+        for _, e in ipairs(ui.outbox) do entries[#entries + 1] = e end
+        w.cfg["bridge/to_sim"] = Wire.encodeMailbox(entries)
+    end
     function ui.call(method, args)
         local id = ui.nextRpc
         ui.nextRpc = id + 1
@@ -367,6 +374,23 @@ T.test("modkit: a cat adopted away from home is summoned when the Zoi gets home"
     T.eq(#s.w.queued, 1)
 end)
 
+T.test("modkit: a page that starts late asks B2 to say hello at once instead of waiting a minute", function()
+    local s = boot({ spawn = false })
+    s.pump()                                          -- connected; the next hello is a minute away
+    local hellos = 0
+    local send = s.w.b2.send
+    s.w.b2.send = function(eid, ch, payload)
+        if ch == "pawhome:hello" then hellos = hellos + 1 end
+        return send(eid, ch, payload)
+    end
+    s.adapter.sinceHello = 0                          -- it has just said hello
+    s.pump(1)
+    T.eq(hellos, 0, "quiet while nothing is asked")
+    s.ui.wake()
+    s.pump(2)                                         -- the relay passes it on, then B2 answers
+    T.truthy(hellos >= 1, "hello right after the wake message")
+end)
+
 T.test("modkit: a summon that never shows up is given up after a while so the engine retries", function()
     local s = boot({ spawn = true })
     s.pump()
@@ -416,6 +440,42 @@ T.test("modkit: city cats the Zoi fed can be adopted as strays; others cannot", 
     T.eq(strays[1].ref, 89129)
     s.w.day = s.w.day + 4
     T.eq(#s.adapter.listStrays(77), 0, "forgotten after a few days")
+end)
+
+T.test("modkit: care from the cat's own menu counts: pet gently, treats, snack, play", function()
+    local s = boot({ spawn = true })
+    s.pump()
+    local offers = s.app:offers(77, true)
+    T.truthy(s.app:adoptOffer(77, 501, offers[1].id, "Mimi").ok)
+    s.adapter.onCatBegin(109546, { home = true })
+    local pet = s.app.ctx.state.pets[1]
+    pet.want = nil; pet.wantNext = math.huge
+    pet.needs.hunger = 30; pet.needs.fun = 20
+    local kinds = {
+        Petting_Cat = "cuddle", Giving_Snack_To_Cat = "feed", Giving_Catnip_Candy_To_Cat = "feed",
+        Object_Void_Cat_Tickle = "play", Object_Void_Cat_Dev = "feed", Playing_Toy_With_Cat = "play",
+    }
+    for bag, kind in pairs(kinds) do
+        T.eq(ModKit.CARE[bag], kind, bag)
+        s.adapter.onInteractionFinished({ entity_id = 501, target_entity_id = 109546, interaction_bag_id = bag })
+    end
+    local res = s.app:applyCare()
+    T.eq(#res, 6, "every menu interaction became one care event")
+    local cuddles = 0
+    for _, r in ipairs(res) do if r.action == "cuddle" then cuddles = cuddles + 1 end end
+    T.eq(cuddles, 1)
+end)
+
+T.test("modkit: a gift is queued on the Zoi as a tiny interaction that puts the real item in her bag", function()
+    local s = boot({ spawn = false })
+    s.pump()
+    T.truthy(s.adapter.giveItem(77, "CatToy01"))
+    T.eq(#s.w.queued, 1)
+    T.eq(s.w.queued[1].bag, "PawHome_Gift_CatToy01")
+    T.eq(s.w.queued[1].zoi, 501); T.eq(s.w.queued[1].target, 501, "an interaction on herself")
+    s.w.home = false                                -- a gift does not wait for the Zoi to be home
+    T.truthy(s.adapter.giveItem(77, "GiftBouquet01"))
+    T.eq(#s.w.queued, 2)
 end)
 
 T.test("modkit: care given to one of our cats is collected once", function()
@@ -588,6 +648,16 @@ T.test("looks: care given with the game's own interaction does not replay an ani
     T.eq(#sent(s, "anim"), 0)
 end)
 
+T.test("looks: pressing buttons quickly sends every reaction at once, marked as the player's", function()
+    local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
+    s.adapter.petLook(pet.entity, { mood = "content", stage = "adult", scale = 1 })
+    T.truthy(s.adapter.playAnimation(pet.entity, "pet_cuddle"))
+    T.truthy(s.adapter.playAnimation(pet.entity, "pet_play"), "the first reaction (12 s) does not hold the second back")
+    local anims = sent(s, "anim")
+    T.eq(#anims, 2)
+    for _, a in ipairs(anims) do T.truthy(a:find("|1$"), a) end
+end)
+
 T.test("looks: nothing is played on a cat while a game interaction runs on it", function()
     local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
     s.adapter.petLook(pet.entity, { mood = "content", stage = "adult", scale = 1 })
@@ -673,6 +743,22 @@ T.test("cat B1: the size is applied on begin, again after a stale start, and ask
     T.eq(b.scale, 0.6)
 end)
 
+T.test("cat B1: a reaction the player asked for is shown at once, an idle change waits for the game", function()
+    local f = fakeCats()
+    local a = f.actor(109546)
+    f.cats.onBegin(a)
+    f.cats.onMessage(a, "pawhome:anim", "ANIM_VoidCat_Sit_Idle_01|0|")
+    a.anim = "ANIM_VoidCat_Eat"                      -- the game changed the animation by itself
+    f.cats.tick(1)                                   -- B1 notices the change
+    f.cats.onMessage(a, "pawhome:anim", "ANIM_VoidCat_Sit_Idle_02|0|")
+    T.eq(a.anim, "ANIM_VoidCat_Eat", "an ordinary idle change keeps off the game's animation")
+    f.cats.onMessage(a, "pawhome:anim", "ANIM_Void_Cat_Welcoming|5.7|ANIM_VoidCat_Sit_Idle_01|1")
+    T.eq(a.anim, "ANIM_Void_Cat_Welcoming", "the player's button is shown right away")
+    -- and a second button press replaces the first reaction instead of waiting for it to end
+    f.cats.onMessage(a, "pawhome:anim", "ANIM_VoidCat_Being_Patted|12.2|ANIM_VoidCat_Sit_Idle_01|1")
+    T.eq(a.anim, "ANIM_VoidCat_Being_Patted")
+end)
+
 T.test("cat B1: a one-shot returns to the sitting idle and is not cut short", function()
     local f = fakeCats()
     local a = f.actor(109546)
@@ -709,10 +795,10 @@ T.test("cat B1: other mods' messages and unknown kinds are ignored", function()
     T.eq(a.anim, nil)
 end)
 
-T.test("modkit: our phone, computer and city-cat entries open the shop on the page", function()
+T.test("modkit: our phone and city-cat entries open the shop on the page", function()
     local s = boot({ spawn = false })
     s.pump()
-    s.adapter.onInteractionStarted({ interaction_bag_id = "PawHome_ShopPC", entity_id = 501 })
+    s.adapter.onInteractionStarted({ interaction_bag_id = "PawHome_ShopPhone", entity_id = 501 })
     s.adapter.onInteractionStarted({ interaction_bag_id = "PawHome_Adopt", entity_id = 501, target_entity_id = 89129 })
     s.adapter.onInteractionStarted({ interaction_bag_id = "PawHome_ShopPhone", entity_id = 777 })   -- not our Zoi
     s.adapter.onInteractionStarted({ interaction_bag_id = "Self_SmartPhone_Check", entity_id = 501 }) -- not ours
@@ -720,7 +806,7 @@ T.test("modkit: our phone, computer and city-cat entries open the shop on the pa
     s.adapter.onInteractionStarted({ interaction_bag_id = "PawHome_Adopt", entity_id = 501, target_entity_id = 109615 }) -- a home cat
     s.pump(2)
     T.eq(#s.ui.opened, 2)
-    T.eq(s.ui.opened[1].shell, "pc")
+    T.eq(s.ui.opened[1].shell, "phone")
     T.eq(s.ui.opened[2].tab, "adopt"); T.eq(s.ui.opened[2].stray, "cat89129")
     local strays = s.app:strays(77)
     local found = false
