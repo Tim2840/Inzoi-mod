@@ -16,7 +16,7 @@ local function world(opts)
         day = 3, hour = 8, minute = 0,
         zoi = 501, household = 77, members = { 501, 502 },
         money = opts.money or 5000,
-        cfg = {},                 -- "section/key" -> value (the shared mailbox files)
+        cfg = opts.cfg or {},     -- "section/key" -> value (the mod's settings files; survive loads)
         toSim = {}, toClient = {}, -- queued inzoi.message deliveries
         toasts = {},
         queued = {},              -- interactions put in the Zoi's queue
@@ -386,4 +386,59 @@ T.test("modkit: care given to one of our cats is collected once", function()
     local care = s.adapter.takeCare(ref)
     T.eq(#care, 1); T.eq(care[1].kind, "play"); T.eq(care[1].zoi, 501)
     T.eq(#s.adapter.takeCare(ref), 0)
+end)
+
+
+-- ------------------------------------------------------------------ backups outside the savegame
+
+T.test("modkit: pets saved while the UI mod was off come back from the relay's backup", function()
+    local s1 = boot({ spawn = false })
+    s1.pump()
+    local offers = s1.app:offers(77, true)
+    T.truthy(s1.app:adoptOffer(77, 501, offers[1].id, "Luna").ok)
+    s1.pump(6)
+    T.truthy(s1.w.cfg["backup/h77"], "the relay kept a copy")
+
+    -- the game was saved without the UI mod: the next load has no data at all
+    local s2 = boot({ spawn = false, session = "S2", cfg = s1.w.cfg, uiState = {} })
+    s2.pump(6)
+    local v = s2.app:view(77, 501)
+    T.eq(#v.pets, 0)
+    T.truthy(v.backup, "a backup is offered"); T.eq(v.backup.names[1], "Luna"); T.eq(v.backup.day, 3)
+    T.truthy(s1.w.cfg["backup/h77"]:find("Luna"), "the empty new start did not overwrite the backup")
+
+    local r = s2.app:restoreBackup()
+    T.truthy(r.ok, r.message)
+    v = s2.app:view(77, 501)
+    T.eq(#v.pets, 1); T.eq(v.pets[1].name, "Luna"); T.eq(v.backup, nil)
+    s2.pump(2)
+    T.truthy(s2.ui.state["pawhome.save"]:find("Luna"), "the UI got the restored data for the next save")
+end)
+
+T.test("modkit: starting over instead of restoring replaces the backup with the new pets", function()
+    local s1 = boot({ spawn = false })
+    s1.pump()
+    T.truthy(s1.app:adoptOffer(77, 501, s1.app:offers(77, true)[1].id, "Luna").ok)
+    s1.pump(6)
+    local s2 = boot({ spawn = false, session = "S2", cfg = s1.w.cfg, uiState = {} })
+    s2.pump(6)
+    T.truthy(s2.app:view(77, 501).backup)
+    T.truthy(s2.app:adoptOffer(77, 501, s2.app:offers(77, true)[1].id, "Coco").ok)
+    T.eq(s2.app:view(77, 501).backup, nil)
+    s2.pump(6)
+    T.truthy(s1.w.cfg["backup/h77"]:find("Coco")); T.falsy(s1.w.cfg["backup/h77"]:find("Luna"))
+end)
+
+T.test("modkit: no backup is offered when the savegame has its own pets or there is none", function()
+    local s1 = boot({ spawn = false })
+    s1.pump()
+    T.eq(s1.app:view(77, 501).backup, nil)                 -- nothing anywhere
+    local offers = s1.app:offers(77, true)
+    T.truthy(s1.app:adoptOffer(77, 501, offers[1].id, "Luna").ok)
+    s1.pump(6)
+    local s2 = boot({ spawn = false, session = "S2", cfg = s1.w.cfg, uiState = s1.ui.state })
+    s2.pump(6)
+    local v = s2.app:view(77, 501)
+    T.eq(#v.pets, 1); T.eq(v.backup, nil)
+    T.falsy(s2.app:restoreBackup().ok)
 end)

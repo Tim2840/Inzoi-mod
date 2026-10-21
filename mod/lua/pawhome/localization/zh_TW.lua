@@ -43,6 +43,7 @@ return {
         get_to_know  = { name = "認識牠", desc = "了解這隻寵物的個性。" },
     },
     msg = {
+        backup_restored = "寵物回來了！",
         fell_ill = "{name}不太舒服：{illness}。",
         recovered = "{name}康復了，又恢復活力。",
         vet_cured = "獸醫治好了{name}，沒事了！",
@@ -69,6 +70,7 @@ return {
         renamed = "已改名為 {name}。",
     },
     fail = {
+        no_backup = "沒有可以還原的備份。",
         not_sick = "{name}很健康。",
         no_pet = "找不到這隻寵物。",
         not_home = "{name} 不在家。",
@@ -87,6 +89,8 @@ return {
         redeem_wait = "{name} 還要 {hours} 小時才能領回。",
     },
     ui = {
+        backup_found = "找到第 {day} 天的寵物備份：{names}。這個存檔裡沒有寵物資料，可能是在毛孩之家關閉時存的檔。",
+        backup_restore = "把牠們找回來",
         vet = "帶去看獸醫（{fee}）",
         illness = "寵物會生病",
         sick = "不舒服",

@@ -11,7 +11,8 @@
 --   platform.log(line)                    optional
 local Wire = require("pawhome.adapters.inzoi_wire")
 
-local Relay = { SECTION = "bridge", OUT = "to_ui", IN = "to_sim", POLL_SECONDS = 2, KEEP = 40 }
+local Relay = { SECTION = "bridge", OUT = "to_ui", IN = "to_sim", POLL_SECONDS = 2, KEEP = 40,
+    BACKUP_SECTION = "backup" }
 
 function Relay.new(platform, opts)
     opts = opts or {}
@@ -73,6 +74,24 @@ function Relay.new(platform, opts)
         elseif kind == "save" or kind == "rpc_result" then
             local session, _, data = r.assembler.add(payload)
             if data ~= nil then post(channel, session .. "|" .. data) end
+        elseif kind == "backup" then
+            -- a copy of the household's data, kept outside the savegame (see the adapter)
+            local _, _, data = r.assembler.add(payload)
+            local t = data and Wire.fromJson(data)
+            if type(t) == "table" and t.hid ~= nil then
+                platform.cfgSave(Relay.BACKUP_SECTION, "h" .. tostring(t.hid), Wire.escape(data))
+            end
+        elseif kind == "backup_get" then
+            local session, hid = tostring(payload):match("^([^|]*)|(.*)$")
+            if session then
+                local stored = platform.cfgLoad(Relay.BACKUP_SECTION, "h" .. hid)
+                local data = (type(stored) == "string" and stored ~= "") and Wire.unescape(stored) or ""
+                r.nextMsg = r.nextMsg + 1
+                for _, part in ipairs(Wire.split(session, "b" .. r.nextMsg, data)) do
+                    platform.sendToSim(ownerEid, Wire.channel("backup_data"), part)
+                end
+                log("backup for household " .. hid .. (data ~= "" and " sent" or ": none"))
+            end
         end
     end
 
