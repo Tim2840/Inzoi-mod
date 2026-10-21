@@ -112,7 +112,7 @@ const Bridge = (() => {
       AgingConditionFlags: 504, RepeatCount: 1,
       InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_SendAway", Label: "A" }] }] }],
     ["Object", "PawHome_LitterBox", { ID: "PawHome_LitterBox", StateVariationId: "Normal",
-      ObjectTemplateId: "PawHome_LitterBox_Template", ObjectCategory: "None", FilterCategory: "Pet",
+      ObjectTemplateId: "Decoration01_Template", ObjectCategory: "None", FilterCategory: "Pet",
       Asset: "/Game/Blueprint/GameObject/Furniture/BP_Bustub01_v01.BP_Bustub01_v01", DevOnly: false,
       Icon: "/Game/UI/Icon/Object/Bustub01_v01.Bustub01_v01", Price: 35,
       DisplayNameTextId: "mod_PawHome_obj_litter_box", DescriptionTextId: "mod_PawHome_obj_litter_box_desc" }],
@@ -121,24 +121,12 @@ const Bridge = (() => {
       Asset: "/Game/Blueprint/GameObject/Furniture/BP_Farm_Fertilizer01.BP_Farm_Fertilizer01", DevOnly: false,
       Icon: "/Game/UI/Icon/Object/Fertilizer01.Fertilizer01", Price: 12,
       DisplayNameTextId: "mod_PawHome_obj_litter_bag", DescriptionTextId: "mod_PawHome_obj_litter_bag_desc" }],
-    ["Interaction", "PawHome_RefillLitter", { ID: "PawHome_RefillLitter", ActionIdList: ["Object_Void_Cat_Tickle"],
-      InteractionSlotUsage: "Single", PostureId: ["Stand"], BodyParts: ["BothHands"] }],
-    ["InteractionBag", "PawHome_RefillLitter", { ID: "PawHome_RefillLitter", PostureGroupId: "StandGroup",
-      AgingConditionFlags: 504, RepeatCount: 1,
-      InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_RefillLitter", Label: "A" }] }],
-      DisplayInfo: { DisplayTextId: "mod_PawHome_refill_litter" } }],
     ["Interaction", "PawHome_UseLitter", { ID: "PawHome_UseLitter", ActionIdList: ["Object_Void_Cat_Tickle"],
       InteractionSlotUsage: "Single", PostureId: ["Stand"], BodyParts: ["BothHands"] }],
     ["InteractionBag", "PawHome_UseLitter", { ID: "PawHome_UseLitter", PostureGroupId: "StandGroup",
       AgingConditionFlags: 504, RepeatCount: 1,
       InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_UseLitter", Label: "A" }] }],
       DisplayInfo: { DisplayTextId: "mod_PawHome_use_litter" } }],
-    ["Interaction", "PawHome_CleanLitter", { ID: "PawHome_CleanLitter", ActionIdList: ["Object_Void_Cat_Tickle"],
-      InteractionSlotUsage: "Single", PostureId: ["Stand"], BodyParts: ["BothHands"] }],
-    ["InteractionBag", "PawHome_CleanLitter", { ID: "PawHome_CleanLitter", PostureGroupId: "StandGroup",
-      AgingConditionFlags: 504, RepeatCount: 1,
-      InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_CleanLitter", Label: "A" }] }],
-      DisplayInfo: { DisplayTextId: "mod_PawHome_clean_litter" } }],
     ["Interaction", "PawHome_CallCatHere", { ID: "PawHome_CallCatHere", ActionIdList: ["Self_Pose_CatHeart"],
       InteractionSlotUsage: "None", NoneTargetPlayable: true, PostureId: ["Stand"], BodyParts: ["BothHands"] }],
     ["InteractionBag", "PawHome_CallCatHere", { ID: "PawHome_CallCatHere", GroupId: "Group_Self_Expression",
@@ -161,41 +149,42 @@ const Bridge = (() => {
       ["InteractionBag", id, { ID: id, GroupId: "Group_Self_Expression", PostureGroupId: "StandGroup", AgingConditionFlags: 504,
         RepeatCount: 1, InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: id, Label: "A" }] }] }]);
   }
-  // Objects with their own menus (verified in game 2026-10-22: a copy of Decoration01_Template with its own
-  // ObjectSelectionSet gives only these objects the interactions, and a placed object reports its own
-  // row id, so the mod finds it on the lot). Menu interactions end up in mod/lua/pawhome/adapters/inzoi_b2.lua.
-  //  - litter box: Add Cat Litter / Clean Litter Box
-  //  - food bowl: Fill the Food Bowl / Let the Cat Eat from the Bowl
-  const OWN_MENU_OBJECTS = [   // [object id, bags]
-    ["PawHome_LitterBox", ["PawHome_RefillLitter", "PawHome_CleanLitter"]],
-    ["PawHome_FoodBowl", ["PawHome_FillBowl", "PawHome_FeedFromBowl"]],
+  // Menus of our own objects. A new ObjectTemplate/ObjectSelectionSet pair is NOT enough: the entries were
+  // listed for the object but clicking it showed no menu and the Zoi refused them (2026-10-22). What works
+  // is the game's own pattern (the laundry hamper): the object keeps Decoration01_Template, the entries are
+  // added to the Decoration01 menu and shown only on our object by a condition (Target IsObject <id>); the
+  // interaction walks the Zoi to one of the object's slots (MoveRotate) and plays a short look animation.
+  // Verified in game 20261019.16318.W (2026-10-22): "Fill the Food Bowl" on a placed PawHome_FoodBowl,
+  // the Zoi walks over, looks into it, interaction.finished reaches the mod and the bowl is filled; a
+  // chair does not get the entries. The results are handled in mod/lua/pawhome/adapters/inzoi_b2.lua.
+  const OBJECT_MENUS = [   // [object id, condition id, [bag, label] ...]
+    ["PawHome_FoodBowl", "PawHome_IsFoodBowl", [["PawHome_FillBowl", "fill_bowl"], ["PawHome_FeedFromBowl", "feed_from_bowl"]]],
+    ["PawHome_LitterBox", "PawHome_IsLitterBox", [["PawHome_RefillLitter", "refill_litter"], ["PawHome_CleanLitter", "clean_litter"]]],
   ];
-  for (const [obj, bags] of OWN_MENU_OBJECTS) {
-    GAME_DATA.unshift(
-      ["ObjectTemplate", obj + "_Template", { ID: obj + "_Template",
-        Asset: "/Game/Blueprint/GameObject/Templates/BP_Decoration01_Template.BP_Decoration01_Template",
-        ObjectSelectionSetId: obj, ObjectWeatheringGroupId: "DefaultWeathering", IsWettable: true, CustomizeType: "MaterialOnly",
-        IsCarriable: false, PlacementFlags: 1, FollowSlotRotation: false, IsDerived: false, ObjectTags: [],
-        CarryHandStyle: "Invalid", PlacementGuideTextId: "", OwnershipCategory: "None", bDisableTakeOutOfInventory: false,
-        bCanInteractInInventory: false, IgnoreSlotToEntityCheck: false, InventroyInteractionBagId: "None",
-        AvailableSocialClusterType: [], WeatherAutonomyBehavior: "AvoidBadWeather", WeatherScripts: [],
-        bForceChildFollowSlotRotation: false, OnAttachChildStateGroupId: "None", OnAttachChildStateId: "None" }],
-      ["ObjectSelectionSet", obj, { ID: obj, IsDisplayObjectString: true, bShowInteractionOnGroupClick: false,
-        SelectionSets: [{ StateGroupId: "Normal", SelectionType: "Normal", InteractionBagList: bags }] }]);
-  }
   GAME_DATA.push(
+    ["Action", "PawHome_ObjLook", { ID: "PawHome_ObjLook", ActionTags: [], Actions: [{ ConditionId: "None", duration: 0,
+      IsForceCancelable: true, IsWaitFinishAction: true, FinishPrev: false, bEnableInsertAutoMove: false, BaseObject: "Self",
+      Command: "PlayAnim", S1: "LaundryHamper01_Looking", S2: "None", F1: 0, F2: 0, StartScriptIdList: [], TickScriptIdList: [],
+      TickInterval: 0, FinishScriptIdList: [], CancelScriptIdList: [], NotifyScriptIds: [] }] }],
     ["Object", "PawHome_FoodBowl", { ID: "PawHome_FoodBowl", StateVariationId: "Normal",
-      ObjectTemplateId: "PawHome_FoodBowl_Template", ObjectCategory: "None", FilterCategory: "Pet",
+      ObjectTemplateId: "Decoration01_Template", ObjectCategory: "None", FilterCategory: "Pet",
       Asset: "/Game/Blueprint/GameObject/Furniture/BP_FoodBowl01.BP_FoodBowl01", DevOnly: false,
       Icon: "/Game/UI/Icon/Object/FoodBowl01.FoodBowl01", Price: 25,
       DisplayNameTextId: "mod_PawHome_obj_food_bowl", DescriptionTextId: "mod_PawHome_obj_food_bowl_desc" }]);
-  for (const [bag, label] of [["PawHome_FillBowl", "fill_bowl"], ["PawHome_FeedFromBowl", "feed_from_bowl"]]) {
-    GAME_DATA.push(
-      ["Interaction", bag, { ID: bag, ActionIdList: ["Object_Void_Cat_Tickle"], InteractionSlotUsage: "Single",
-        PostureId: ["Stand"], BodyParts: ["BothHands"] }],
-      ["InteractionBag", bag, { ID: bag, PostureGroupId: "StandGroup", AgingConditionFlags: 504, RepeatCount: 1,
-        InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: bag, Label: "A" }] }],
-        DisplayInfo: { DisplayTextId: "mod_PawHome_" + label } }]);
+  const OBJECT_MENU_ENTRIES = [];
+  for (const [obj, cond, bags] of OBJECT_MENUS) {
+    GAME_DATA.push(["Condition", cond, { ID: cond, OrConditionsList: [], AndConditionsList: [{ Conditions: [{
+      BaseObject: "Target", Command: "IsObject", CompareType: "Equal", UseHand: "Default", S1: obj, S2: "None", F1: 0, F2: 0 }] }] }]);
+    for (const [bag, label] of bags) {
+      GAME_DATA.push(
+        ["Interaction", bag, { ID: bag, ActionIdList: ["MoveRotate", "PawHome_ObjLook"], InteractionSlotUsage: "Single",
+          EnableSlotTags: ["None"], ObjectSlotUsage: "None", bCheckCanMoveToSlot: true, PostureId: ["Stand"], BodyParts: ["BothHands"] }],
+        ["InteractionBag", bag, { ID: bag, PostureGroupId: "StandGroup", AgingConditionFlags: 504, RepeatCount: 1,
+          InteractionVisibleConditionIds: [cond], InteractionEnableConditionIds: [cond],
+          InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: bag, Label: "B" }] }],
+          DisplayInfo: { DisplayTextId: "mod_PawHome_" + label } }]);
+      OBJECT_MENU_ENTRIES.push(["Decoration01", "Normal", bag]);
+    }
   }
   // The cat's clips. The cat only really animates when the game's own PlayVATAnim action runs on it
   // (the direct B1 call shows a clip's first frame and then stays frozen; verified 2026-10-22), so
@@ -269,7 +258,7 @@ const Bridge = (() => {
     ["DEV_Void_Cat", "Normal", "PawHome_Adopt"],
     ["SelfCharacter", "Normal", "PawHome_CallCatHere"],
     ["SelfCharacter", "Normal", "PawHome_ShopPhone"],
-  ];
+  ].concat(OBJECT_MENU_ENTRIES);
   // The game limits how fast commands may come in (it answers "request limit exceeded" and the
   // rows after that are lost; seen 2026-10-22 with about 90 quick calls). So the setup is paced and
   // a refused call is tried again. Appending a row whose id exists REPLACES it (verified), so rows

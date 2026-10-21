@@ -3,6 +3,8 @@ All notable changes are listed here ([Keep a Changelog](https://keepachangelog.c
 
 ## [Unreleased]
 ### Added
+- Food bowl and litter box menus (game-verified 2026-10-22 through the CLI): "Fill the Food Bowl" / "Let the Cat Eat from the Bowl" on a Paw Home food bowl, "Add Cat Litter" / "Clean Litter Box" on the litter box. Hungry cats eat from a filled bowl by themselves and are put in front of it. Results show as game toasts. Save format v6.
+- Called cats land on the Zoi's floor (not under a deck) and in a spot clear of furniture.
 - Cat Moments (`docs/design/gameplay-v2.md`): cats have wants (feed, play, cuddle, clean the litter) shown as a thought bubble; meeting a want is a happy moment (needs, bond and training gain more, the cat reacts at once). No cooldowns; repeating one action gives less each time (`data/care.lua`). Save format v5 (`album`).
 - Keepsakes: a happy moment can make the cat bring a gift, which is a real game item (stone, catnip candy, cat treat, cat toy, plush, bouquet, ribbon, amethyst, aquamarine, emerald) put in the Zoi's bag with a data script (`PawHome_Gift_*`, verified in game 2026-10-22: the cat treat made "Give Treat to Cat" usable). Keepsake album tab in the panel.
 - Care from the cat's own interaction menu: Pet Gently, Give Treat, Give Catnip Candy (vanilla bags appended to `DEV_Void_Cat`) count like Give Snack and Play; the panel only shows mood, needs and the album (verified in game 2026-10-22).
