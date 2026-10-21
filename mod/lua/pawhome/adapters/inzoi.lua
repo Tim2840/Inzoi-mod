@@ -38,6 +38,12 @@ local ModKit = {
     WELCOME = "PawHome_WelcomeCat",
     SEND_AWAY = "PawHome_SendAway",
     CARE = { Object_Void_Cat_Dev = "feed", Object_Void_Cat_Tickle = "play" },
+    -- our entry interactions (rows added by mod/ui/bridge.js) -> where the shop opens
+    OPEN = {
+        PawHome_ShopPhone = { shell = "phone" },
+        PawHome_ShopPC = { shell = "pc" },
+        PawHome_Adopt = { shell = "phone", tab = "adopt" },   -- on a city cat
+    },
 }
 
 function ModKit.new(platform, opts)
@@ -358,6 +364,24 @@ function ModKit.new(platform, opts)
         for _, eid in ipairs(list) do
             if a.cats[eid] == nil or not a.cats[eid].home then a.onCatBegin(eid, { home = true }) end
         end
+    end
+
+    -- interaction.started event: the player's Zoi picked one of our entries (phone, computer,
+    -- "adopt" on a city cat) -> the page shows the shop. Event fields as in interaction.finished.
+    function a.onInteractionStarted(ev)
+        local entry = ev and ModKit.OPEN[ev.interaction_bag_id]
+        if not entry or ev.entity_id ~= target() then return false end
+        local open = { shell = entry.shell, tab = entry.tab }
+        local cat = ev.target_entity_id
+        if entry.tab == "adopt" and cat then
+            -- the entry is on every DEV_Void_Cat, our home cats included: those are already ours
+            for _, eid in pairs(a.refs) do if eid == cat then return false end end
+            if a.cats[cat] and a.cats[cat].home then return false end
+            a.cats[cat] = a.cats[cat] or { home = false }   -- missed by the binding (hot remount)
+            a.met[cat] = a.now()                             -- choosing "adopt" counts as meeting it
+            open.stray = "cat" .. tostring(cat)
+        end
+        return sendLong("open", Wire.toJson(open))
     end
 
     -- interaction.finished event: summoned cats, city cats the player met, and care given.
