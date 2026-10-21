@@ -237,3 +237,9 @@ button { cursor: pointer; }
 .devbar { border: 2px dashed var(--line); border-radius: 16px; padding: 8px 10px; margin-top: 8px; font-size: 12px; color: var(--muted);
           display: flex; flex-wrap: wrap; align-items: center; }
 .devbar .btn { padding: 3px 8px; font-size: 12px; margin: 2px 4px 2px 0; }
+
+/* coat buttons in the adoption cards: one small cat head per coat */
+.chips.coats { margin: 6px 0; }
+.chip.coat { width: 40px; height: 40px; padding: 2px; justify-content: center; }
+.chip.coat .ico, .chip.coat svg { width: 32px; height: 32px; }
+.chip.coat[aria-pressed="true"] { background: var(--peach-2); border-color: var(--ink); }

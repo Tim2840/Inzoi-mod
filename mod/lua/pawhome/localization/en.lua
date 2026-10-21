@@ -98,6 +98,7 @@ return {
         adopt_cat = "Adopt this cat (Paw Home)",
     },
     ui = {
+        coat_label = "Coat",
         backup_found = "Found a copy of your pets from day {day}: {names}. This save has none, maybe it was saved while Paw Home was off.",
         backup_restore = "Bring them back",
         vet = "Take to the vet ({fee})",

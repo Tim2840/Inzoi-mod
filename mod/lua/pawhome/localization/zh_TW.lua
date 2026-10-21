@@ -96,6 +96,7 @@ return {
         adopt_cat = "領養這隻貓（毛孩之家）",
     },
     ui = {
+        coat_label = "花色",
         backup_found = "找到第 {day} 天的寵物備份：{names}。這個存檔裡沒有寵物資料，可能是在毛孩之家關閉時存的檔。",
         backup_restore = "把牠們找回來",
         vet = "帶去看獸醫（{fee}）",

@@ -41,11 +41,29 @@ const Icons = (() => {
     happy: "happy", playful: "happy", energized: "happy", content: "content", asleep: "sleep",
     sad: "sad", uncomfortable: "grumpy", tense: "grumpy", angry: "grumpy", sick: "sick",
   };
-  function cat(mood) {
+  // fur of the four game coats (data/coats.lua ids); anything else is the plain cream cat
+  const COAT = {
+    orange_tabby: { fur: "#f2a65e", stripe: "#c97a2e", ear: "#ffb199" },
+    brown_tabby: { fur: "#b98d66", stripe: "#7d5535", ear: "#e2a99a" },
+    calico: { fur: "#fff4e4", stripe: "#e9a066", ear: "#ffb3c1" },
+    tuxedo: { fur: "#4f5262", stripe: "#3b3d4b", ear: "#f7a1c4" },
+  };
+  // extra markings drawn over the head (calico patches, the tuxedo's white muzzle)
+  const MARKS = {
+    calico: `<path d="M10 21 L11.5 8.5 Q12.2 6 14.5 7.2 L21 12.2 Q17 16 15 24 Q11 24 10 21 Z" fill="#f2a65e"/>`
+      + `<path d="M38 21 L36.5 8.5 Q35.8 6 33.5 7.2 L30 10.4 Q35 14 35.5 22 Q37.5 22 38 21 Z" fill="#6b5a52"/>`
+      + `<ellipse cx="33" cy="35" rx="5.5" ry="4" fill="#f2a65e"/>`,
+    tuxedo: `<ellipse cx="24" cy="31" rx="12.5" ry="10.5" fill="#ffffff"/>`
+      + `<path d="M24 14 L27 24 H21 Z" fill="#ffffff"/>`,
+  };
+
+  function cat(mood, coat) {
     const face = FACE_OF[mood] || (EYES[mood] ? mood : "content");
-    return `<path d="M10 21 L11.5 8.5 Q12.2 6 14.5 7.2 L21 12.2 Q24 11.6 27 12.2 L33.5 7.2 Q35.8 6 36.5 8.5 L38 21 Q41.5 28 37.5 34 Q32.5 41.5 24 41.5 Q15.5 41.5 10.5 34 Q6.5 28 10 21 Z" ${s(C.cream)}/>`
-      + `<path d="M14 11 L19.5 14.5 L14.8 17.5 Z M34 11 L28.5 14.5 L33.2 17.5 Z" fill="${C.peach}"/>`
-      + `<path d="M21 14.6 L21.9 17.6 M24 13.8 V17.4 M27 14.6 L26.1 17.6" ${line(1.8, C.stripe)}/>`
+    const k = COAT[coat] || { fur: C.cream, stripe: C.stripe, ear: C.peach };
+    return `<path d="M10 21 L11.5 8.5 Q12.2 6 14.5 7.2 L21 12.2 Q24 11.6 27 12.2 L33.5 7.2 Q35.8 6 36.5 8.5 L38 21 Q41.5 28 37.5 34 Q32.5 41.5 24 41.5 Q15.5 41.5 10.5 34 Q6.5 28 10 21 Z" ${s(k.fur)}/>`
+      + (MARKS[coat] || "")
+      + `<path d="M14 11 L19.5 14.5 L14.8 17.5 Z M34 11 L28.5 14.5 L33.2 17.5 Z" fill="${k.ear}"/>`
+      + (coat === "tuxedo" ? "" : `<path d="M21 14.6 L21.9 17.6 M24 13.8 V17.4 M27 14.6 L26.1 17.6" ${line(1.8, k.stripe)}/>`)
       + `<circle cx="14.4" cy="30.6" r="2.6" fill="${C.blush}"/><circle cx="33.6" cy="30.6" r="2.6" fill="${C.blush}"/>`
       + EYES[face]
       + `<path d="M22.4 28.6 H25.6 L24 30.6 Z" ${s("#f2738c", 1.2)}/>`
@@ -172,18 +190,18 @@ const Icons = (() => {
       + `<path d="M13 44 Q17 26 21 14 Q33 25 47 44 Z" fill="#f58fa3"/></g></svg>`;
   }
 
-  function markup(name, mood) {
+  function markup(name, mood, coat) {
     if (name === "ear" || name === "ear-r") return ear(name === "ear-r");
     const key = ALIAS[name] || name;
-    const body = key === "cat" ? cat(mood) : ICONS[key];
+    const body = key === "cat" ? cat(mood, coat) : ICONS[key];
     if (!body) return null;
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">${body}</svg>`;
   }
   const cache = {};
-  function url(name, mood) {
-    const k = name + "/" + (mood || "");
+  function url(name, mood, coat) {
+    const k = name + "/" + (mood || "") + "/" + (coat || "");
     if (!(k in cache)) {
-      const m = markup(name, mood);
+      const m = markup(name, mood, coat);
       cache[k] = m ? "data:image/svg+xml;charset=utf-8," + encodeURIComponent(m) : null;
     }
     return cache[k];
@@ -195,11 +213,11 @@ const Icons = (() => {
     const o = opts || {};
     const el = document.createElement("span");
     el.className = "ico" + (o.cls ? " " + o.cls : "");
-    el.innerHTML = markup(name, o.mood) || "";
+    el.innerHTML = markup(name, o.mood, o.coat) || "";
     if (o.label) { el.setAttribute("role", "img"); el.setAttribute("aria-label", o.label); }
     else el.setAttribute("aria-hidden", "true");
     return el;
   }
   const names = () => Object.keys(ICONS).concat(["cat"]);
-  return { img, url, markup, names, moods: Object.keys(EYES) };
+  return { img, url, markup, names, moods: Object.keys(EYES), coats: Object.keys(COAT) };
 })();
