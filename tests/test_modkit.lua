@@ -588,6 +588,16 @@ T.test("looks: care given with the game's own interaction does not replay an ani
     T.eq(#sent(s, "anim"), 0)
 end)
 
+T.test("looks: pressing buttons quickly sends every reaction at once, marked as the player's", function()
+    local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
+    s.adapter.petLook(pet.entity, { mood = "content", stage = "adult", scale = 1 })
+    T.truthy(s.adapter.playAnimation(pet.entity, "pet_cuddle"))
+    T.truthy(s.adapter.playAnimation(pet.entity, "pet_play"), "the first reaction (12 s) does not hold the second back")
+    local anims = sent(s, "anim")
+    T.eq(#anims, 2)
+    for _, a in ipairs(anims) do T.truthy(a:find("|1$"), a) end
+end)
+
 T.test("looks: nothing is played on a cat while a game interaction runs on it", function()
     local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
     s.adapter.petLook(pet.entity, { mood = "content", stage = "adult", scale = 1 })
@@ -671,6 +681,22 @@ T.test("cat B1: the size is applied on begin, again after a stale start, and ask
     local b = f.actor(109546)
     f.cats.onBegin(b)
     T.eq(b.scale, 0.6)
+end)
+
+T.test("cat B1: a reaction the player asked for is shown at once, an idle change waits for the game", function()
+    local f = fakeCats()
+    local a = f.actor(109546)
+    f.cats.onBegin(a)
+    f.cats.onMessage(a, "pawhome:anim", "ANIM_VoidCat_Sit_Idle_01|0|")
+    a.anim = "ANIM_VoidCat_Eat"                      -- the game changed the animation by itself
+    f.cats.tick(1)                                   -- B1 notices the change
+    f.cats.onMessage(a, "pawhome:anim", "ANIM_VoidCat_Sit_Idle_02|0|")
+    T.eq(a.anim, "ANIM_VoidCat_Eat", "an ordinary idle change keeps off the game's animation")
+    f.cats.onMessage(a, "pawhome:anim", "ANIM_Void_Cat_Welcoming|5.7|ANIM_VoidCat_Sit_Idle_01|1")
+    T.eq(a.anim, "ANIM_Void_Cat_Welcoming", "the player's button is shown right away")
+    -- and a second button press replaces the first reaction instead of waiting for it to end
+    f.cats.onMessage(a, "pawhome:anim", "ANIM_VoidCat_Being_Patted|12.2|ANIM_VoidCat_Sit_Idle_01|1")
+    T.eq(a.anim, "ANIM_VoidCat_Being_Patted")
 end)
 
 T.test("cat B1: a one-shot returns to the sitting idle and is not cut short", function()

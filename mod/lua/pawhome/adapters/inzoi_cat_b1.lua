@@ -105,9 +105,11 @@ function CatB1.new(platform)
             applyScale(cat)
             return
         end
-        local name, seconds, back = tostring(payload):match("^([^|]*)|([^|]*)|(.*)$")
+        -- "name|seconds|back" or "name|seconds|back|1": the last field marks a reaction the player just
+        -- asked for (a panel button); it is shown at once, whatever else the cat was doing
+        local name, seconds, back, force = tostring(payload):match("^([^|]*)|([^|]*)|([^|]*)|?(.*)$")
         if not name or name == "" then return end
-        local why = blocked(cat)
+        local why = force ~= "1" and blocked(cat) or nil
         if why then
             log("skipped " .. name .. " on " .. tostring(cat.eid) .. " (" .. why .. ")")
             return

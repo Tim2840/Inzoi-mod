@@ -310,12 +310,14 @@ function ModKit.new(platform, opts)
         return Anim.moods[look and look.mood or "content"] or Anim.moods.content
     end
 
-    local function sendAnim(eid, key, backKey)
+    -- force: a reaction the player asked for; B1 shows it at once instead of waiting for the game's
+    -- own animation changes to settle
+    local function sendAnim(eid, key, backKey, force)
         local seq = Anim.sequences[key]
         if not seq then return false end
         local back = backKey and Anim.sequences[backKey]
         platform.send(eid, Wire.channel("anim"),
-            seq.name .. "|" .. tostring(seq.seconds or 0) .. "|" .. (back and back.name or ""))
+            seq.name .. "|" .. tostring(seq.seconds or 0) .. "|" .. (back and back.name or "") .. (force and "|1" or ""))
         local st = shownOf(eid)
         if seq.loop then st.base = key elseif back then st.base = backKey end
         -- a game minute is about 2 real seconds at normal speed; B1 also refuses to cut a
@@ -339,8 +341,9 @@ function ModKit.new(platform, opts)
     function a.playAnimation(ref, id)
         if not a.caps.animate then return false end
         local eid, key = catOf(ref), Anim.actions[id]
-        if eid == nil or key == nil or not free(eid) then return false end
-        return sendAnim(eid, key, moodDef(ref).base)
+        -- only the game's own interaction on the cat holds this back, not our earlier animation
+        if eid == nil or key == nil or a.busy[eid] then return false end
+        return sendAnim(eid, key, moodDef(ref).base, true)
     end
 
     -- force: send even if it was sent before (a message to a cat whose actor is not ready
