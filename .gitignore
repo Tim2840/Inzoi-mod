@@ -6,3 +6,6 @@ __pycache__/
 
 # per-worker git worktrees created by Claude Code
 .claude/worktrees/
+
+# release builds
+dist/

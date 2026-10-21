@@ -21,17 +21,21 @@ inZOI 目前沒有寵物系統。本模組照 The Sims 4《貓狗成群》的玩
 
 | 部分 | 狀態 |
 |---|---|
-| 寵物引擎 `mod/lua/pawhome/` | ✅ 完成，156 項離線測試全過；已在遊戲 B2 執行 |
-| 介面 `mod/ui/`（繁中／英文） | ✅ 遊戲內顯示、領養、設定已實測（2026-10-21）；圖示待做（遊戲字型沒有 emoji） |
-| `adapters/inzoi*.lua`（官方 ModKit） | ✅ 時間、存檔握手、家戶、金錢扣款、召喚與綁定家貓（跨存檔）已實測；送走貓、照顧事件計入引擎待測（`docs/design/modkit-runtime.md` 第 4 節） |
+| 寵物引擎 `mod/lua/pawhome/` | ✅ 領養、需求、心情、成長老死、照顧、生病與獸醫、貓家具加成、疏於照顧與贖回、固定花色、存檔備援；199 項離線測試全過；已在遊戲 B2 執行 |
+| 介面 `mod/ui/`（繁中／英文） | ✅ 可愛風寵物店（手機／電腦／啟動鈕三種外觀）、自製 SVG 圖示、花色選擇；啟動鈕與手機版面已在遊戲內驗證，電腦版面與選單入口文字待驗證 |
+| `adapters/inzoi*.lua`（官方 ModKit） | ✅ 時間、存檔握手、家戶、金錢、召喚與綁定家貓、送走貓、遊戲原生照顧計入、動畫與縮放、花色（B1 設材質貼圖）已實測；逐項狀態見 `docs/design/modkit-runtime.md` 第 4 節 |
 | `mod/ui/bridge.js` 的遊戲內傳輸 | ✅ 已實測（B2 ⇄ B1 ⇄ `uimod.cfg_*` ⇄ UI，`wf.state` 存檔）；每次載入以 `data.patch` 加入遊戲資料 |
+| 會走動的貓 | ❌ 結案：遊戲的貓是 VAT 動畫，沒有走路動畫，滑行不可接受（`docs/research/walking-cat.md`）。貓依心情播 9 段原版坐姿類動畫 |
+| 打包與發佈 | ⏳ `tools/make_release.py`、`docs/packaging.md`、`docs/player-guide.md` 完成；ModKit 正式打包與 CurseForge 發佈待 PO |
 | 官方路線遊戲內實測 | ✅ 第 0 階段完成（遊戲 `20261019.16318.W`，2026-10-20／21） |
 | UE4SS 路線（`adapters/ue4ss.lua`、`mod/ue4ss/`、`scripts/*ue4ss*`、`scripts/smoke-t1.ps1`） | ⏸ 暫停。有遊戲內證據（v0.11.0），但裝著 UE4SS 時「存檔後離開」會崩潰（ADR 0005） |
 
-## 第一優先：實作（ADR 0007、0008）
+## 第一優先（工作線與進度見 [`docs/roadmap.md`](docs/roadmap.md)）
 
-1. 經 adapter 送走貓（`PawHome_SendAway`）的遊戲內測試。2. 照顧事件（餵、玩）計入引擎。3. 「領養」互動用資料補丁加進城市貓選單。4. UI 圖示、模組打包。
-開發版模組：`Documents\inZOI\Mods\InGame\PawHomeDev_A5BI7C`，用 `py -I tools/build_modkit.py` 產生；先在主選單 `luamod.mount` 再讀檔。
+1. 專用測試存檔：用遊戲新開一個專用存檔，之後才能測「存檔→讀檔」（花色、寵物綁定）。**複製存檔不能隔離**，見規矩 14。
+2. 打包與乾淨安裝測試（需要 PO 開 ModKit）；發佈要 PO 同意。
+3. 待驗證：手機／電腦／城市貓的互動選單入口文字、貓的小反應動畫、電腦版面。
+開發版模組：`Documents\inZOI\Mods\InGame\PawHomeDev_A5BI7C`，用 `py -I tools/build_modkit.py <該資料夾>` 產生；遊戲內測試用 `tools/ingame_smoke.py`、`tools/ui_rpc.py`、`tools/mod_log.py`，一個遊戲同時只能一個人用（`tools/game_lock.py`）。
 遊戲內測試用 `tools/game_mcp.py`（遊戲 MCP 的 JSON-RPC 呼叫器）；探勘用 ModKit 專案 `PawHome_Probe_DBA66034`（不進 repo）。
 
 ## 規矩
@@ -51,6 +55,8 @@ inZOI 目前沒有寵物系統。本模組照 The Sims 4《貓狗成群》的玩
 11. 不要把 ModKit 的 Unreal 專案或大型二進位檔直接 commit；先和 PO 討論 `.gitignore` 或 Git LFS。
 12. 桌面預覽：`py tools\preview_server.py` → `http://127.0.0.1:8765/?preview=1`。改 Lua 之後要重啟它。
 13. 永遠不取得 AES 金鑰、不散佈 KRAFTON 的遊戲資源。
+14. **測試時絕對不要存檔**（`game.goto_lobby save=true`）：遊戲依存檔「名稱」寫回，複製存檔資料夾不能隔離，2026-10-22 因此改到 PO 的原存檔（已還原）。測完回主選單用 `save=false`。
+15. 不要把從遊戲匯出的資料（骨架、網格、貼圖）放進 repo。
 
 ## 開發規則（ADR 0008，修訂 ADR 0006）
 
