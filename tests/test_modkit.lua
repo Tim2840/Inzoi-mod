@@ -53,7 +53,7 @@ end
 -- A UI that speaks the bridge.js protocol (kept deliberately literal).
 local function fakeUi(w, state)
     local ui = { state = state or {}, session = nil, answered = nil, outbox = {}, nextSeq = 1,
-                 lastSeen = 0, relayEpoch = nil, nextRpc = 1, results = {}, epoch = "ui1" }
+                 lastSeen = 0, relayEpoch = nil, nextRpc = 1, results = {}, epoch = "ui1", opened = {} }
     local function send(channel, data)
         ui.outbox[#ui.outbox + 1] = { seq = ui.nextSeq, channel = channel, payload = ui.session .. "|" .. data }
         ui.nextSeq = ui.nextSeq + 1
@@ -74,6 +74,8 @@ local function fakeUi(w, state)
                 elseif from == ui.session and e.channel == "pawhome:save" then
                     local t = Wire.fromJson(data)
                     ui.state[t.key] = t.value
+                elseif from == ui.session and e.channel == "pawhome:open" then
+                    ui.opened[#ui.opened + 1] = Wire.fromJson(data)
                 elseif from == ui.session and e.channel == "pawhome:rpc_result" then
                     local t = Wire.fromJson(data)
                     ui.results[t.id] = t.result
@@ -441,4 +443,23 @@ T.test("modkit: no backup is offered when the savegame has its own pets or there
     local v = s2.app:view(77, 501)
     T.eq(#v.pets, 1); T.eq(v.backup, nil)
     T.falsy(s2.app:restoreBackup().ok)
+end)
+
+T.test("modkit: our phone, computer and city-cat entries open the shop on the page", function()
+    local s = boot({ spawn = false })
+    s.pump()
+    s.adapter.onInteractionStarted({ interaction_bag_id = "PawHome_ShopPC", entity_id = 501 })
+    s.adapter.onInteractionStarted({ interaction_bag_id = "PawHome_Adopt", entity_id = 501, target_entity_id = 89129 })
+    s.adapter.onInteractionStarted({ interaction_bag_id = "PawHome_ShopPhone", entity_id = 777 })   -- not our Zoi
+    s.adapter.onInteractionStarted({ interaction_bag_id = "Self_SmartPhone_Check", entity_id = 501 }) -- not ours
+    s.adapter.onCatBegin(109615, { home = true })
+    s.adapter.onInteractionStarted({ interaction_bag_id = "PawHome_Adopt", entity_id = 501, target_entity_id = 109615 }) -- a home cat
+    s.pump(2)
+    T.eq(#s.ui.opened, 2)
+    T.eq(s.ui.opened[1].shell, "pc")
+    T.eq(s.ui.opened[2].tab, "adopt"); T.eq(s.ui.opened[2].stray, "cat89129")
+    local strays = s.app:strays(77)
+    local found = false
+    for _, st in ipairs(strays) do if tostring(st.ref) == "89129" then found = true end end
+    T.truthy(found, "the cat the player chose to adopt is offered as a stray")
 end)

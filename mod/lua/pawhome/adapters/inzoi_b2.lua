@@ -66,6 +66,9 @@ function R.start(opts)
     R.handlers = {
         ["time.hour_changed"] = function() onHour() end,
         ["interaction.finished"] = onInteraction,
+        ["interaction.started"] = function(p)
+            if R.adapter and type(p) == "table" then pcall(R.adapter.onInteractionStarted, p) end
+        end,
     }
     for name, fn in pairs(R.handlers) do
         local ok, e = pcall(inzoi.event.on, name, fn)       -- verified 2026-10-20 (B2)
