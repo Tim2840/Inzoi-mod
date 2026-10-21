@@ -3,6 +3,7 @@
 -- ("fatigue"), and doing what the cat wants right now is a happy moment worth much more.
 local actions = require("pawhome.data.actions")
 local careData = require("pawhome.data.care")
+local litterData = require("pawhome.data.litter")
 local Api = require("pawhome.core.api")
 local Registry = require("pawhome.pets.registry")
 local Needs = require("pawhome.pets.needs")
@@ -55,6 +56,12 @@ function C.perform(ctx, petId, zoiId, actionId, opts)
     if refused then return fail(ctx, refused, { name = pet.name }) end
     if def.scope == "household" and not Litter.present(ctx, pet.household) then
         return fail(ctx, "no_litter_box", { name = pet.name })
+    end
+    if actionId == "clean_litter" and ctx.state and ctx.state.litterBox then
+        local entry = ctx.state.litterBox[tostring(pet.household or 1)]
+        if type(entry) == "table" and entry.state == "empty" then
+            return fail(ctx, "litter_empty", { name = pet.name })
+        end
     end
 
     local result = { ok = true, petId = pet.id, action = actionId, extra = {} }
@@ -130,7 +137,8 @@ function C.perform(ctx, petId, zoiId, actionId, opts)
         end
     end
     if actionId == "clean_litter" then
-        Api.movePetToObject(pet.entity, require("pawhome.data.litter").object)
+        Litter.clean(ctx, pet.household)
+        Api.movePetToObject(pet.entity, litterData.object)
     end
     if animation and (actionId == "clean_litter" or not (fromGame and not (result.keepsake))) then
         Api.playAnimation(pet.entity, animation)

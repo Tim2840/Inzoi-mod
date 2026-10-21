@@ -106,9 +106,13 @@ function Mock.new(opts)
     m.coatList = nil                    -- the last list the mod gave setCoats
     function m.setCoats(list) m.coatList = list end
     function m.playAnimation(ref, anim) m.animations[#m.animations + 1] = { ref = ref, anim = anim } end
-    m.teleports = {}                    -- { ref, object } teleports requested
+    m.teleports = {}                    -- { ref, object/zoi } teleports requested
     function m.movePetToObject(ref, objectId)
         m.teleports[#m.teleports + 1] = { ref = ref, object = objectId }
+        return true
+    end
+    function m.movePetToZoi(ref, zoiId)
+        m.teleports[#m.teleports + 1] = { ref = ref, zoi = zoiId }
         return true
     end
     function m.placeLitterBox(hid)

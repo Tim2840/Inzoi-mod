@@ -282,6 +282,46 @@
       }, view.ui.backup_restore));
   }
 
+  function renderLitterControls(pet, u) {
+    if (pet.status !== "home") return null;
+    const ls = pet.litterStatus || { present: !!pet.litterBox, bagPresent: false, state: "empty", stateLabel: u.litter_state_empty };
+    const callBtn = h("button", {
+      class: "btn ghost", style: "margin-top:6px;width:100%",
+      onclick: async () => { await call("callPet", { petId: pet.id }); render(); },
+    }, u.call_cat);
+    if (!ls.present) {
+      return h("div", { class: "card tip" },
+        h("div", { class: "sub" }, u.tip),
+        callBtn,
+        h("div", { class: "sub", style: "margin-top:6px" }, u.litter_hint));
+    }
+    let actionBtn = null;
+    let extraHint = null;
+    if (ls.state === "empty") {
+      if (!ls.bagPresent) extraHint = h("div", { class: "sub", style: "margin-top:4px" }, u.litter_bag_hint);
+      actionBtn = h("button", {
+        class: "btn", style: "margin-top:6px;width:100%",
+        onclick: async () => { await call("refillLitter", {}); render(); },
+      }, u.refill_litter);
+    } else if (ls.state === "dirty") {
+      actionBtn = h("button", {
+        class: "btn", style: "margin-top:6px;width:100%",
+        onclick: async () => { await call("perform", { petId: pet.id, action: "clean_litter" }); render(); },
+      }, u.clean_litter_btn);
+    } else {
+      actionBtn = h("button", {
+        class: "btn ghost", style: "margin-top:6px;width:100%",
+        onclick: async () => { await call("useLitter", { petId: pet.id }); render(); },
+      }, u.use_litter);
+    }
+    return h("div", { class: "card tip" },
+      h("div", { class: "sub" }, u.tip),
+      callBtn,
+      h("div", { class: "sub", style: "margin-top:6px;font-weight:bold" }, ls.stateLabel),
+      extraHint,
+      actionBtn);
+  }
+
   function renderPets(view) {
     const u = view.ui;
     if (view.pets.length === 0) {
@@ -291,7 +331,6 @@
     }
     const pet = currentPet();
     state.petId = pet.id;
-    const noBox = pet.status === "home" && pet.litterBox === false;
     return h("div", {},
       backupCard(view),
       view.pets.length > 1
@@ -300,13 +339,7 @@
               icon("cat", { mood: p.mood, coat: p.coat }), p.name)))
         : null,
       petCard(pet, u),
-      pet.status === "home" ? h("div", { class: "card tip" }, h("div", { class: "sub" }, u.tip),
-        noBox
-          ? [h("div", { class: "sub", style: "margin-top:4px" }, u.litter_hint),
-             h("button", { class: "btn", style: "margin-top:6px;width:100%",
-               onclick: async () => { await call("placeLitterBox", {}); render(); } }, u.place_litter)]
-          : h("button", { class: "btn ghost", style: "margin-top:6px;width:100%",
-              onclick: async () => { await call("perform", { petId: pet.id, action: "clean_litter" }); render(); } }, u.use_litter)) : null,
+      renderLitterControls(pet, u),
       traitsCard(pet, view),
       furnitureCard(view));
   }

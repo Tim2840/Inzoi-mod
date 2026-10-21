@@ -259,16 +259,39 @@ T.test("litter: with a box the need runs, can be wanted, and the box can be clea
     T.eq(pet.needs.bladder, 100)
 end)
 
-T.test("litter: placing a litter box and automatic self-use teleport the cat and refill bladder", function()
+T.test("litter: build-mode litter box starts empty, refills with litter bag, dirties on use, and empties after cleaning", function()
     local app, mock, pet = newCat()
-    T.truthy(app:placeLitterBox(1).ok)
-    T.truthy(app:view(1, 101).pets[1].litterBox)
+    mock.lot[1] = { "PawHome_LitterBox" }
+    local ls = app:view(1, 101).pets[1].litterStatus
+    T.truthy(ls.present)
+    T.falsy(ls.bagPresent)
+    T.eq(ls.state, "empty")
     pet.needs.bladder = 25
-    local res = app:autoLitter(101)
-    T.eq(#res, 1)
+    -- empty box cannot be used yet, and refilling requires a PawHome_LitterBag on the lot
+    T.eq(#app:autoLitter(101), 0)
+    T.eq(app:useLitter(pet.id, 101).reason, "litter_empty")
+    T.eq(app:refillLitter(1, 101).reason, "no_litter_bag")
+    -- buy PawHome_LitterBag in Build Mode and refill: autoLitter immediately lets the cat use it!
+    mock.lot[1] = { "PawHome_LitterBox", "PawHome_LitterBag" }
+    T.truthy(app:refillLitter(1, 101).ok)
     T.eq(pet.needs.bladder, 100)
     T.eq(#mock.teleports, 1)
     T.eq(mock.teleports[1].object, "PawHome_LitterBox")
+    -- after the cat used it, the litter box is now dirty and must be cleaned before another use
+    T.eq(app:view(1, 101).pets[1].litterStatus.state, "dirty")
+    T.eq(app:useLitter(pet.id, 101).reason, "litter_dirty")
+    -- cleaning 1st use leaves 1 use remaining ("clean")
+    T.truthy(app:perform(pet.id, 101, "clean_litter").ok)
+    T.eq(app:view(1, 101).pets[1].litterStatus.state, "clean")
+    -- 2nd use makes it dirty again, and cleaning the 2nd use exhausts the litter back to "empty"
+    pet.needs.bladder = 30
+    T.truthy(app:useLitter(pet.id, 101).ok)
+    T.eq(app:view(1, 101).pets[1].litterStatus.state, "dirty")
+    T.truthy(app:perform(pet.id, 101, "clean_litter").ok)
+    T.eq(app:view(1, 101).pets[1].litterStatus.state, "empty")
+    -- calling the cat over teleports it to the Zoi
+    T.truthy(app:callPet(pet.id, 101).ok)
+    T.eq(mock.teleports[#mock.teleports].zoi, 101)
 end)
 
 -- ------------------------------------------------------------------ gifts are built by bridge.js

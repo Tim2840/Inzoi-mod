@@ -5,7 +5,8 @@ local Platform = require("pawhome.adapters.inzoi_platform")
 local App = require("pawhome.app")
 local Rpc = require("pawhome.rpc")
 
-local R = { platform = nil, adapter = nil, app = nil, handlers = {}, opts = {}, failed = nil }
+local DEFAULT_OPTS = { spawn = true, animate = true, scale = true }
+local R = { platform = nil, adapter = nil, app = nil, handlers = {}, opts = DEFAULT_OPTS, failed = nil }
 
 -- Lines also go to the B1 relay's log (pawhome:diag), the only place a running B2 can report to.
 local function log(line)
@@ -29,6 +30,22 @@ local function onInteraction(p)
     R.adapter.onInteractionFinished(p)
     if R.app and p.interaction_bag_id == ModKit.PLACE_LITTER then
         pcall(function() R.app:autoLitter(R.platform.possessed()) end)
+    elseif R.app and p.interaction_bag_id == ModKit.REFILL_LITTER then
+        pcall(function() R.app:refillLitter(R.platform.household(), p.entity_id or R.platform.possessed()) end)
+    elseif R.app and p.interaction_bag_id == ModKit.USE_LITTER then
+        pcall(function()
+            local Registry = require("pawhome.pets.registry")
+            for _, pet in ipairs(Registry.home(R.app.ctx, nil)) do
+                R.app:useLitter(pet.id, p.entity_id or R.platform.possessed())
+            end
+        end)
+    elseif R.app and p.interaction_bag_id == ModKit.CALL_CAT then
+        pcall(function()
+            local Registry = require("pawhome.pets.registry")
+            for _, pet in ipairs(Registry.home(R.app.ctx, nil)) do
+                R.app:callPet(pet.id, p.entity_id or R.platform.possessed())
+            end
+        end)
     end
     if R.app and ModKit.CARE[p.interaction_bag_id] then
         local ok, res = pcall(function() return R.app:applyCare() end)
@@ -43,7 +60,7 @@ end
 -- B2 Main on_begin. Also called lazily from the first binding callback, because a mod that is
 -- mounted while a game is running never gets Main.on_begin for that session.
 function R.start(opts)
-    opts = opts or R.opts or {}
+    opts = opts or R.opts or DEFAULT_OPTS
     R.opts = opts
     R.platform = Platform.b2(opts)
     R.platform.report = function(line) log(line) end

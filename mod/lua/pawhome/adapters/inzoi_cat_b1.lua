@@ -22,6 +22,20 @@ local CatB1 = {
     GRACE = 15,            -- seconds a foreign animation blocks ours
     POLL = 1,              -- seconds between looks at what the cat plays
     REAPPLY = { 1.5, 5 },  -- seconds after on_begin to apply the size again (early refs go stale)
+    IDLE_RINGS = {
+        anim_voidcat_sit_idle_01 = {
+            "ANIM_Void_Cat_Welcoming",
+            "ANIM_VoidCat_Sit_Idle_01",
+            "ANIM_VoidCat_Being_Patted",
+            "ANIM_VoidCat_Take_Food",
+            "ANIM_VoidCat_Give_Gift",
+        },
+        anim_voidcat_sit_idle_02 = {
+            "ANIM_VoidCat_Sit_Idle_02",
+            "ANIM_VoidCat_Being_Patted",
+            "ANIM_VoidCat_Sit_Idle_01",
+        },
+    },
 }
 
 function CatB1.new(platform)
@@ -151,6 +165,8 @@ function CatB1.new(platform)
             -- the loop on show (this one, or the one the cat returns to) is restarted every `cycle`
             cat.cycle = cycle and cycle > 0 and cycle or nil
             cat.cycleName = seconds > 0 and back ~= "" and back or name
+            cat.cycleBase = lower(cat.cycleName)
+            cat.cycleIdx = 0
             cat.cycleAt = cat.cycle and (c.t + (seconds > 0 and back ~= "" and seconds or 0) + cat.cycle) or nil
         end
     end
@@ -166,7 +182,17 @@ function CatB1.new(platform)
                 if cat.reapply and cat.reapply[1] and c.t >= cat.reapply[1] then
                     table.remove(cat.reapply, 1)
                     applyScale(cat)
-        applyPos(cat)
+                    applyPos(cat)
+                    if cat.ours == nil then
+                        pcall(platform.sendToSim, cat.eid, Wire.channel("cat_begin"), "")
+                        if #cat.reapply == 0 and not blocked(cat) then
+                            cat.cycle = 6.0
+                            cat.cycleName = "ANIM_Void_Cat_Welcoming"
+                            cat.cycleBase = "anim_voidcat_sit_idle_01"
+                            cat.cycleIdx = 1
+                            if play(cat, cat.cycleName) then cat.cycleAt = c.t + cat.cycle end
+                        end
+                    end
                 end
                 if poll then
                     local ok, now = pcall(platform.currentVat, cat.actor)
@@ -186,14 +212,22 @@ function CatB1.new(platform)
                     local back = cat.back
                     cat.backAt, cat.back = nil, nil
                     if not blocked(cat) then
+                        cat.cycleName = back
+                        cat.cycleBase = lower(back)
+                        cat.cycleIdx = 0
                         play(cat, back)
                         if cat.cycle then cat.cycleAt = c.t + cat.cycle end
                     end
                 end
                 if cat.cycleAt and not cat.backAt and c.t >= cat.cycleAt then
-                    -- a still picture is the worst a cat can do: start the loop over (when the game is
-                    -- not busy with the cat; the next look tries again)
+                    -- a still picture is the worst a cat can do: rotate through the sitting idle ring
+                    -- so every cycle starts a lively 30 FPS baked VAT clip at frame 0
                     if not blocked(cat) and cat.ours == lower(cat.cycleName) then
+                        local ring = CatB1.IDLE_RINGS[cat.cycleBase]
+                        if ring then
+                            cat.cycleIdx = ((cat.cycleIdx or 0) % #ring) + 1
+                            cat.cycleName = ring[cat.cycleIdx]
+                        end
                         play(cat, cat.cycleName)
                         cat.cycleAt = c.t + cat.cycle
                     elseif cat.ours ~= lower(cat.cycleName) then

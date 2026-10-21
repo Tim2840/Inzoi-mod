@@ -1,3 +1,9 @@
--- The litter box is an object of the mod (the game has none): the Object row id the household
--- must have on its lot. Without one the litter need does not run (nobody can clean it).
-return { object = "PawHome_LitterBox" }
+-- The litter box and cat litter refill pack are Build Mode objects in the Pet category:
+--   object:      PawHome_LitterBox (the litter box on the household's lot)
+--   bag:         PawHome_LitterBag (the cat litter refill pack on the household's lot)
+--   usesPerFill: how many times the litter box can be used and cleaned before it is empty again
+return {
+    object = "PawHome_LitterBox",
+    bag = "PawHome_LitterBag",
+    usesPerFill = 2,
+}

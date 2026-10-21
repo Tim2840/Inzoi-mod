@@ -116,31 +116,54 @@ def main():
         code = mod_code(root)
         table = root / "non_ufs" / "StringTableExport"
         table.mkdir(parents=True, exist_ok=True)
-        (table / ("mod_ST_InteractionBag_%s.json" % code)).write_text(
-            json.dumps({"TableId": "ST_InteractionBag_" + code, "Entries": dict(en)}, indent=2, ensure_ascii=False),
-            encoding="utf-8")
-        print(f"wrote string table ST_InteractionBag_{code} with {len(en)} labels")
-    # Build-mode / object registration patch for PawHome_LitterBox
+        for st_name in ("InteractionBag", "Object"):
+            (table / ("mod_ST_%s_%s.json" % (st_name, code))).write_text(
+                json.dumps({"TableId": f"ST_{st_name}_{code}", "Entries": dict(en)}, indent=2, ensure_ascii=False),
+                encoding="utf-8")
+        print(f"wrote string tables ST_InteractionBag_{code} and ST_Object_{code} with {len(en)} labels")
+    # Build-mode / object registration patch for PawHome_LitterBox and PawHome_LitterBag
     jpatch = root / "non_ufs" / "JsonPatch"
     jpatch.mkdir(parents=True, exist_ok=True)
     obj_patch = [{
         "target": "Object",
-        "operations": [{
-            "method": "Append",
-            "query": "",
-            "value": json.dumps({
-                "ID": "PawHome_LitterBox",
-                "StateVariationId": "Normal",
-                "DevOnly": False,
-                "MultipleSelect": True,
-                "ObjectCategory": "None",
-                "FilterCategory": "Pet",
-                "ObjectTemplateId": "Decoration01_Template",
-                "Asset": "/Game/Blueprint/GameObject/Furniture/BP_Bustub01_v01.BP_Bustub01_v01",
-                "Icon": "/Game/UI/Icon/Object/Bustub01_v01.Bustub01_v01",
-                "Price": 35,
-            }),
-        }],
+        "operations": [
+            {
+                "method": "Append",
+                "query": "",
+                "value": json.dumps({
+                    "ID": "PawHome_LitterBox",
+                    "StateVariationId": "Normal",
+                    "DevOnly": False,
+                    "MultipleSelect": True,
+                    "ObjectCategory": "None",
+                    "FilterCategory": "Pet",
+                    "ObjectTemplateId": "Decoration01_Template",
+                    "Asset": "/Game/Blueprint/GameObject/Furniture/BP_Bustub01_v01.BP_Bustub01_v01",
+                    "Icon": "/Game/UI/Icon/Object/Bustub01_v01.Bustub01_v01",
+                    "Price": 35,
+                    "DisplayNameTextId": "mod_PawHome_obj_litter_box",
+                    "DescriptionTextId": "mod_PawHome_obj_litter_box_desc",
+                }),
+            },
+            {
+                "method": "Append",
+                "query": "",
+                "value": json.dumps({
+                    "ID": "PawHome_LitterBag",
+                    "StateVariationId": "Normal",
+                    "DevOnly": False,
+                    "MultipleSelect": True,
+                    "ObjectCategory": "None",
+                    "FilterCategory": "Pet",
+                    "ObjectTemplateId": "Decoration01_Template",
+                    "Asset": "/Game/Blueprint/GameObject/Furniture/BP_Farm_Fertilizer01.BP_Farm_Fertilizer01",
+                    "Icon": "/Game/UI/Icon/Object/Fertilizer01.Fertilizer01",
+                    "Price": 12,
+                    "DisplayNameTextId": "mod_PawHome_obj_litter_bag",
+                    "DescriptionTextId": "mod_PawHome_obj_litter_bag_desc",
+                }),
+            },
+        ],
     }]
     (jpatch / "Object_patch.json").write_text(json.dumps(obj_patch, indent=2), encoding="utf-8")
     # mod_manifest.json lists the mod's loose files ("NonAssets"); keep it in step with what we wrote

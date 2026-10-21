@@ -34,6 +34,9 @@ local handlers = {}
 
 function handlers.view() return snapshot() end
 function handlers.placeLitterBox() return snapshot({ result = P.app:placeLitterBox(P.HOUSEHOLD) }) end
+function handlers.refillLitter() return snapshot({ result = P.app:refillLitter(P.HOUSEHOLD, P.ZOI) }) end
+function handlers.useLitter(a) return snapshot({ result = P.app:useLitter(a.petId, P.ZOI) }) end
+function handlers.callPet(a) return snapshot({ result = P.app:callPet(a.petId, P.ZOI) }) end
 
 function handlers.perform(a)
     return snapshot({ result = P.app:perform(a.petId, P.ZOI, a.action) })

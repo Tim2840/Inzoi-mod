@@ -848,29 +848,42 @@ T.test("modkit: our phone and city-cat entries open the shop on the page", funct
     T.truthy(found, "the cat the player chose to adopt is offered as a stray")
 end)
 
-T.test("modkit: litter box placement and cat teleport-to-litter-box resolve bladder need", function()
+T.test("modkit: litter box refill, cat teleport-to-litter-box, and call-cat-over work end to end", function()
     local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
-    s.w.b2.homeObjects = function() return { "PawHome_LitterBox" } end
+    s.w.b2.homeObjects = function(watched)
+        local out = {}
+        for _, id in ipairs(watched or {}) do
+            if id == "PawHome_LitterBox" or id == "PawHome_LitterBag" then out[#out + 1] = id end
+        end
+        return out
+    end
     local movedTo = nil
     s.w.b2.moveCatToObject = function(eid, objId)
         movedTo = { eid = eid, obj = objId }
         return 120.5, -340.0, 15.0, 90.0
     end
-    T.truthy(s.app:placeLitterBox(77).ok)
-    T.eq(s.w.queued[#s.w.queued].bag, "PawHome_PlaceLitterBox")
+    local movedToZoi = nil
+    s.w.b2.moveCatToZoi = function(eid, zoiId)
+        movedToZoi = { eid = eid, zoi = zoiId }
+        return 210.0, 400.0, 12.0, 270.0
+    end
     pet.needs.bladder = 20
+    T.truthy(s.app:refillLitter(77, 501).ok)
+    T.eq(pet.needs.bladder, 100)
+    T.truthy(movedTo and movedTo.eid == 109546 and movedTo.obj == "PawHome_LitterBox")
+    T.eq(s.app:view(77, 501).pets[1].litterStatus.state, "dirty")
     local ev = { entity_id = 501, target_entity_id = 109546, interaction_bag_id = "PawHome_CleanLitter" }
     s.adapter.onInteractionStarted(ev)
     s.adapter.onInteractionFinished(ev)
     local res = s.app:applyCare()
     T.eq(#res, 1); T.truthy(res[1].ok)
-    T.eq(pet.needs.bladder, 100)
-    T.truthy(movedTo and movedTo.eid == 109546 and movedTo.obj == "PawHome_LitterBox")
+    T.eq(s.app:view(77, 501).pets[1].litterStatus.state, "clean")
+    T.truthy(s.app:callPet(pet.id, 501).ok)
+    T.truthy(movedToZoi and movedToZoi.eid == 109546 and movedToZoi.zoi == 501)
     local teleports = sent(s, "teleport")
-    T.eq(#teleports, 1)
-    T.eq(teleports[1], "120.5|-340.0|15.0|90.0")
-    local anims = sent(s, "anim")
-    T.truthy(#anims >= 1 and anims[1]:find("ANIM_VoidCat_Take_Food"), "plays litter animation even from game menu")
+    T.eq(#teleports, 3)
+    T.eq(teleports[1], "210.0|400.0|12.0|270.0")
+    T.eq(teleports[3], "120.5|-340.0|15.0|90.0")
 end)
 
 T.test("cat B1: teleport message moves the cat actor and reapplies after a stale start", function()

@@ -47,6 +47,9 @@ local ModKit = {
     WELCOME = "PawHome_WelcomeCat",
     SEND_AWAY = "PawHome_SendAway",
     PLACE_LITTER = "PawHome_PlaceLitterBox",
+    REFILL_LITTER = "PawHome_RefillLitter",
+    USE_LITTER = "PawHome_UseLitter",
+    CALL_CAT = "PawHome_CallCatHere",
     GIFT_PREFIX = "PawHome_Gift_",
     -- The care the player gives from the cat's own interaction menu (all vanilla interactions
     -- except the first two, which the mod appends to the menu in bridge.js).
@@ -387,6 +390,17 @@ function ModKit.new(platform, opts)
         return true
     end
 
+    -- Teleports the cat 90 cm in front of the specified Zoi (or the controlled Zoi) on both B2 and B1.
+    function a.movePetToZoi(ref, zoiId)
+        local eid = catOf(ref)
+        if eid == nil or not platform.moveCatToZoi then return false end
+        local ok, x, y, z, yaw = pcall(platform.moveCatToZoi, eid, zoiId or target())
+        if not ok or type(x) ~= "number" or type(y) ~= "number" or type(z) ~= "number" then return false end
+        platform.send(eid, Wire.channel("teleport"),
+            string.format("%.1f|%.1f|%.1f|%.1f", x, y, z, tonumber(yaw) or 0))
+        return true
+    end
+
     -- force: send even if it was sent before (a message to a cat whose actor is not ready
     -- yet is lost, e.g. right after a summon; the idle timer repeats the size now and then)
     local function showScale(eid, ref, force)
@@ -400,7 +414,12 @@ function ModKit.new(platform, opts)
         if type(look) ~= "table" then return false end
         a.looks[ref] = look
         local eid = catOf(ref)
-        if eid ~= nil then showScale(eid, ref) end
+        if eid ~= nil then
+            showScale(eid, ref)
+            if a.catBegun and a.catBegun[eid] and a.caps.animate and free(eid) and shownOf(eid).base == nil then
+                sendAnim(eid, moodDef(ref).base)
+            end
+        end
         return true
     end
 
@@ -444,7 +463,10 @@ function ModKit.new(platform, opts)
     -- The B1 cat binding saw the cat's actor (re)appear: it starts at the game's size and
     -- animation, so show the pet's look again.
     function a.onCatMessage(eid, kind)
-        if kind ~= "cat_begin" or a.cats[eid] == nil then return end
+        if kind ~= "cat_begin" then return end
+        a.catBegun = a.catBegun or {}
+        a.catBegun[eid] = true
+        if a.cats[eid] == nil then return end
         local ref = refOf(eid)
         if ref == nil then return end
         local st = shownOf(eid)

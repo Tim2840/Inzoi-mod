@@ -131,11 +131,23 @@ function Platform.b2(opts)
         if not home then return out end
         for _, id in ipairs(watched or {}) do want[id] = true end
         if want.PawHome_LitterBox then want.Bustub01_v01 = true end
+        if want.PawHome_LitterBag then
+            want.Farm_Fertilizer01 = true
+            want.E01_CatSandSpray01 = true
+        end
         eachEntity(inzoi.EB2EntityType.GameObject, function(item)
             local ok, id, site = pcall(function()
                 return tostring(item:GetObjectTableId()), tostring(item:GetLocatedSiteDtId())
             end)
-            if ok and want[id] and site == home then out[#out + 1] = (id == "Bustub01_v01" and "PawHome_LitterBox" or id) end
+            if ok and want[id] and site == home then
+                if id == "Bustub01_v01" then
+                    out[#out + 1] = "PawHome_LitterBox"
+                elseif id == "Farm_Fertilizer01" or id == "E01_CatSandSpray01" then
+                    out[#out + 1] = "PawHome_LitterBag"
+                else
+                    out[#out + 1] = id
+                end
+            end
             return false
         end)
         return out
@@ -175,6 +187,40 @@ function Platform.b2(opts)
             p.report(string.format("moveCatToObject %s -> %s at (%.1f, %.1f, %.1f)", tostring(eid), tostring(objectId), x, y, z))
         end
         return x, y, z, yaw
+    end
+
+    -- Moves the B2 cat entity 90 cm in front of `zoiId` (or the possessed Zoi) and returns
+    -- x, y, z, yaw for the B1 actor.
+    function p.moveCatToZoi(eid, zoiId)
+        local zoi = tonumber(zoiId) or p.possessed()
+        if not zoi then return nil end
+        local character = p.character(zoi)
+        if not character then return nil end
+        local okLoc, loc = pcall(function() return character:GetLocation() end)
+        if not okLoc or not loc then return nil end
+        local okRot, rot = pcall(function() return character:GetRotation() end)
+        local zoiYaw = (okRot and rot and tonumber(rot.Yaw)) or 0
+        local rad = math.rad(zoiYaw)
+        local dist = 90
+        local x = (tonumber(loc.X) or 0) + math.cos(rad) * dist
+        local y = (tonumber(loc.Y) or 0) + math.sin(rad) * dist
+        local z = tonumber(loc.Z) or 0
+        local catYaw = (zoiYaw + 180) % 360
+        local cat = p.cats[eid]
+        if not cat then p.homeCats(); cat = p.cats[eid] end
+        if cat then
+            pcall(function()
+                local cLoc = cat:GetLocation()
+                cLoc.X, cLoc.Y, cLoc.Z = x, y, z
+                local cRot = cat:GetRotation()
+                cRot.Pitch, cRot.Yaw, cRot.Roll = 0, catYaw, 0
+                cat:SetLocationAndRotationOnlySimul(cLoc, cRot)
+            end)
+        end
+        if p.report then
+            p.report(string.format("moveCatToZoi %s -> zoi %s at (%.1f, %.1f, %.1f)", tostring(eid), tostring(zoi), x, y, z))
+        end
+        return x, y, z, catYaw
     end
 
     -- UNVERIFIED: FB2Actor:GetHouseholdEntityId, FB2EntityManager:FindHousehold, Currency component.
@@ -483,15 +529,15 @@ function Platform.b1(opts)
     end
 
     function p.setLocation(actor, x, y, z)
-        local v = call(actor, "GetActorLocation")
+        local v = call(actor, "K2_GetActorLocation")
         v.X, v.Y, v.Z = x, y, z
         call(actor, "K2_SetActorLocation", v, false, nil, true)
-        local now = call(actor, "GetActorLocation")
+        local now = call(actor, "K2_GetActorLocation")
         return math.abs(now.X - x) < 1 and math.abs(now.Y - y) < 1
     end
 
     function p.setYaw(actor, yaw)
-        local r = call(actor, "GetActorRotation")
+        local r = call(actor, "K2_GetActorRotation")
         r.Pitch, r.Yaw, r.Roll = 0, yaw, 0
         call(actor, "K2_SetActorRotation", r, true)
         return true
@@ -508,8 +554,17 @@ function Platform.b1(opts)
     end
 
     -- An unknown name is ignored by the game; success means the cat now plays `name`.
+    -- UB1AnimToTexComponent ignores PlayAnimSequence when `Animation` already equals `name`,
+    -- so we switch to an alternate clip first to force the VAT material clock back to 0.
     function p.playVat(actor, name)
-        call(vat(actor), "PlayAnimSequence", name, 0)
+        local comp = vat(actor)
+        local cur = p.currentVat(actor)
+        if cur ~= nil and cur:lower() == tostring(name):lower() then
+            local alt = cur:lower() == "anim_voidcat_sit_idle_01"
+                and "ANIM_VoidCat_Sit_Idle_02" or "ANIM_VoidCat_Sit_Idle_01"
+            pcall(call, comp, "PlayAnimSequence", alt, 0)
+        end
+        call(comp, "PlayAnimSequence", name, 0)
         local now = p.currentVat(actor)
         return now ~= nil and now:lower() == tostring(name):lower()
     end

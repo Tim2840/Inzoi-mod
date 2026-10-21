@@ -14,6 +14,7 @@ local Wants = require("pawhome.pets.wants")
 local Litter = require("pawhome.pets.litter")
 local Keepsakes = require("pawhome.pets.keepsakes")
 local enrichmentData = require("pawhome.data.enrichment")
+local litterData = require("pawhome.data.litter")
 local Engine = require("pawhome.pets.engine")
 local Care = require("pawhome.pets.care")
 local Adoption = require("pawhome.pets.adoption")
@@ -218,6 +219,71 @@ function App:placeLitterBox(householdId)
     return { ok = true, message = I18n.t("msg.litter_placed"), notifications = {} }
 end
 
+function App:refillLitter(householdId, zoiId)
+    self:sync()
+    if self.suspended then return self:noSave() end
+    Litter.forget(self.ctx)
+    if not Litter.present(self.ctx, householdId) then
+        return { ok = false, reason = "no_litter_box", message = I18n.t("fail.no_litter_box"), notifications = {} }
+    end
+    if not Litter.bagPresent(self.ctx, householdId) then
+        return { ok = false, reason = "no_litter_bag", message = I18n.t("fail.no_litter_bag"), notifications = {} }
+    end
+    Litter.refill(self.ctx, householdId)
+    self:autoLitter(zoiId)
+    self:save()
+    return { ok = true, message = I18n.t("msg.litter_refilled"), notifications = {} }
+end
+
+function App:useLitter(petId, zoiId)
+    self:sync()
+    if self.suspended then return self:noSave() end
+    Litter.forget(self.ctx)
+    local pet = Registry.get(self.ctx, petId)
+    if not pet or (pet.status ~= "home" and pet.status ~= "impounded") then
+        return { ok = false, reason = "no_pet", message = I18n.t("fail.no_pet"), notifications = {} }
+    end
+    if pet.status ~= "home" then
+        return { ok = false, reason = "not_home", message = I18n.t("fail.not_home", { name = pet.name }), notifications = {} }
+    end
+    if not Litter.present(self.ctx, pet.household) then
+        return { ok = false, reason = "no_litter_box", message = I18n.t("fail.no_litter_box"), notifications = {} }
+    end
+    local boxState = Litter.boxState(self.ctx, pet.household)
+    if boxState == "empty" then
+        return { ok = false, reason = "litter_empty", message = I18n.t("fail.litter_empty", { name = pet.name }), notifications = {} }
+    end
+    if boxState == "dirty" then
+        return { ok = false, reason = "litter_dirty", message = I18n.t("fail.litter_dirty", { name = pet.name }), notifications = {} }
+    end
+    Api.movePetToObject(pet.entity, litterData.object)
+    Api.playAnimation(pet.entity, "pet_litter")
+    pet.needs.bladder = 100
+    Litter.markUsed(self.ctx, pet.household)
+    Engine.looks(self.ctx)
+    self:save()
+    return { ok = true, petId = pet.id, message = I18n.t("msg.litter_used", { name = pet.name }), notifications = {} }
+end
+
+function App:callPet(petId, zoiId)
+    self:sync()
+    if self.suspended then return self:noSave() end
+    local pet = Registry.get(self.ctx, petId)
+    if not pet or (pet.status ~= "home" and pet.status ~= "impounded") then
+        return { ok = false, reason = "no_pet", message = I18n.t("fail.no_pet"), notifications = {} }
+    end
+    if pet.status ~= "home" then
+        return { ok = false, reason = "not_home", message = I18n.t("fail.not_home", { name = pet.name }), notifications = {} }
+    end
+    if not Api.movePetToZoi(pet.entity, zoiId) then
+        return { ok = false, reason = "call_failed", message = I18n.t("fail.call_failed", { name = pet.name }), notifications = {} }
+    end
+    Api.playAnimation(pet.entity, "pet_play")
+    Engine.looks(self.ctx)
+    self:save()
+    return { ok = true, petId = pet.id, message = I18n.t("msg.pet_called", { name = pet.name }), notifications = {} }
+end
+
 function App:autoLitter(zoiId)
     self:sync()
     if self.suspended then return {} end
@@ -225,13 +291,15 @@ function App:autoLitter(zoiId)
     local results = {}
     for _, pet in ipairs(Registry.home(self.ctx, nil)) do
         if pet.needs.bladder <= needsData.bladder.low and Litter.present(self.ctx, pet.household) then
-            local zoi = zoiId or (Api.householdMembers(pet.household)[1]) or 0
-            local r = Care.perform(self.ctx, pet.id, zoi, "clean_litter")
-            if r.ok then results[#results + 1] = r end
+            local boxState = Litter.boxState(self.ctx, pet.household)
+            if boxState == "clean" then
+                local zoi = zoiId or (Api.householdMembers(pet.household)[1]) or 0
+                local r = self:useLitter(pet.id, zoi)
+                if r.ok then results[#results + 1] = r end
+            end
         end
     end
     if #results > 0 then
-        Engine.looks(self.ctx)
         Engine.looks(self.ctx)
         Engine.flush(self.ctx)
         self:save()
@@ -322,6 +390,8 @@ local function petView(ctx, pet, zoiId)
     local mood = pet.status == "home" and Moods.compute(pet, sleeping) or "sad"
     local needs = {}
     local hasBox = Litter.present(ctx, pet.household)
+    local hasBag = Litter.bagPresent(ctx, pet.household)
+    local boxState, boxUses = Litter.boxState(ctx, pet.household)
     for _, id in ipairs(needsData.order) do
       if id ~= "bladder" or hasBox then
         needs[#needs + 1] = {
@@ -366,6 +436,13 @@ local function petView(ctx, pet, zoiId)
         illness = Illness.view(ctx, pet),
         want = want,
         litterBox = hasBox,
+        litterStatus = {
+            present = hasBox,
+            bagPresent = hasBag,
+            state = boxState,
+            uses = boxUses,
+            stateLabel = I18n.t("ui.litter_state_" .. boxState),
+        },
     }
 end
 
@@ -416,6 +493,7 @@ end
 function App:view(householdId, zoiId)
     self:sync()
     local ctx = self.ctx
+    Litter.forget(ctx)
     local pets = {}
     if not self.suspended then
         for _, pet in ipairs(Registry.list(ctx, householdId)) do

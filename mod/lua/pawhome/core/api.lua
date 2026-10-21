@@ -199,6 +199,13 @@ function Api.movePetToObject(ref, objectId)
     return ok and v == true
 end
 
+-- Optional. Teleports the pet in front of the specified Zoi.
+function Api.movePetToZoi(ref, zoiId)
+    if ref == nil then return false end
+    local ok, v = call("movePetToZoi", ref, zoiId)
+    return ok and v == true
+end
+
 -- Optional. Places a litter box in front of the household's Zoi at home.
 function Api.placeLitterBox(householdId)
     local ok, v = call("placeLitterBox", householdId)
