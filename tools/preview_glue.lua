@@ -79,6 +79,30 @@ function handlers.advance(a)
     return snapshot({ notifications = notes })
 end
 
+function handlers.vet(a)
+    return snapshot({ result = P.app:vet(P.HOUSEHOLD, P.ZOI, a.petId) })
+end
+
+-- preview only: put a piece of cat furniture on the lot, or take it away
+function handlers.toggleFurniture(a)
+    local lot = P.mock.lot[P.HOUSEHOLD] or {}
+    P.mock.lot[P.HOUSEHOLD] = lot
+    for i, id in ipairs(lot) do
+        if id == a.id then table.remove(lot, i); return snapshot() end
+    end
+    lot[#lot + 1] = a.id
+    return snapshot()
+end
+
+-- preview only: make every pet at home ill
+function handlers.sicken(a)
+    local Registry = require("pawhome.pets.registry")
+    for _, pet in ipairs(Registry.list(P.app.ctx, P.HOUSEHOLD)) do
+        pet.illness = { id = a.id or "fleas", since = P.mock.clock, goodHours = 0 }
+    end
+    return snapshot()
+end
+
 function handlers.reset(a)
     P.reset(a.locale, a.seed)
     return snapshot()

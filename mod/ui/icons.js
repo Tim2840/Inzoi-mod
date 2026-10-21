@@ -27,15 +27,19 @@ const Icons = (() => {
       + `<path d="M32 29 Q30.4 31.6 32 32.8 Q33.6 31.6 32 29 Z" fill="${C.sky}"/>`,
     grumpy: `<ellipse cx="18" cy="26" rx="2" ry="2.2" fill="${INK}"/><ellipse cx="30" cy="26" rx="2" ry="2.2" fill="${INK}"/>`
       + `<path d="M15 20 L20.5 22 M27.5 22 L33 20" ${line(2)}/>`,
+    sick: `<path d="M15.5 25.5 L20.5 25.5 M27.5 25.5 L32.5 25.5" ${line(2.3)}/>`
+      + `<rect x="25.5" y="14" width="9.5" height="4.6" rx="2.2" transform="rotate(-18 30 16)" ${s("#ffe3b3", 1.4)}/>`
+      + `<path d="M35.5 21 Q34 23.5 35.5 24.6 Q37 23.5 35.5 21 Z" fill="${C.sky}"/>`,
   };
   const MOUTH = {
     content: `<path d="M24 30.6 Q22.6 33.4 20.4 32.2 M24 30.6 Q25.4 33.4 27.6 32.2" ${line(1.8)}/>`,
     sad: `<path d="M21 33.4 Q24 31 27 33.4" ${line(1.8)}/>`,
     grumpy: `<path d="M21.4 32.6 H26.6" ${line(1.8)}/>`,
+    sick: `<path d="M20.4 33 Q22.2 31.6 24 33 Q25.8 34.4 27.6 33" ${line(1.8)}/>`,
   };
   const FACE_OF = {
     happy: "happy", playful: "happy", energized: "happy", content: "content", asleep: "sleep",
-    sad: "sad", uncomfortable: "grumpy", tense: "grumpy", angry: "grumpy",
+    sad: "sad", uncomfortable: "grumpy", tense: "grumpy", angry: "grumpy", sick: "sick",
   };
   function cat(mood) {
     const face = FACE_OF[mood] || (EYES[mood] ? mood : "content");
@@ -125,6 +129,23 @@ const Icons = (() => {
     get_to_know: bubble(C.bubble)
       + `<path d="M19.6 15 Q19.6 10.6 24 10.6 Q28.4 10.6 28.4 14.4 Q28.4 17.4 24 18.8 V20.6" ${line(3)}/>`
       + `<circle cx="24" cy="25.4" r="1.9" fill="${INK}"/>`,
+    vet: `<path d="M18 15 V11.5 Q18 8 21.5 8 H26.5 Q30 8 30 11.5 V15" ${line(2.5)}/>`
+      + `<rect x="6" y="15" width="36" height="26" rx="6" ${s(C.paper)}/>`
+      + `<path d="M6 22 H42" ${line(2)}/>`
+      + `<path d="M24 25.5 V36.5 M18.5 31 H29.5" ${line(4, "#f2738c")}/>`,
+    CatScratcher01: `<path d="M30 12 L36.5 20" ${line(1.8)}/><circle cx="37.5" cy="22.5" r="3" ${s(C.rose, 2)}/>`
+      + `<rect x="18" y="9" width="12" height="30" rx="2.5" ${s(C.sand)}/>`
+      + `<path d="M18 15 L30 18 M18 21 L30 24 M18 27 L30 30 M18 33 L30 36" ${line(1.6, C.wood)}/>`
+      + `<rect x="8" y="38" width="32" height="6" rx="3" ${s(C.wood)}/>`,
+    CatTower01: `<rect x="12" y="14" width="5" height="27" ${s(C.sand, 2)}/><rect x="31" y="24" width="5" height="17" ${s(C.sand, 2)}/>`
+      + `<rect x="5" y="9" width="21" height="6.5" rx="3.2" ${s(C.pink)}/>`
+      + `<rect x="23" y="19.5" width="21" height="6.5" rx="3.2" ${s(C.lilac)}/>`
+      + `<path d="M9 9 L10.5 4.5 L13.5 8 M18 8 L20.5 4.5 L22 9" ${s(C.cream, 1.8)}/>`
+      + `<rect x="5" y="40" width="38" height="5" rx="2.5" ${s(C.wood)}/>`,
+    CatWheel01: `<path d="M13 44 L24 26 L35 44" ${line(3)}/>`
+      + `<circle cx="24" cy="22" r="17" ${s(C.sky)}/><circle cx="24" cy="22" r="11.5" ${s(C.cream, 2)}/>`
+      + `<path d="M24 10.5 V33.5 M12.5 22 H35.5" ${line(1.6, C.steel)}/>`
+      + `<circle cx="24" cy="22" r="2.4" fill="${INK}"/>`,
     phone: `<rect x="13" y="5" width="22" height="38" rx="6" ${s(C.blush)}/>`
       + `<rect x="16.5" y="10" width="15" height="26" rx="3" fill="${C.cream}"/>`
       + `<ellipse cx="24" cy="25" rx="3.4" ry="2.8" fill="${C.peach}"/><circle cx="20.4" cy="21" r="1.4" fill="${C.peach}"/>`

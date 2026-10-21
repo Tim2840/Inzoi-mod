@@ -169,6 +169,29 @@
       }, r.ready ? u.redeem : fmt(u.redeem_wait, { hours: r.waitHours })));
   }
 
+  function renderIllness(pet, u) {
+    const ill = pet.illness;
+    return h("div", { class: "ill" },
+      h("div", { class: "section-title" }, icon("vet"), h("span", {}, ill.name)),
+      h("div", { class: "sub" }, ill.desc),
+      h("button", {
+        class: "btn", style: "margin-top:8px;width:100%",
+        onclick: async () => { await call("vet", { petId: pet.id }); render(); },
+      }, fmt(u.vet, { fee: ill.vetFee })));
+  }
+
+  // cat furniture found on the household's lot ("home comfort")
+  function furnitureCard(view) {
+    const u = view.ui, list = view.furniture || [];
+    return h("section", { class: "card" },
+      h("div", { class: "section-title" }, icon("CatTower01"), h("span", {}, u.furniture)),
+      list.length === 0 ? h("div", { class: "sub" }, u.furniture_none)
+        : list.map((f) => h("div", { class: "furn" },
+            icon(f.id),
+            h("div", {}, h("b", {}, f.name),
+              h("div", { class: "chips" }, (f.effects || []).map((e) => h("span", { class: "chip" }, e)))))));
+  }
+
   function petCard(pet, u) {
     const away = pet.status === "impounded";
     return h("section", { class: "card", "aria-label": pet.name },
@@ -178,6 +201,7 @@
           h("h2", { text: pet.name }),
           h("div", { class: "sub" }, `${pet.stageLabel} · ${pet.ageLabel}`),
           away ? h("div", { class: "away" }, pet.statusLabel) : h("span", { class: "mood" }, pet.moodLabel))),
+      !away && pet.illness ? renderIllness(pet, u) : null,
       away ? renderShelter(pet, u) : h("div", {}, pet.needs.map((n) =>
         h("div", { class: "need", "data-state": n.state },
           icon(NEED_ICON[n.id] || "paw"),
@@ -226,7 +250,7 @@
         : null,
       h("div", { class: "pw-cols" },
         h("div", { class: "pw-col" }, petCard(pet, u)),
-        h("div", { class: "pw-col" }, careCard(pet, view))));
+        h("div", { class: "pw-col" }, careCard(pet, view), furnitureCard(view))));
   }
 
   function renderOffer(o, u) {
@@ -314,6 +338,7 @@
       toggle(u.aging, "agingEnabled", s),
       toggle(u.misbehavior, "misbehaviorEnabled", s),
       toggle(u.animal_control, "animalControl", s),
+      toggle(u.illness, "illnessEnabled", s),
       slider(u.decay, "needDecayScale", 0.25, 2, 0.25, s, "×"),
       slider(u.lifescale, "lifeScale", 0.5, 4, 0.5, s, "×"),
       slider(u.max_pets_setting, "maxPetsPerHousehold", 1, 4, 1, s, ""));
@@ -328,6 +353,9 @@
       adv("+1h", 60), adv("+6h", 360), adv("+1d", 1440), adv("+3d", 4320),
       h("button", { class: "btn ghost", onclick: async () => { state.offers = state.strays = null; state.petId = null; await call("reset", { locale: state.snap.view.locale }); render(); } }, "Reset"),
       shell("phone"), shell("pc"), shell("mini"),
+      h("button", { class: "btn ghost", onclick: async () => { await call("sicken", { id: "fleas" }); render(); } }, "sick"),
+      ["CatScratcher01", "CatTower01", "CatWheel01"].map((id) =>
+        h("button", { class: "btn ghost", onclick: async () => { await call("toggleFurniture", { id }); render(); } }, id.replace("Cat", "").replace("01", ""))),
       h("button", { class: "btn ghost", onclick: () => openEntry({ shell: "phone", tab: "adopt", stray: "s2" }) }, "cat menu"));
   }
 
@@ -346,7 +374,7 @@
 
   function launcher() {
     const pet = currentPet();
-    const alert = pets().some((p) => p.status === "impounded" || p.needs.some((n) => n.state === "critical"));
+    const alert = pets().some((p) => p.status === "impounded" || p.illness || p.needs.some((n) => n.state === "critical"));
     return h("button", { class: "pw-launch", title: ui().open || "", "aria-label": ui().open || "", onclick: () => setShell(state.lastOpen) },
       icon("cat", { mood: pet ? pet.mood : "content" }),
       h("span", { class: "pw-badge" + (alert ? " alert" : "") }, icon("paw")));

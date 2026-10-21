@@ -155,6 +155,12 @@ img.ico { display: block; width: 24px; height: 24px; flex: none; }
 .away { color: var(--critical); font-weight: 700; }
 .shelter { border: 2px dashed var(--ink); border-radius: 16px; padding: 12px; margin: 4px 0 12px; background: var(--paper-2); }
 
+.ill { border: 2px solid var(--ink); border-radius: 16px; padding: 10px 12px; margin: 0 0 12px; background: #e6f2ff; }
+.ill .section-title { margin: 0 0 4px; }
+.furn { display: flex; align-items: flex-start; padding: 6px 0; border-top: 2px dashed var(--line); }
+.section-title + .furn { border-top: 0; }
+.furn img.ico { width: 40px; height: 40px; margin-right: 10px; }
+.furn b { display: block; margin-bottom: 4px; }
 .need { display: flex; align-items: center; margin-bottom: 9px; font-size: 14px; }
 .need img.ico { width: 30px; height: 30px; margin-right: 8px; }
 .need .lbl { width: 62px; flex: none; font-weight: 700; }
