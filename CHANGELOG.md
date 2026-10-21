@@ -3,6 +3,7 @@ All notable changes are listed here ([Keep a Changelog](https://keepachangelog.c
 
 ## [Unreleased]
 ### Added
+- Research W1, walking cat (`docs/research/walking-cat.md`, probe in `tools/walk_probe/`): the cat is a VAT mesh with nine baked animations and no walk or run; the walk/run animations are not packaged in the game, so a smoothly walking cat is not possible with game assets. B1 Lua can move, rotate and scale the cat actor and play its baked animations (verified in game 20261019.16318.W, 2026-10-21).
 - Care given with the game's own cat interactions (Give Snack, Play) counts in the engine like the panel's buttons, with the same cooldowns and conditions (verified in game 2026-10-21).
 - Cat furniture: the game's buildable Cat Tower, Cat Scratcher and Cat Wheel on the household's lot slow fun/energy decay; the panel lists them (`data/enrichment.lua`, `docs/research/cat-items.md`).
 - Illness and the vet: upset tummy, cat cold and fleas; illness speeds up some need decay and shows as the "Unwell" mood; recovery with good care or a paid vet visit; never fatal; can be switched off. Save format v3.
