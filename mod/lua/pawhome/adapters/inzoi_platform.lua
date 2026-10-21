@@ -32,12 +32,16 @@ local function quote(s) return '"' .. tostring(s):gsub('"', "'") .. '"' end
 Platform.ZOI_HALF_HEIGHT = 83
 function Platform.floorUnderZoi(zoiZ, nodeFloor, halfHeight, catZ)
     local guess = zoiZ - Platform.ZOI_HALF_HEIGHT
+    local half = type(halfHeight) == "number" and halfHeight > 20 and halfHeight < 200 and halfHeight or nil
+    local feet = half and (zoiZ - half) or nil
+    -- The movement component's node floor is the navigation ground, which is NOT the floor the Zoi
+    -- stands on when she is on a deck or an upper floor (seen 2026-10-22 at Cahaya_Residence_LocalHouse1:
+    -- node floor 0.0 under a Zoi whose feet were at 68, so the called cat appeared under the deck
+    -- and "vanished"). It is only trusted when it agrees with her feet.
     if type(nodeFloor) == "number" and nodeFloor <= zoiZ and nodeFloor >= zoiZ - 200 then
-        return nodeFloor, "node floor"
+        if not feet or math.abs(nodeFloor - feet) <= 30 then return nodeFloor, "node floor" end
     end
-    if type(halfHeight) == "number" and halfHeight > 20 and halfHeight < 200 then
-        return zoiZ - halfHeight, "half height"
-    end
+    if feet then return feet, "half height" end
     if type(catZ) == "number" and math.abs(catZ - guess) < 60 then
         return catZ, "cat floor"
     end
@@ -414,6 +418,20 @@ function Platform.b2(opts)
         return success
     end
 
+    -- True when the Zoi has nothing queued and nothing running (interaction.get_queue, Public).
+    -- Verified answer shape 2026-10-22: {"queue_count":0,"is_empty":true} (no current interaction key).
+    function p.zoiIdle(zoi)
+        local t = cli("interaction.get_queue" .. (zoi and (" entity_id=" .. tostring(zoi)) or ""))
+        if type(t) ~= "table" then return true end
+        if t.is_empty == false then return false end
+        for k, v in pairs(t) do
+            if k ~= "queue_count" and k ~= "is_empty" and v ~= nil and v ~= false and v ~= "" then
+                if tostring(k):lower():find("current") then return false end
+            end
+        end
+        return true
+    end
+
     -- Home site of the controlled Zoi. Verified field: entity.get_character_info returns
     -- "home_site_id" (2026-10-21).
     function p.homeSite()
@@ -590,9 +608,11 @@ function Platform.b1(opts)
         return tostring(call(anim, "GetName"))
     end
 
-    -- An unknown name is ignored by the game; success means the cat now plays `name`.
-    -- UB1AnimToTexComponent ignores PlayAnimSequence when `Animation` already equals `name`,
-    -- so we switch to an alternate clip first to force the VAT material clock back to 0.
+    -- Direct B1 play (kept for reference, no longer used for the cat's animations): UB1AnimToTexComponent
+    -- :PlayAnimSequence(name, 0) changes `Animation` and shows the clip's FIRST frame, then the cat stays
+    -- frozen (frames of an enlarged cat over 14 s were identical, 2026-10-22). Clips only play when the
+    -- game's own PlayVATAnim action runs: see adapters/inzoi.lua "playClip" and the PawHome_Vat_* rows.
+    -- An unknown name is ignored by the game; success means the cat now shows `name`.
     function p.playVat(actor, name)
         local comp = vat(actor)
         local cur = p.currentVat(actor)

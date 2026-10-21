@@ -50,6 +50,7 @@ local ModKit = {
     REFILL_LITTER = "PawHome_RefillLitter",
     USE_LITTER = "PawHome_UseLitter",
     CALL_CAT = "PawHome_CallCatHere",
+    VAT_PREFIX = "PawHome_Vat_",   -- one interaction per cat clip (mod/ui/bridge.js CAT_CLIPS)
     GIFT_PREFIX = "PawHome_Gift_",
     -- The care the player gives from the cat's own interaction menu (all vanilla interactions
     -- except the first two, which the mod appends to the menu in bridge.js).
@@ -97,6 +98,7 @@ function ModKit.new(platform, opts)
         looks = {},         -- pet ref -> { mood, stage, scale } from the engine
         shown = {},         -- cat entity id -> { scale, base, nextIdle, busyUntil }
         busy = {},          -- cat entity id -> true while a game interaction runs on it
+        clock = 0,          -- real seconds since this adapter started (clip timing)
     }
 
     local function log(line)
@@ -338,25 +340,59 @@ function ModKit.new(platform, opts)
         return Anim.moods[look and look.mood or "content"] or Anim.moods.content
     end
 
-    -- force: a reaction the player asked for; B1 shows it at once instead of waiting for the game's
-    -- own animation changes to settle
+    -- A cat clip is played by the game itself: an interaction with one action, PlayVATAnim on the cat
+    -- (rows PawHome_Vat_<key>, mod/ui/bridge.js), queued on the controlled Zoi. The interaction ends at
+    -- once and the Zoi does nothing visible, but the clip plays through. Direct B1 PlayAnimSequence only
+    -- shows a clip's first frame and then freezes (2026-10-22, enlarged cat, 14 s of identical frames),
+    -- while this path moved the cat (stand-up clip, frames compared) - verified in game 20261019.16318.W.
+    -- Loops are started again when they end (`cycle`); a one-shot is followed by the loop it returns to.
+    local function playClip(eid, key)
+        local zoi = target()
+        if zoi == nil or not platform.enqueue then return false end
+        local ok, done = pcall(platform.enqueue, zoi, eid, ModKit.VAT_PREFIX .. key)
+        return ok and done == true
+    end
+
     local function sendAnim(eid, key, backKey, force)
         local seq = Anim.sequences[key]
         if not seq then return false end
+        if not playClip(eid, key) then return false end
         local back = backKey and Anim.sequences[backKey]
-        -- the last field: seconds after which what the cat ends up showing (this loop, or the loop it
-        -- returns to) is started again
-        local cycleOf = seq.loop and seq or back
-        local cycle = cycleOf and cycleOf.cycle
-        platform.send(eid, Wire.channel("anim"),
-            seq.name .. "|" .. tostring(seq.seconds or 0) .. "|" .. (back and back.name or "")
-            .. "|" .. (force and "1" or "") .. (cycle and ("|" .. tostring(cycle)) or ""))
         local st = shownOf(eid)
-        if seq.loop then st.base = key elseif back then st.base = backKey end
-        -- a game minute is about 2 real seconds at normal speed; B1 also refuses to cut a
-        -- one-shot short, so this only keeps B2 from sending in the meantime
+        if seq.loop then
+            st.base, st.restartAt, st.returnAt, st.backKey = key, a.clock + (seq.cycle or 15), nil, nil
+        else
+            if back then st.base = backKey end
+            st.restartAt = nil
+            st.returnAt, st.backKey = back and (a.clock + (seq.seconds or 5)) or nil, back and backKey or nil
+        end
+        -- a game minute is about 2 real seconds at normal speed
         if seq.seconds then st.busyUntil = a.now() + math.ceil(seq.seconds / 2) + 1 end
         return true
+    end
+
+    -- Every second or so: a one-shot that ended is followed by its loop, a loop that ended starts over.
+    -- The loop only restarts while the Zoi has nothing else queued (so the clip does not wait behind her
+    -- other interactions and pile up); a game interaction on the cat holds both back.
+    local function clipStep()
+        local checked, idle
+        for ref in pairs(a.looks) do
+            local eid = catOf(ref)
+            local st = eid ~= nil and a.cats[eid].home and a.shown[eid]
+            if st and not a.busy[eid] then
+                if st.returnAt and a.clock >= st.returnAt then
+                    local key = st.backKey
+                    st.returnAt, st.backKey = nil, nil
+                    sendAnim(eid, key)
+                elseif st.restartAt and a.clock >= st.restartAt then
+                    if not checked then
+                        checked = true
+                        idle = platform.zoiIdle == nil or platform.zoiIdle(target()) ~= false
+                    end
+                    if idle then sendAnim(eid, st.base) else st.restartAt = a.clock + 2 end
+                end
+            end
+        end
     end
 
     local function sendScale(eid, scale)
@@ -476,7 +512,13 @@ function ModKit.new(platform, opts)
     end
 
     -- a game interaction on one of our cats: keep our animations off it meanwhile
+    local function ownClip(ev)
+        local bag = ev and ev.interaction_bag_id
+        return type(bag) == "string" and bag:sub(1, #ModKit.VAT_PREFIX) == ModKit.VAT_PREFIX
+    end
+
     local function markBusy(ev)
+        if ownClip(ev) then return end
         local eid = ev and tonumber(ev.target_entity_id)
         if eid ~= nil and a.cats[eid] ~= nil then a.busy[eid] = true end
     end
@@ -484,6 +526,7 @@ function ModKit.new(platform, opts)
     -- canceled / failed / finished: the game leaves the cat in the interaction's last
     -- pose; the next idle change puts it back on its sitting idle a little later
     function a.onInteractionEnded(ev)
+        if ownClip(ev) then return end
         local eid = ev and tonumber(ev.target_entity_id)
         if eid ~= nil and a.busy[eid] then
             a.busy[eid] = nil
@@ -498,6 +541,12 @@ function ModKit.new(platform, opts)
     -- B2 binding tick (any binding, real seconds). Says hello every few seconds until the UI
     -- answers, then once a minute so a UI that was reloaded can find this session again.
     function a.tick(dt)
+        a.clock = a.clock + (dt or 0)
+        a.sinceClips = (a.sinceClips or 0) + (dt or 0)
+        if a.sinceClips >= 1 then
+            a.sinceClips = 0
+            if a.caps.animate then pcall(clipStep) end
+        end
         a.sinceBackup = a.sinceBackup + (dt or 0)
         -- the player started over instead of restoring: back up the new pets from now on
         if a.backupOffer and a.backupDirty and petCount(a.cache) > 0 then a.backupOffer = nil end

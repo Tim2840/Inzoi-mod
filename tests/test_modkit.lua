@@ -580,6 +580,16 @@ local function sent(s, kind)
     return out
 end
 
+-- The clips queued for the cat (interactions PawHome_Vat_<key>, see adapters/inzoi.lua playClip)
+local function clips(s)
+    local out = {}
+    for _, q in ipairs(s.w.queued) do
+        local key = tostring(q.bag):match("^PawHome_Vat_(.+)$")
+        if key then out[#out + 1] = key end
+    end
+    return out
+end
+
 T.test("looks: a kitten is shown at its stage's size, repeated now and then for late actors", function()
     local s, pet = adoptedCat({ spawn = true, scale = true })
     pet.stage = "kitten"
@@ -623,18 +633,19 @@ T.test("looks: the size is sent again whenever the cat's actor reappears", funct
     for _, m in ipairs(s.w.catMsgs) do T.eq(m.eid, 109546) end
 end)
 
-T.test("looks: care from the panel plays its animation and returns to the mood's idle", function()
+T.test("looks: care from the panel plays its clip through the game and returns to the mood's idle", function()
     local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
     pet.needs.hunger = 30
     local r = s.app:perform(pet.id, 501, "feed")
     T.truthy(r.ok, r.message)
     s.pump(1)
-    local anims = sent(s, "anim")
-    T.truthy(#anims >= 1)
-    local name, seconds, back = anims[1]:match("^([^|]*)|([^|]*)|(.*)$")
-    T.eq(name, Anim.sequences.eat.name)
-    T.eq(tonumber(seconds), Anim.sequences.eat.seconds)
-    T.truthy(back:find("Sit_Idle"), "returns to a sitting idle")
+    local c = clips(s)
+    local ate = false
+    for _, k in ipairs(c) do if k == "eat" then ate = true end end
+    T.truthy(ate, "the eat clip was queued")
+    for _ = 1, Anim.sequences.eat.seconds + 2 do s.adapter.tick(1) end
+    c = clips(s)
+    T.eq(c[#c], Anim.moods[pet.mood and "content" or "content"].base, "back to a sitting idle")
 end)
 
 T.test("looks: care given with the game's own interaction does not replay an animation", function()
@@ -648,14 +659,16 @@ T.test("looks: care given with the game's own interaction does not replay an ani
     T.eq(#sent(s, "anim"), 0)
 end)
 
-T.test("looks: pressing buttons quickly sends every reaction at once, marked as the player's", function()
+T.test("looks: pressing buttons quickly plays every reaction at once", function()
     local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
     s.adapter.petLook(pet.entity, { mood = "content", stage = "adult", scale = 1 })
+    local before = #clips(s)
     T.truthy(s.adapter.playAnimation(pet.entity, "pet_cuddle"))
     T.truthy(s.adapter.playAnimation(pet.entity, "pet_play"), "the first reaction (12 s) does not hold the second back")
-    local anims = sent(s, "anim")
-    T.eq(#anims, 2)
-    for _, a in ipairs(anims) do T.truthy(a:find("|1|[%d.]+$") or a:find("|1$"), a) end
+    local c = clips(s)
+    T.eq(#c - before, 2)
+    T.eq(c[#c - 1], "patted")
+    T.eq(c[#c], "welcoming")
 end)
 
 T.test("looks: nothing is played on a cat while a game interaction runs on it", function()
@@ -663,26 +676,53 @@ T.test("looks: nothing is played on a cat while a game interaction runs on it", 
     s.adapter.petLook(pet.entity, { mood = "content", stage = "adult", scale = 1 })
     local ev = { entity_id = 501, target_entity_id = 109546, interaction_bag_id = "Object_Void_Cat_Tickle" }
     s.adapter.onInteractionStarted(ev)
+    local n = #clips(s)
     T.falsy(s.adapter.playAnimation(pet.entity, "pet_play"))
     for _ = 1, 30 do s.w.minute = s.w.minute + 2; s.adapter.tick(10) end
-    T.eq(#sent(s, "anim"), 0)
+    T.eq(#clips(s), n, "nothing while the game's interaction runs")
     s.adapter.onInteractionEnded(ev)
     for _ = 1, 30 do s.w.minute = s.w.minute + 2; s.adapter.tick(10) end
-    T.truthy(#sent(s, "anim") >= 1, "the idle comes back after the interaction")
+    T.truthy(#clips(s) > n, "the idle comes back after the interaction")
 end)
 
-T.test("looks: the idle follows the mood and is not resent while it does not change", function()
+T.test("looks: our own clip interactions are not mistaken for the game playing on the cat", function()
+    local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
+    s.adapter.petLook(pet.entity, { mood = "content", stage = "adult", scale = 1 })
+    local ev = { entity_id = 501, target_entity_id = 109546, interaction_bag_id = "PawHome_Vat_sit1" }
+    s.adapter.onInteractionStarted(ev)
+    T.truthy(s.adapter.playAnimation(pet.entity, "pet_play"), "still free to play")
+    s.adapter.onInteractionEnded(ev)
+end)
+
+T.test("looks: a loop is started again when it has played through, only while the Zoi has nothing else to do", function()
+    local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
+    s.adapter.petLook(pet.entity, { mood = "content", stage = "adult", scale = 1 })
+    s.adapter.onCatMessage(109546, "cat_begin")
+    for _ = 1, 3 do s.adapter.tick(1) end
+    local n = #clips(s)
+    T.truthy(n >= 1)
+    for _ = 1, Anim.sequences.sit1.cycle - 4 do s.adapter.tick(1) end
+    T.eq(#clips(s), n, "not before the clip ends")
+    for _ = 1, 6 do s.adapter.tick(1) end
+    T.eq(#clips(s), n + 1, "started over")
+    s.w.b2.zoiIdle = function() return false end
+    for _ = 1, 40 do s.adapter.tick(1) end
+    T.eq(#clips(s), n + 1, "waits while the Zoi is busy")
+    s.w.b2.zoiIdle = function() return true end
+    for _ = 1, 4 do s.adapter.tick(1) end
+    T.eq(#clips(s), n + 2, "and goes on when she is free")
+end)
+
+T.test("looks: the idle follows the mood and only the mood's loop is restarted", function()
     local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
     s.adapter.petLook(pet.entity, { mood = "angry", stage = "adult", scale = 1 })
     for _ = 1, 40 do s.w.minute = s.w.minute + 1; s.adapter.tick(10) end
-    local anims = sent(s, "anim")
-    T.eq(#anims, 1)
-    T.eq(anims[1], Anim.sequences[Anim.moods.angry.base].name .. "|0|||" .. tostring(Anim.sequences[Anim.moods.angry.base].cycle))
+    local base = Anim.moods.angry.base
+    for _, k in ipairs(clips(s)) do T.eq(k, base) end
     s.adapter.petLook(pet.entity, { mood = "asleep", stage = "adult", scale = 1 })
     for _ = 1, 40 do s.w.minute = s.w.minute + 1; s.adapter.tick(10) end
-    anims = sent(s, "anim")
-    T.eq(#anims, 2)
-    T.eq(anims[2], Anim.sequences[Anim.moods.asleep.base].name .. "|0|||" .. tostring(Anim.sequences[Anim.moods.asleep.base].cycle))
+    local c = clips(s)
+    T.eq(c[#c], Anim.moods.asleep.base)
 end)
 
 T.test("looks: every mood and action points at a known animation", function()
@@ -911,6 +951,11 @@ T.test("platform: a called cat lands on the floor under the Zoi, not at her body
     -- a floating cat (Z 158) or one on another storey is not trusted as the floor
     T.eq(select(2, Platform.floorUnderZoi(158.0, nil, nil, 158.0)), "default half height")
     T.eq(select(2, Platform.floorUnderZoi(158.0, nil, nil, -250.0)), "default half height")
+    -- on a deck the navigation floor (0.0) is the ground below it: the Zoi's feet decide
+    -- (Cahaya_Residence_LocalHouse1 2026-10-22: Zoi Z 158.0, half height 90, node floor 0.0, deck at 68)
+    local z2, how2 = Platform.floorUnderZoi(158.0, 0.0, 90, 0.0)
+    T.eq(z2, 68.0)
+    T.eq(how2, "half height")
     -- nonsense answers from the game are ignored
     T.eq(select(2, Platform.floorUnderZoi(158.0, 900, 0, nil)), "default half height")
 end)

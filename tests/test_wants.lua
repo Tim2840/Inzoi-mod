@@ -319,4 +319,18 @@ T.test("storage: a v4 save loads as v5 with an empty album and keeps its pets", 
     T.eq(state.pets[1].want, nil)
 end)
 
+
+T.test("clips: bridge.js builds a game clip interaction for every cat animation", function()
+    local f = assert(io.open("mod/ui/bridge.js", "r"))
+    local js = f:read("*a")
+    f:close()
+    local Anim = require("pawhome.data.animations")
+    for key, seq in pairs(Anim.sequences) do
+        T.truthy(js:find('["' .. key .. '", "', 1, true), key .. " has a row in bridge.js CAT_CLIPS")
+        local len = seq.seconds or seq.cycle
+        local line = js:match('%["' .. key .. '", "[^"]*", [^,]*, ([%d.]+)%]')
+        T.truthy(line and math.abs(tonumber(line) - len) < 0.05, key .. " length in bridge.js matches data/animations.lua")
+    end
+end)
+
 return true

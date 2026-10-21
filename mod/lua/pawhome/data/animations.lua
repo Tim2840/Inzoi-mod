@@ -9,10 +9,11 @@
 -- sitting idle when they end.
 return {
     sequences = {
-        -- `cycle`: real seconds after which B1 rotates/restarts the idle loop so the VAT
-        -- playback clock resets and the cat continuously moves at 30 FPS instead of freezing.
-        sit1      = { name = "ANIM_VoidCat_Sit_Idle_01", loop = true, cycle = 6.0 },
-        sit2      = { name = "ANIM_VoidCat_Sit_Idle_02", loop = true, cycle = 8.0 },
+        -- `cycle`: real seconds after which B1 starts the idle loop again, which is the clip's own
+        -- length (montage rows: Sit_Idle_01 15.03 s, the cat washes its face with a paw; Sit_Idle_02
+        -- 43.2 s, it settles and its tail twitches). A clip is played through, never cut off early.
+        sit1      = { name = "ANIM_VoidCat_Sit_Idle_01", loop = true, cycle = 15.03 },
+        sit2      = { name = "ANIM_VoidCat_Sit_Idle_02", loop = true, cycle = 43.2 },
         welcoming = { name = "ANIM_Void_Cat_Welcoming", seconds = 5.7 },
         eat       = { name = "ANIM_VoidCat_Eat", seconds = 8.7 },
         patted    = { name = "ANIM_VoidCat_Being_Patted", seconds = 12.2 },

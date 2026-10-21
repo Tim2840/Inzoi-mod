@@ -161,6 +161,42 @@ const Bridge = (() => {
       ["InteractionBag", id, { ID: id, GroupId: "Group_Self_Expression", PostureGroupId: "StandGroup", AgingConditionFlags: 504,
         RepeatCount: 1, InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: id, Label: "A" }] }] }]);
   }
+  // The cat's clips. The cat only really animates when the game's own PlayVATAnim action runs on it
+  // (the direct B1 call shows a clip's first frame and then stays frozen; verified 2026-10-22), so
+  // every clip is an interaction with that one action, queued on the controlled Zoi by the mod
+  // (mod/lua/pawhome/adapters/inzoi.lua playClip). The action does not wait, so the interaction ends
+  // at once and the Zoi does nothing visible while the clip plays through. Keys and lengths are the
+  // ones of data/animations.lua; a test keeps the lists equal. [key, AnimGameObject id, montage, seconds]:
+  // a montage means the row is added here, otherwise the game's own row is used.
+  const CAT_DIR = "/Game/Characters/Void/Void_Cat/Anim/";
+  const CAT_CLIPS = [
+    ["sit1", "PawHome_Vat_sit1", "ANIM_VoidCat_Sit_Idle_01_Montage", 15.0333],
+    ["sit2", "PawHome_Vat_sit2", "ANIM_VoidCat_Sit_Idle_02_Montage", 43.2],
+    ["hiss", "PawHome_Vat_hiss", "ANIM_Void_Cat_Hissing_Interaction_Montage", 2.7],
+    ["welcoming", "VoidCat_Tickle", null, 5.6667],
+    ["eat", "VoidCat_Eat", null, 8.6667],
+    ["patted", "Petting_Cat_Target", null, 12.1667],
+    ["gift", "VoidCat_Received_Gift_Together", null, 9.6667],
+    ["takeFood", "VoidCat_Eat_Snack", null, 12],
+    ["scared", "VoidCat_Scare", null, 2.5],
+  ];
+  for (const [key, vat, montage, seconds] of CAT_CLIPS) {
+    const id = "PawHome_Vat_" + key;
+    if (montage) {
+      GAME_DATA.push(["AnimGameObject", vat, { ID: vat, PlayingComponentName: "Root", StartAnimSection: "Default",
+        AnimInfoList: [{ Gender: "Default", AnimGrowthStep: "Default", Animation: CAT_DIR + montage + "." + montage,
+          TotalPlayLength: seconds, LoopPlayLength: 0, RateScale: 1, RandomLoopAnims: [] }] }]);
+    }
+    GAME_DATA.push(
+      ["Action", id, { ID: id, ActionTags: [], Actions: [{ ConditionId: "None", duration: 0, IsForceCancelable: true,
+        IsWaitFinishAction: false, FinishPrev: false, BaseObject: "Target", Command: "PlayVATAnim", S1: vat, S2: "None",
+        F1: 0, F2: 0, StartScriptIdList: [], TickScriptIdList: [], TickInterval: 0, FinishScriptIdList: [],
+        CancelScriptIdList: [], NotifyScriptIds: [] }] }],
+      ["Interaction", id, { ID: id, ActionIdList: [id], InteractionSlotUsage: "None", NoneTargetPlayable: true,
+        PostureId: ["Stand"], BodyParts: ["BothHands"] }],
+      ["InteractionBag", id, { ID: id, PostureGroupId: "StandGroup", AgingConditionFlags: 504, RepeatCount: 1,
+        InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: id, Label: "A" }] }] }]);
+  }
   // Shop entries in the game's own menus (docs/research/phone-pc-ui.md). Labels are our text ids
   // (mod_PawHome_*), shipped as l10n/<culture>_mod/PawHome.po by tools/build_modkit.py.
   //  - PawHome_ShopPhone: the Zoi's own menu, "Use smartphone" group; she looks at her phone.

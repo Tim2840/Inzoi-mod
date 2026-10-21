@@ -124,3 +124,13 @@ PO 的問題：Age of Magic（AOM）模組召喚的貓好像會動，我們能�
 - **AOM 的貓真的會走嗎：無法證實。** 看不到它的程式，公開資料裡沒有任何移動指令。我的推測（未驗證）：它用的是和我們同一個 `DEV_Void_Cat`，「會動」多半是貓的待機動畫（呼吸、尾巴、換姿勢）與互動動畫，不是位移。
 - **我們能召喚會走的貓嗎：目前沒有路。** 召喚得到的是靜態物件加 VAT 動畫，沒有走路段；骨架貓沒有可召喚的 Object 列。
 - **還沒試過、可以試的方向**（需要遊戲與 PO 同意）：(a) 召喚 `DEV_Void_Labrador`／`Fox`／`Raccoon`／`Squirrel`／`Rat` 看它們的 VAT 有幾段動畫（有沒有走路）；(b) 在 B1 用 `UE.UObject.Load` 試載 `SKM_CHA_CatB001` 與 `/Game/Characters/Pets/Anims/` 的動畫，看是否打包。兩項都是唯讀探測，不改存檔。
+
+## 第 7 節：貓為什麼不會動（2026-10-22，遊戲 20261019.16318.W，Cahaya_Residence_LocalHouse1）
+
+| # | 發現 | 狀態 | 依據 |
+|---|---|---|---|
+| 7.1 | B1 直接呼叫 `PlayAnimSequence(名稱, 0)`：`Animation` 換了，但畫面只停在該段的第一格。把貓放大 3 倍、連拍 12～14 張（約 14 秒），姿勢完全相同；改傳世界時鐘當起始時間也一樣。**PO 說的「貓是靜止的」是對的**，原因不是輪播間隔 | 已驗證（截圖逐張比對） | `ScreenShot00049–56`、`00142–153` 的裁切並排圖 |
+| 7.2 | `FB1Packet_S_PlayVATAnim` 的欄位是 `AnimSequenceId`、`EntityId`、`Position`（秒）；`InStartTime` 是片段內的位置，不是世界時間 | 已驗證（定義檔） | `luals-defs/structs/FB1Packet_S_PlayVATAnim.lua` |
+| 7.3 | 遊戲自己的 `PlayVATAnim` 動作（Action 列，BaseObject=Target）讓貓真的動：自訂 `AnimGameObject`＋`Action`（只有這一個動作、`IsWaitFinishAction=false`）＋`Interaction`＋`InteractionBag`，用 `interaction.execute` 排進 Zoi 的佇列，互動立刻結束、Zoi 不做任何事，貓卻把整段播完（站起來再坐下，兩次連拍都看到） | 已驗證（2 次）；之後在較近的鏡頭下重做 4 次**看不出站起**，只看到頭部細微晃動 | `ScreenShot00162–169`、`00170–177`；`00220–235` |
+| 7.4 | 因此 mod 改為用這條路徑播所有貓的動畫：`PawHome_Vat_<key>` 互動（`bridge.js` `CAT_CLIPS`），B2 把它排進受控 Zoi 的佇列（`inzoi.lua` `playClip`），循環片段在播完時重排，Zoi 佇列不空時等待；單次片段播完回到心情對應的循環。**排隊成功（結果 37），但這條路徑是否每次都真的在動，還沒有穩定的證據** | 實作完成、測試過；遊戲內效果未穩定驗證 | 離線測試；日誌 `enqueue PawHome_Vat_* … result 37` |
+| 7.5 | 備註：Age of Magic 的貓與我們的 `DEV_Void_Cat` 是同一種物件（同一場景中兩隻貓的物件資料與網格元件相同） | 已驗證 | `entity.get_object_info` 15861、18787 |
