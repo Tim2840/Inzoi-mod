@@ -8,7 +8,15 @@
 
 ## 結論摘要
 
-（遊戲內結果撰寫中）
+**用目前遊戲裡有的資產，做不出「走路動畫流暢、不滑步」的貓。W2（走路原型）不做。**
+
+1. 貓（`BP_Void_Cat`，城市貓與召喚貓共用）是 **VAT 靜態網格**，只烘了 9 段動畫：吃、歡迎（坐→站）、兩種坐姿待機、哈氣、受驚、被摸、送禮、接食物。**沒有走路、跑步、站立待機、趴著**（4.8、4.9）。
+2. 走路／跑步的 Montage 雖然在資產目錄裡，但**沒有打包進遊戲**：`UE.UObject.Load` 載得到吃飯、歡迎的 Montage 與 AnimSequence，載不到走路、跑步（4.17）。所以也無法改用骨架網格播放走路。
+3. 「移動」這一半是做得到的：B1 Lua 每幀 `K2_SetActorLocation` 能平滑移動貓、結束時 B2 `SetLocationAndRotationOnlySimul` 同步，移動後不會被拉回、Zoi 的互動會走到新位置、actor 重生時在新位置（4.10–4.12）。但沒有走路動畫，畫面就是**坐姿滑行**（4.13），不符合 PO 的要求。
+4. ModKit 不能自製或匯入動畫（只有角色動畫工作區，且只引用既有資產），也不能重新烘 VAT（方案 F）。
+5. **S2（幼貓縮放）可行**：B1 `SetActorScale3D` 讓貓立刻變小、VAT 動畫照播、看不出破圖；B2 `SetScale` 只改模擬值、畫面不變，讀檔後是否套用未驗證（4.14）。
+
+**可以做、而且不破圖的替代方案**（給 PO 選，見第 5 節）：讓貓「活起來」而不走路——在 B1 輪播 9 段已烘的動畫（兩種坐姿待機、歡迎、送禮、哈氣…）；貓「換位置」只在玩家看不到時發生（例如 Zoi 不在家、讀檔時），用已驗證的 B1＋B2 同步搬過去。
 
 ## 1. `BP_Void_Cat` 是什麼
 
@@ -35,9 +43,12 @@
 | 方案 | 判定 | 理由（細節見第 4 節） |
 |---|---|---|
 | A. 資料動作／互動讓貓自己走（`WalkTo*` 等動作加在貓身上） | **不可能** | 走路動作的執行者是角色（`FB2Action_WalkTo.Walker: FB2Character`），貓是遊戲物件（`FB2GameObject`），沒有移動元件、路徑、`Locomotion` 列。資料表裡動物端只有 `PlayVATAnim` |
-| B. 資料互動播放走路 VAT（`PlayVATAnim` + 自訂 `AnimGameObject` 列指向 `ANIM_Void_Cat_Walk_F_Montage`） | 見 4.7 | 能不能播取決於走路有沒有被烘進這隻貓的 VAT 貼圖；只能原地踏步，**本身不會位移** |
+| B. 資料互動播放走路 VAT（`PlayVATAnim` + 自訂 `AnimGameObject` 列指向 `ANIM_Void_Cat_Walk_F_Montage`） | **不可能** | 資料補丁被接受，但走路沒有烘進貓的 VAT，貓的動畫不變（4.9）；就算有，也只是原地踏步 |
 | C. 模擬層移動（B2 `SetLocationOnlySimul` 等） | **單獨用不行** | phase0 P3：模擬座標改了，畫面不動 |
-| D. 畫面層移動（B1 `K2_SetActorLocation` 逐幀內插）＋ VAT 走路循環＋結束時 B2 同步模擬座標 | 見 4.8 | 唯一有機會「平滑」的路：B1 每幀小步移動 actor，畫面上就是連續移動；模擬座標只在走完時寫一次，讓互動與存檔用新位置 |
+| D. 畫面層移動（B1 `K2_SetActorLocation` 逐幀內插）＋ VAT 走路循環＋結束時 B2 同步模擬座標 | **部分可行**：移動與同步做得到；**走路動畫沒有** → 只能滑行 | 4.10–4.13 |
+| D'. 把 VAT 換成骨架網格播走路（B1 把 `SKM_Void_Cat` 設到 actor 內的 `UB1DummySkeletalMeshComponent`，隱藏 VAT 網格，`PlayAnimation`） | **不可能** | 走路／跑步動畫沒有打包進遊戲、載不到（4.17）；且試著用「吃」的動畫換骨架時，畫面上看不到貓（4.18） |
+| H. 貓「瞬間換位置」（B1＋B2 同步搬，0 秒） | **可行但有瞬移**；只建議在玩家看不到時用 | 4.10–4.11 的機制，時間設 0 即可 |
+| I. 輪播已烘的 VAT 動畫讓貓有變化 | **可行**，不破圖 | 4.8：名稱不存在時什麼都不做；9 段可用 |
 | E. 貓掛在隱形角色身上（`RequestAddChildEntity`、`entity.attach_prop`） | **正式功能不可行** | `entity.attach_prop` 是 UserCheat 指令，而且是「生成新物件掛在角色骨頭上」，不是把既有的貓掛上去；隱藏角色要 `entity.set_visibility`（UserCheat）。規矩 3：正式功能只能靠 Public 指令與資料腳本。`FB2Actor:RequestAddChildEntity` 在定義檔裡有，但 `EB1EntityAttachRule` 的值沒有公開（未驗證），而且會讓貓跟著一個多出來的 NPC，那個 NPC 有自己的自主行為與需求 |
 | F. ModKit 動畫工作區自製動畫 | **不可能** | 三種動畫工作區（Montage／Locomotion／StatLocomotion）都只給**角色**用，欄位是指向既有資產的軟參照；文件明寫「Mesh import tools not supported」，沒有匯入動畫（FBX/AnimSequence）的工具，也沒有烘焙 VAT 的工具。而且原版已經有貓的走路與跑步 Montage，不需要自製 |
 | G. 建造模式指令搬貓（`building.set_object_location`／`move_object`） | **不可行** | 都是作弊層級（UserCheat／ScriptCheat）且只能在建造模式用 |
@@ -72,3 +83,24 @@ B1 綁 `ObjectTemplate`（兩個貓範本）、`Component`（`B1AnimToTexCompone
 | 4.13 | 沒有走路動畫時，移動的樣子就是「坐姿滑行」（截圖 m1：貓維持坐姿、朝向移動方向）——**正是 PO 不要的滑步** | 已驗證 | 截圖 m1 |
 | 4.14 | **縮放（S2）**：B2 `FB2GameObject:SetScale(0.6)` 成功（`GetScale` 回 0.6）但**畫面不變**；B1 `SetActorScale3D(0.6)` 畫面立刻變小，VAT 動畫（`Hissing`）照常播放，截圖看不出破圖（毛的殼一起縮）。B2 縮放在 actor 重生或讀檔時會不會套用：未驗證（離開住家的測試因遊戲被關掉沒做完） | 畫面縮放已驗證；持久化未驗證 | 截圖 sc1／sc2／sc3 |
 | 4.15 | `entity.set_scale` 只對角色（說明：縮放骨架網格、膠囊、走速） | 未驗證（文件） | `cli_help` |
+
+### 第三輪（2026-10-21 下午，遊戲 `20261019.16318.W`，朴恩珠存檔，載入約 6 分鐘、不存檔回主選單）
+
+| # | 結果 | 狀態 | 依據 |
+|---|---|---|---|
+| 4.16 | B1 Lua 有 `UE.UObject.Load(物件路徑)`，能在執行中載入遊戲資產（`SKM_Void_Cat`、`ANIM_VoidCat_Eat_Montage`、`ANIM_VoidCat_Eat`、`ANIM_Void_Cat_Welcoming`）。`UE.LoadObject` 回 nil；`UE.UKismetSystemLibrary` 在執行期是 nil | 已驗證 | 日誌 |
+| 4.17 | **載不到**：`ANIM_Void_Cat_Walk_F`、`ANIM_Void_Cat_Walk_F_Montage`、`ANIM_Void_Cat_Run_F`、`ANIM_Void_Cat_Run_F_Montage`（同一資料夾的吃飯、歡迎都載得到）→ 走路與跑步**沒有打包進遊戲**。`/Game/BG/Working/JM/MakeVAT/` 底下那份 `SKM_Void_Cat` 也載不到 | 已驗證 | 日誌 |
+| 4.18 | 貓 actor 裡的 `SkeletalMeshComponent_B1AnimToTex`（`UB1DummySkeletalMeshComponent`）本來沒有網格；`SetSkeletalMeshAsset(SKM_Void_Cat)`、`SetVisibility(true)`、隱藏 `StaticMesh`／`StaticMeshFur`、`PlayAnimation(ANIM_VoidCat_Eat, true)` 都回成功，但**截圖上貓消失、沒有骨架貓出現**（推測這個 dummy 元件不渲染，未深究）；`vatback` 把 VAT 網格顯示回來後貓又出現 | 已驗證（現象） | 截圖 k1／k2 |
+
+探勘模組原始碼與驅動腳本放在 `tools/walk_probe/`（`lua/` 複製到 `Documents\inZOI\Mods\InGame\PawWalkProbe\lua` 後以 `luamod.mount` 掛上；`drive.py cmd "<指令>"` 經 cfg 郵筒下指令）。只供探勘，不進正式模組。
+
+## 5. 給 PO 的選項（需要 PO 決定方向）
+
+| 選項 | 畫面 | 風險 |
+|---|---|---|
+| a. 不做走路；貓在原地輪播 9 段已烘動畫（坐姿待機 1／2、歡迎、送禮、哈氣、受驚…），依心情挑 | 不破圖、不滑步 | 低。只用 B1 Lua（`PlayAnimSequence`），名稱錯了也不會破圖 |
+| b. a ＋ 貓會「換地方」，但只在玩家看不到時（Zoi 不在家、離開住家再回來、讀檔時）瞬間搬到家裡另一個空位 | 玩家看不到過程，回來時貓在別處 | 中。落點要有互動空間（4.12）；選點要避開牆與家具（尚無物件用的尋路，需要自己挑點，例如記錄 Zoi 走過的位置） |
+| c. 用滑行移動（4.10） | **滑步**，違反 PO 要求 | 不建議 |
+| d. 等 KRAFTON 出寵物系統或打包走路動畫 | — | 不在我們控制 |
+
+S2（幼貓長大）：可以用 B1 `SetActorScale3D` 依年齡設縮放（幼貓約 0.6）。要做的話還要確認：讀檔或 actor 重生後要不要重設（B2 `SetScale` 是否會帶到畫面，未驗證；保守作法是 B1 每次 `on_begin` 依引擎資料重設）、互動點（`InteractionSlot_M` 在貓前方 90 cm）不隨縮放移動時 Zoi 的位置是否自然（未驗證）。

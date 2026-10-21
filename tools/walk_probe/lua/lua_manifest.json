@@ -1,0 +1,14 @@
+{
+  "bindings": {
+    "B2": [
+      { "type": "ObjectTemplate", "key": "DEV_AnimalObjectVoidCatTemplate", "script": "PawWalk.CatSim" },
+      { "type": "ObjectTemplate", "key": "DEV_E01_AnimalObjectVoidCatTemplate", "script": "PawWalk.CatSim" }
+    ],
+    "B1": [
+      { "type": "ObjectTemplate", "key": "DEV_AnimalObjectVoidCatTemplate", "script": "PawWalk.Cat" },
+      { "type": "ObjectTemplate", "key": "DEV_E01_AnimalObjectVoidCatTemplate", "script": "PawWalk.Cat" },
+      { "type": "Component", "key": "B1AnimToTexComponent", "script": "PawWalk.Vat" },
+      { "type": "Zoi", "key": "ResidenceFamily", "script": "PawWalk.Zoi" }
+    ]
+  }
+}
