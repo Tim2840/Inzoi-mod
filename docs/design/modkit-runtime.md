@@ -30,6 +30,7 @@ UI ──wf.state──▶ 遊戲存檔（UIMD 區塊）
 3. adapter 收到完整內容 → 放進快取、`slotId()` 回傳 session → 引擎讀檔、開始運作。新存檔（UI 沒資料）回傳空字串。
 4. `saveSet` 更新快取並送 `pawhome:save`；UI 寫進 `wf.state.pawhome`，下次遊戲存檔時一起存。
 5. UI 沒回應（UI 模組被停用）時引擎維持暫停，不會產生沒存檔的假狀態。
+6. **存檔外備份**：存檔時沒掛 UI 模組，`wf.state` 的寵物資料會消失（2026-10-21 實際發生）。B2 每 30 秒最多一次把資料連同家戶 ID 送給 B1（`pawhome:backup`），B1 以 `uimod.cfg_save`（區段 `backup`、鍵 `h<家戶ID>`）存在存檔之外；沒有寵物的資料不送，避免空白新開局蓋掉好的備份。讀到沒有寵物資料的存檔時 B2 問 B1（`pawhome:backup_get` → `pawhome:backup_data`），面板提示，玩家按下才還原（RPC `restoreBackup`）。✅ 已驗證（2026-10-21）：領養 → 20 秒內寫入備份 → 不存檔重讀 → 提示「第 1029 天：Mochi」→ 還原成功。
 
 ## 4. adapter 函式對照（2026-10-21 遊戲 `20261019.16318.W` 實測）
 
