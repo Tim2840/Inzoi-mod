@@ -1,6 +1,7 @@
 -- B1 runtime: one relay for the whole game thread, plus the cats' looks. The thin binding
 -- scripts in mod/modkit/lua/B1 forward their callbacks here.
 local Relay = require("pawhome.adapters.inzoi_relay")
+local Coats = require("pawhome.adapters.inzoi_coats")
 local Platform = require("pawhome.adapters.inzoi_platform")
 local CatB1 = require("pawhome.adapters.inzoi_cat_b1")
 
@@ -11,6 +12,8 @@ local function ensure(opts)
         R.platform = Platform.b1(opts)
         R.relay = Relay.new(R.platform)
         R.cats = CatB1.new(R.platform)
+        R.coats = Coats.new(R.platform)
+        R.relay.onCoats = function(text) R.coats.setList(text) end
         R.platform.log("B1 relay started, mod " .. Platform.MOD_ID .. ", epoch " .. R.relay.epoch)
     end
     return R.relay
@@ -23,6 +26,7 @@ function R.start(opts) ensure(opts) end
 function R.tick(dt)
     ensure().tick(dt)
     R.cats.tick(dt)
+    R.coats.tick(dt)
 end
 
 -- B1 Zoi(ResidenceFamily) on_lua_message. owner is an AB1Character.
@@ -34,10 +38,11 @@ function R.onMessage(owner, channel, payload)
 end
 
 -- B1 ObjectTemplate(cat) on_begin / on_end / on_lua_message. owner is the cat's actor.
-function R.onCatBegin(owner) ensure(); R.cats.onBegin(owner) end
-function R.onCatEnd(owner) ensure(); R.cats.onEnd(owner) end
+-- The looks (size, animations) and the fixed coat both listen to every cat actor.
+function R.onCatBegin(owner) ensure(); R.cats.onBegin(owner); R.coats.onActor(owner) end
+function R.onCatEnd(owner) ensure(); R.cats.onEnd(owner); R.coats.onActorEnd(owner) end
 function R.onCatMessage(owner, channel, payload) ensure(); R.cats.onMessage(owner, channel, payload) end
 
-function R.stop() R.relay, R.cats = nil, nil end
+function R.stop() R.relay, R.cats, R.coats = nil, nil, nil end
 
 return R

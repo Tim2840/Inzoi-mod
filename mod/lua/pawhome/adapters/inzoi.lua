@@ -78,6 +78,8 @@ function ModKit.new(platform, opts)
         backupDirty = false,
         sinceBackup = math.huge,
         backupOffer = nil,  -- { day, cache } from the relay when the savegame had no data
+        coats = {},         -- pet ref -> coat texture name (from the engine, see setCoats)
+        coatsSent = nil,    -- the last coat list sent to B1
         rpc = nil,          -- function(method, args) -> result table
         looks = {},         -- pet ref -> { mood, stage, scale } from the engine
         shown = {},         -- cat entity id -> { scale, base, nextIdle, busyUntil }
@@ -183,6 +185,35 @@ function ModKit.new(platform, opts)
     local function resolve(ref)
         if type(ref) == "number" then return ref end
         return a.refs[ref]
+    end
+
+    -- Coats (docs/research/fixed-coat.md): the game re-rolls a cat's coat whenever its actor
+    -- is created, and only the game thread (B1) can change it. B2 sends B1 the list
+    -- "<entity id>=<texture>;..." of our cats; the B1 cat binding applies it.
+    local function coatText()
+        local parts = {}
+        for ref, texture in pairs(a.coats) do
+            local eid = resolve(ref)
+            if eid ~= nil then parts[#parts + 1] = tostring(eid) .. "=" .. texture end
+        end
+        table.sort(parts)
+        return table.concat(parts, ";")
+    end
+
+    function a.sendCoats(force)
+        if not a.ready then return end
+        local text = coatText()
+        if not force and text == a.coatsSent then return end
+        if sendLong("coats", text) then a.coatsSent = text end
+    end
+
+    function a.setCoats(list)
+        local map = {}
+        for _, c in ipairs(list or {}) do
+            if c.ref ~= nil and type(c.texture) == "string" then map[c.ref] = c.texture end
+        end
+        a.coats = map
+        a.sendCoats(false)
     end
 
     function a.spawnPet(householdId, spec)
@@ -419,6 +450,7 @@ function ModKit.new(platform, opts)
             if eid ~= nil then
                 platform.send(eid, Wire.channel("hello"), a.session)
                 a.sinceHello = 0
+                if a.ready then a.sendCoats(true) end
             end
         end
     end
@@ -506,6 +538,7 @@ function ModKit.new(platform, opts)
             log("summoned cat " .. tostring(eid) .. " is " .. p.ref)
             persistRefs()
             showScale(eid, p.ref)
+            a.sendCoats(false)
         end
     end
 

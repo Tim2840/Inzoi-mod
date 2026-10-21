@@ -207,7 +207,7 @@
     const away = pet.status === "impounded";
     return h("section", { class: "card", "aria-label": pet.name },
       h("div", { class: "pet-head" },
-        h("div", { class: "avatar" }, icon(away ? "shelter" : "cat", { mood: pet.mood })),
+        h("div", { class: "avatar" }, icon(away ? "shelter" : "cat", { mood: pet.mood, coat: pet.coat })),
         h("div", {},
           h("h2", { text: pet.name }),
           h("div", { class: "sub" }, `${pet.stageLabel} · ${pet.ageLabel}`),
@@ -271,26 +271,45 @@
       view.pets.length > 1
         ? h("div", { class: "chips", style: "margin-bottom:8px" }, view.pets.map((p) =>
             h("button", { class: "chip pet", "aria-pressed": p.id === pet.id, onclick: () => { state.petId = p.id; render(); } },
-              icon("cat", { mood: p.mood }), p.name)))
+              icon("cat", { mood: p.mood, coat: p.coat }), p.name)))
         : null,
       h("div", { class: "pw-cols" },
         h("div", { class: "pw-col" }, petCard(pet, u)),
         h("div", { class: "pw-col" }, careCard(pet, view), furnitureCard(view))));
   }
 
+  // One row of coat buttons; `pick` is { avatar, mood, coat } and is updated on every click.
+  function coatPicker(choices, pick, u) {
+    const buttons = [];
+    function show() {
+      setChildren(pick.avatar, icon("cat", { mood: pick.mood, coat: pick.coat }));
+      for (const b of buttons) b.setAttribute("aria-pressed", String(b.getAttribute("data-coat") === pick.coat));
+    }
+    for (const c of choices) {
+      buttons.push(h("button", { class: "chip coat", type: "button", "data-coat": c.id, title: c.label, "aria-label": c.label,
+        onclick: () => { pick.coat = c.id; show(); } }, icon("cat", { mood: "content", coat: c.id })));
+    }
+    show();
+    return h("div", { class: "chips coats", role: "group", "aria-label": u.coat_label || "Coat" }, buttons);
+  }
+
   function renderOffer(o, u) {
     const input = h("input", { type: "text", value: o.name, maxlength: 24, "aria-label": u.name_label });
+    const pick = { avatar: h("div", { class: "avatar" }), mood: "content", coat: o.coat };
+    const picker = o.coats && o.coats.length ? coatPicker(o.coats, pick, u) : null;
+    if (!picker) setChildren(pick.avatar, icon("cat", { mood: "content", coat: o.coat }));
     return h("div", { class: "cell" }, h("section", { class: "card offer" },
       h("div", { class: "who" },
-        h("div", { class: "avatar" }, icon("cat", { mood: "content" })),
+        pick.avatar,
         h("div", {}, h("h3", { text: o.name }), h("div", { class: "sub" }, o.stageLabel))),
       h("div", { class: "chips" }, o.traits.map((t) => h("span", { class: "chip", title: t.desc }, t.label))),
+      picker,
       h("div", { class: "row" },
         input,
         h("button", {
           class: "btn",
           onclick: async () => {
-            const data = await call("adoptOffer", { offerId: o.id, name: input.value });
+            const data = await call("adoptOffer", { offerId: o.id, name: input.value, coat: pick.coat });
             if (data && data.result && data.result.ok) { state.offers = null; state.tab = "pets"; }
             render();
           },
@@ -301,16 +320,21 @@
   function renderStray(s, u) {
     const input = h("input", { type: "text", placeholder: u.name_label, maxlength: 24, "aria-label": u.name_label });
     const focus = state.focusStray != null && String(state.focusStray) === String(s.id);
+    const choices = state.coats || [];
+    const pick = { avatar: h("div", { class: "avatar" }), mood: focus ? "happy" : "content", coat: choices[0] && choices[0].id };
+    const picker = choices.length ? coatPicker(choices, pick, u) : null;
+    if (!picker) setChildren(pick.avatar, icon("cat", { mood: pick.mood }));
     return h("div", { class: "cell" }, h("section", { class: "card offer" + (focus ? " focus" : ""), "data-stray": s.id },
       h("div", { class: "who" },
-        h("div", { class: "avatar" }, icon("cat", { mood: focus ? "happy" : "content" })),
+        pick.avatar,
         h("div", {}, h("h3", {}, s.stageLabel || s.stage), focus ? h("div", { class: "sub" }, u.adopt_this) : null)),
+      picker,
       h("div", { class: "row" },
         input,
         h("button", {
           class: "btn",
           onclick: async () => {
-            const data = await call("adoptStray", { strayId: s.id, name: input.value });
+            const data = await call("adoptStray", { strayId: s.id, name: input.value, coat: pick.coat });
             if (data && data.result && data.result.ok) { state.strays = null; state.focusStray = null; state.tab = "pets"; }
             render();
           },
@@ -417,7 +441,7 @@
       const o = await call("offers", {});
       if (o) state.offers = o.offers;
       const s = await call("strays", {});
-      if (s) state.strays = s.strays;
+      if (s) { state.strays = s.strays; state.coats = s.coats || []; }
     }
   }
 

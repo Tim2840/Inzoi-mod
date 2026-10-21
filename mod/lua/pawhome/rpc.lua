@@ -36,15 +36,15 @@ function handlers.strays(app, who)
         local stage = s.stage or "adult"
         out[i] = { id = s.id, stage = stage, stageLabel = I18n.t("stages." .. stage) }
     end
-    return snapshot(app, who, { strays = out })
+    return snapshot(app, who, { strays = out, coats = app:coats() })
 end
 
 function handlers.adoptOffer(app, who, a)
-    return snapshot(app, who, { result = app:adoptOffer(who.household, who.zoi, a.offerId, a.name) })
+    return snapshot(app, who, { result = app:adoptOffer(who.household, who.zoi, a.offerId, a.name, a.coat) })
 end
 
 function handlers.adoptStray(app, who, a)
-    return snapshot(app, who, { result = app:adoptStray(who.household, who.zoi, a.strayId, a.name) })
+    return snapshot(app, who, { result = app:adoptStray(who.household, who.zoi, a.strayId, a.name, a.coat) })
 end
 
 function handlers.restoreBackup(app, who)

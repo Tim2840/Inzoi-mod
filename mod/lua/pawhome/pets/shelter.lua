@@ -56,7 +56,7 @@ function S.redeem(ctx, householdId, zoiId, petId)
 
     local entity
     if Api.caps().spawn then
-        entity = Api.spawnPet(householdId, { appearance = pet.appearance, stage = pet.stage })
+        entity = Api.spawnPet(householdId, { appearance = pet.appearance, stage = pet.stage, coat = pet.coat })
         if entity == nil then return fail(ctx, "spawn_failed") end
     end
     if not Api.charge(householdId, fee) then
