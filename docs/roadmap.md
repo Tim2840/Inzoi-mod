@@ -34,6 +34,8 @@ PO 的目標（2026-10-21）：接近 The Sims 4《貓狗成群》家貓的程�
 - **遊戲只有一個。** 會改變遊戲狀態的操作（讀檔、離開存檔、掛載模組、寫開發版模組資料夾、`data.patch`、作弊、生成物件）都要先拿遊戲鎖：
   `py -I tools/game_lock.py acquire <你的名字> 45 <做什麼>`；結束前回到主選單、卸載自己掛的模組，再 `release`。
   拿不到鎖就先做不需要遊戲的工作，稍後再試。只讀查詢（`data.table_get`、`cli_help`、`game.get_state`、掃描）不用鎖。
+- **不要留下會自己拿鎖或操作遊戲的背景迴圈**（等鎖的迴圈只能用在你自己還在線上等結果時）。中途被打斷（例如用量上限）時，持有的鎖與遊戲狀態會留在原地；主線會在下次開始時清理。
+- 遊戲沒開時由主線啟動（Steam `steam://rungameid/2456740`），子代理不要自己開或關遊戲。
 - 拿鎖之後、操作之前，先看 `game.get_state`：如果狀態不是上一個持鎖者留下的樣子（例如 PO 正在玩），立刻停手並回報。
 - **不要存 PO 的存檔。** 需要存檔的測試用專用測試存檔（名稱見 M2，完成前一律不存檔離開）。
 - 開發版模組資料夾 `Documents\inZOI\Mods\InGame\PawHomeDev_A5BI7C` 是共用的：只在持鎖時用 `py -I tools/build_modkit.py "C:/Users/user/Documents/inZOI/Mods/InGame/PawHomeDev_A5BI7C"` 重建；之後在主選單 `luamod_remount`、`uimod_enable Keyword=PawHomeDev`，再讀檔，釋放鎖前不需要還原。
