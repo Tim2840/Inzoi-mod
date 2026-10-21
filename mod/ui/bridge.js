@@ -134,7 +134,17 @@ const Bridge = (() => {
       DisplayInfo: { DisplayTextId: "mod_PawHome_shop_pc",
         DisplayCategoryTextId: "InteractionBag_DisplayInfo_Computer_Use_Lookup_DisplayCategoryTextId" } }],
   ];
+  // PawHome_Adopt: on city cats (DEV_Void_Cat / Level_Void_Cat share this selection set; the
+  // B2 adapter ignores it on our own home cats). The Zoi plays with the cat once; at the start
+  // the adapter sends pawhome:open with the cat, and the shop opens on the adopt tab.
+  SHOP_DATA.push(
+    ["Interaction", "PawHome_Adopt", { ID: "PawHome_Adopt", ActionIdList: ["Object_Void_Cat_Tickle"],
+      InteractionSlotUsage: "Single", PostureId: ["Stand"], BodyParts: ["BothHands"] }],
+    ["InteractionBag", "PawHome_Adopt", { ID: "PawHome_Adopt", PostureGroupId: "StandGroup", AgingConditionFlags: 504, RepeatCount: 1,
+      InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_Adopt", Label: "A" }] }],
+      DisplayInfo: { DisplayTextId: "mod_PawHome_adopt_cat" } }]);
   const SHOP_MENUS = [   // [selection set row, state group, interaction bag]
+    ["DEV_Void_Cat", "Normal", "PawHome_Adopt"],
     ["SelfCharacter", "Normal", "PawHome_ShopPhone"],
     ["Computer01", "Normal", "PawHome_ShopPC"],
     ["Laptop01", "Normal", "PawHome_ShopPC"],
