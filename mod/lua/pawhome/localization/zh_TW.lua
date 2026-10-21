@@ -73,6 +73,11 @@ return {
         not_impounded = "{name} 不在收容所。",
         redeem_wait = "{name} 還要 {hours} 小時才能領回。",
     },
+    game = {
+        shop_phone = "毛孩之家寵物店",
+        shop_pc = "逛毛孩之家線上寵物店",
+        adopt_cat = "領養這隻貓（毛孩之家）",
+    },
     ui = {
         title = "毛孩之家",
         pets = "寵物",

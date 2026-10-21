@@ -73,6 +73,13 @@ return {
         not_impounded = "{name} is not at the shelter.",
         redeem_wait = "{name} can be redeemed in {hours} h.",
     },
+    -- labels in the game's own menus (interaction names); tools/build_modkit.py writes them to
+    -- l10n/<culture>_mod/PawHome.po under the text id "mod_PawHome_<key>"
+    game = {
+        shop_phone = "Paw Home pet shop",
+        shop_pc = "Browse the Paw Home pet shop",
+        adopt_cat = "Adopt this cat (Paw Home)",
+    },
     ui = {
         title = "Paw Home",
         pets = "Pets",
