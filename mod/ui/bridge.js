@@ -110,8 +110,47 @@ const Bridge = (() => {
       AgingConditionFlags: 504, RepeatCount: 1,
       InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_SendAway", Label: "A" }] }] }],
   ];
+  // Shop entries in the game's own menus (docs/research/phone-pc-ui.md). Labels are our text ids
+  // (mod_PawHome_*), shipped as l10n/<culture>_mod/PawHome.po by tools/build_modkit.py.
+  //  - PawHome_ShopPhone: the Zoi's own menu, "Use smartphone" group; she looks at her phone.
+  //  - PawHome_ShopPC: computers and laptops; she sits down and browses.
+  // While the Zoi does one of them, app.js opens the shop in the matching shell.
+  const SHOP_DATA = [
+    ["Interaction", "PawHome_ShopPhone", { ID: "PawHome_ShopPhone", ActionIdList: ["Stand", "Self_SmartPhone_Insurance_CurrentState"],
+      InteractionSlotUsage: "None", PostureId: ["Stand", "Stand"], BodyParts: ["BothHands"] }],
+    ["InteractionBag", "PawHome_ShopPhone", { ID: "PawHome_ShopPhone", GroupId: "Group_Using_SmartPhone", PostureGroupId: "StandGroup",
+      AgingConditionFlags: 480, RepeatCount: 1,
+      InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_ShopPhone", Label: "B" }] }],
+      DisplayInfo: { DisplayTextId: "mod_PawHome_shop_phone", Icon: "/Game/UI/Icon/Object/Action_SmartPhone.Action_SmartPhone",
+        DisplayCategoryTextId: "InteractionBag_DisplayInfo_Self_SmartPhone_Insurance_CurrentState_DisplayCategoryTextId" } }],
+    ["Interaction", "PawHome_ShopPC", { ID: "PawHome_ShopPC", ActionIdList: ["Computer_Use_Lookup"], InteractionSlotUsage: "None",
+      EnableSlotTags: ["Customer", "Computer"], SpaceTargetFilterId: "TargetConnectedChair",
+      StartScriptIdList: ["Start_Computer_Search_State"], CancelScriptIdList: ["Finish_Computer_State_Search"],
+      FinishScriptIdList: ["Finish_Computer_State_Search"], PostureId: ["MovingChair_Sit", "PicnicTable_Sit", "Sit"], BodyParts: ["BothHands"] }],
+    ["InteractionBag", "PawHome_ShopPC", { ID: "PawHome_ShopPC", PostureGroupId: "StandGroup", AgingConditionFlags: 504, RepeatCount: 1,
+      InteractionVisibleConditionIds: ["DC_PC_Use_Condition", "TargetNotBusinessType"],
+      InteractionEnableConditionIds: ["DC_PC_Use_Condition", "TargetNotBusinessType"],
+      InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_ShopPC", Label: "C" }] }],
+      DisplayInfo: { DisplayTextId: "mod_PawHome_shop_pc",
+        DisplayCategoryTextId: "InteractionBag_DisplayInfo_Computer_Use_Lookup_DisplayCategoryTextId" } }],
+  ];
+  const SHOP_MENUS = [   // [selection set row, state group, interaction bag]
+    ["SelfCharacter", "Normal", "PawHome_ShopPhone"],
+    ["Computer01", "Normal", "PawHome_ShopPC"],
+    ["Laptop01", "Normal", "PawHome_ShopPC"],
+  ];
   (async () => {
-    for (const [alias, id, row] of GAME_DATA) {
+    for (const [set, stateGroup, bag] of SHOP_MENUS) {
+      const r = await cli("data.table_get", { alias: "ObjectSelectionSet", row: set }).catch(() => null);
+      if (!r || !r.success || JSON.stringify(r).indexOf('"' + bag + '"') >= 0) continue;   // missing set, or added already
+      SHOP_DATA.push(["menu", set, { query: `ObjectSelectionSet[Id=${set}].SelectionSets[StateGroupId=${stateGroup}].InteractionBagList`, value: bag }]);
+    }
+    for (const [alias, id, row] of GAME_DATA.concat(SHOP_DATA)) {
+      if (alias === "menu") {
+        const r = await cli("data.patch", { method: "Append", query: row.query, value: row.value }).catch((e) => e);
+        if (!r || !r.success) report("menu " + id + " failed: " + JSON.stringify(r));
+        continue;
+      }
       // table_get rejects when the row does not exist yet
       const exists = await cli("data.table_get", { alias, row: id }).then((r) => !!(r && r.success), () => false);
       if (exists) continue;                                     // already added this session
