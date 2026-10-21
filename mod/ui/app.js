@@ -477,6 +477,30 @@
   // the Lua side may ask to open the shop too ("pawhome:open" with a JSON entry)
   if (Bridge.onOpen) Bridge.onOpen((e) => openEntry(e || {}));
 
+  // Entries through the game's own menus: our interactions (GAME_DATA in bridge.js) send the
+  // Zoi to her phone or to a computer; while she does that, the shop opens in the matching shell.
+  const ENTRY_BAGS = { PawHome_ShopPhone: { shell: "phone" }, PawHome_ShopPC: { shell: "pc" } };
+  const ENTRY_POLL_MS = 1500;
+  let possessed = null, possessedAt = 0, lastBag = null;
+  const data = (r) => (r && typeof r.data === "object" && r.data) || r || {};
+  async function watchEntries() {
+    try {
+      if (!possessed || Date.now() - possessedAt > 10000) {
+        possessed = data(await window.inzoi.cli.execute("entity.get_possessed", {})).entity_id || null;
+        possessedAt = Date.now();
+      }
+      if (possessed) {
+        const cur = data(await window.inzoi.cli.execute("interaction.get_current", { entity_id: possessed }));
+        const bag = cur.playing === false ? null : cur.interaction_bag_id || null;
+        if (bag !== lastBag) {
+          lastBag = bag;
+          if (ENTRY_BAGS[bag]) openEntry(ENTRY_BAGS[bag]);
+        }
+      }
+    } catch (e) { possessed = null; } finally { setTimeout(watchEntries, ENTRY_POLL_MS); }
+  }
+  if (!Bridge.preview && window.inzoi && window.inzoi.cli) watchEntries();
+
   // start: in the game as the launcher once window.js has restored its saved window state
   const startShell = Bridge.preview ? (SIZE[params.get("shell")] ? params.get("shell") : "phone") : "mini";
   function start(tries) {
