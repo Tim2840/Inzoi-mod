@@ -7,7 +7,7 @@ local Traits = require("pawhome.pets.traits")
 
 local R = {}
 
--- spec: name, household, stage, traits, revealed(table id->true), entity, appearance
+-- spec: name, household, stage, traits, revealed(table id->true), entity, appearance, coat
 function R.create(ctx, spec)
     local id = ctx.state.nextPetId
     ctx.state.nextPetId = id + 1
@@ -29,6 +29,7 @@ function R.create(ctx, spec)
         status = "home",          -- home | impounded | lost (rehomed) | dead
         entity = spec.entity,
         appearance = spec.appearance,
+        coat = spec.coat,             -- data/coats.lua id
         cooldowns = {},
         notified = {},
         flags = {},

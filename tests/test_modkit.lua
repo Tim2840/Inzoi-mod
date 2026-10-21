@@ -295,6 +295,38 @@ T.test("modkit: adopting with spawn queues the welcome interaction and binds the
     T.eq(s.adapter.refs[s.app.ctx.state.pets[1].entity], 109546)
 end)
 
+T.test("modkit: the coats of our summoned cats reach the game thread", function()
+    local s = boot({ spawn = true })
+    local got = {}
+    s.relay.onCoats = function(text) got[#got + 1] = text end
+    s.pump()
+    local offers = s.app:offers(77, true)
+    T.truthy(s.app:adoptOffer(77, 501, offers[1].id, "Mimi", "calico").ok)
+    s.pump()
+    T.eq(got[#got] or "", "", "no cat in the list while it is still on its way")
+    s.adapter.onCatBegin(109546, { home = true })
+    s.pump()
+    T.eq(got[#got], "109546=Void_Cat_001_002_D")
+    local n = #got
+    require("pawhome.pets.coats").publish(s.app.ctx)     -- what every engine tick does
+    local sent = {}
+    for _, m in ipairs(s.w.toClient) do
+        if m[2] == "pawhome:coats" then sent[#sent + 1] = m[3] end
+    end
+    T.eq(table.concat(sent, ","), "", "an unchanged list is not sent again on every tick")
+    s.pump(8)     -- 80 seconds: the minute's hello repeats the list for a relay that restarted
+    T.gt(#got, n)
+    T.eq(got[#got], "109546=Void_Cat_001_002_D")
+
+    -- after a load the list is sent as soon as the save data arrived
+    local again = boot({ session = "S2", uiState = s.ui.state, spawn = true })
+    local got2 = {}
+    again.relay.onCoats = function(text) got2[#got2 + 1] = text end
+    again.adapter.onCatBegin(109546, { home = true })
+    again.pump()
+    T.eq(got2[#got2], "109546=Void_Cat_001_002_D")
+end)
+
 T.test("modkit: the placeholder-to-cat mapping survives save and load", function()
     local s = boot({ spawn = true })
     s.pump()

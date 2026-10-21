@@ -5,7 +5,7 @@
 --   required: now, saveGet, saveSet
 --   optional: notify, householdMembers, funds, charge, addBuff, listStrays,
 --             bringStray, spawnPet, entityExists, despawnPet,
---             playAnimation, locale, logSink,
+--             playAnimation, setCoats, locale, logSink,
 --             slotId, subscribe   (see below: the savegame slot the player is in),
 --             saveGetBackup       (older generations of a save, see below)
 --   caps: { spawn = bool, moveStray = bool, animate = bool, buffs = bool }
@@ -158,6 +158,13 @@ function Api.takeCare(ref)
     if ref == nil then return {} end
     local ok, v = call("takeCare", ref)
     return ok and type(v) == "table" and v or {}
+end
+
+-- Optional. The coat each pet at home should show: { { ref, coat, texture }, ... } (the whole
+-- list every time; pets missing from it are left to the game). Adapters that cannot change
+-- the look simply do not implement it.
+function Api.setCoats(list)
+    return (call("setCoats", list or {}))
 end
 
 function Api.playAnimation(ref, animationId)

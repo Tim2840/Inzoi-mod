@@ -116,7 +116,7 @@ local function ensurePresent(ctx, pet)
     if ctx.now - p.lastTry < presenceData.retryMinutes then return end
     p.lastTry = ctx.now
     if pet.entity ~= nil then Api.despawnPet(pet.entity) end
-    local ref = Api.spawnPet(pet.household, { appearance = pet.appearance, stage = pet.stage })
+    local ref = Api.spawnPet(pet.household, { appearance = pet.appearance, stage = pet.stage, coat = pet.coat })
     pet.entity = ref
     if ref ~= nil then
         pet.presence = nil

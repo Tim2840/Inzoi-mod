@@ -2,6 +2,7 @@ return {
     mod = { name = "毛孩之家" },
     needs = { hunger = "飢餓", energy = "精力", fun = "娛樂", bladder = "貓砂" },
     stages = { kitten = "幼貓", adult = "成貓", elder = "老貓" },
+    coats = { orange_tabby = "橘虎斑", brown_tabby = "棕虎斑", calico = "三花", tuxedo = "賓士貓" },
     illness = {
         upset_tummy = { name = "腸胃不適", desc = "餓太久了。比較容易累、容易無聊。好好照顧會自己好，也可以看獸醫。" },
         cold        = { name = "貓感冒", desc = "累壞又著涼。精力掉得快很多。休息和照顧會好，也可以看獸醫。" },
@@ -80,6 +81,7 @@ return {
         no_funds = "金錢不足（需要 {fee}）。",
         no_offer = "這隻寵物已經不在了。",
         bad_name = "名字需要 1 到 24 個字。",
+        bad_coat = "沒有這種花色。",
         no_stray = "找不到這隻流浪貓。",
         spawn_failed = "無法把寵物帶回家，請在家附近再試一次。",
         no_save = "還沒有載入存檔。",
@@ -111,6 +113,7 @@ return {
         bond = "親密度",
         age = "年齡：{days} 天",
         unknown_trait = "???",
+        coat = "花色",
         traits = "個性",
         training = "寵物訓練 Lv.{level}",
         impounded = "在動物收容所",

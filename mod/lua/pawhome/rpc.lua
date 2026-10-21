@@ -34,15 +34,15 @@ function handlers.strays(app, who)
     for i, s in ipairs(app:strays(who.household)) do
         out[i] = { id = s.id, stage = s.stage or "adult" }
     end
-    return snapshot(app, who, { strays = out })
+    return snapshot(app, who, { strays = out, coats = app:coats() })
 end
 
 function handlers.adoptOffer(app, who, a)
-    return snapshot(app, who, { result = app:adoptOffer(who.household, who.zoi, a.offerId, a.name) })
+    return snapshot(app, who, { result = app:adoptOffer(who.household, who.zoi, a.offerId, a.name, a.coat) })
 end
 
 function handlers.adoptStray(app, who, a)
-    return snapshot(app, who, { result = app:adoptStray(who.household, who.zoi, a.strayId, a.name) })
+    return snapshot(app, who, { result = app:adoptStray(who.household, who.zoi, a.strayId, a.name, a.coat) })
 end
 
 function handlers.vet(app, who, a)

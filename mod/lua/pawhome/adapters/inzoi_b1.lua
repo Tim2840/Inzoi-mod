@@ -1,6 +1,7 @@
 -- B1 runtime: one relay for the whole game thread. The thin binding scripts in
 -- mod/modkit/lua/B1 forward their callbacks here.
 local Relay = require("pawhome.adapters.inzoi_relay")
+local Coats = require("pawhome.adapters.inzoi_coats")
 local Platform = require("pawhome.adapters.inzoi_platform")
 
 local R = { relay = nil }
@@ -9,6 +10,8 @@ local function ensure(opts)
     if not R.relay then
         R.platform = Platform.b1(opts)
         R.relay = Relay.new(R.platform)
+        R.coats = Coats.new(R.platform)
+        R.relay.onCoats = function(text) R.coats.setList(text) end
         R.platform.log("B1 relay started, mod " .. Platform.MOD_ID .. ", epoch " .. R.relay.epoch)
     end
     return R.relay
@@ -28,6 +31,10 @@ function R.onMessage(owner, channel, payload)
     ensure().onMessage(eid, channel, payload)
 end
 
-function R.stop() R.relay = nil end
+-- B1 ObjectTemplate(cat) on_begin / on_end. owner is the cat actor (BP_Void_Cat_C).
+function R.onCatBegin(owner) ensure(); R.coats.onActor(owner) end
+function R.onCatEnd(owner) if R.coats then R.coats.onActorEnd(owner) end end
+
+function R.stop() R.relay, R.coats = nil, nil end
 
 return R

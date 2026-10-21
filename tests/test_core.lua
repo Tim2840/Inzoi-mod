@@ -173,7 +173,7 @@ T.test("storage: a v2 save loads as v3 with the illness settings filled in", fun
     mock.store[Storage.KEY] = Serialize.encode({ version = 2, nextPetId = 2, settings = { vetFee = 99 },
         pets = { { id = 1, name = "Old", status = "home", bond = {}, flags = {} } } })
     local state, how = Storage.load()
-    T.eq(how, "loaded"); T.eq(state.version, 3)
+    T.eq(how, "loaded"); T.eq(state.version, Storage.VERSION)
     T.eq(state.settings.illnessEnabled, true)
     T.eq(state.settings.vetFee, 99, "an existing value is kept")
     T.eq(state.pets[1].illness, nil)

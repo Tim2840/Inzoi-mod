@@ -98,6 +98,8 @@ function Mock.new(opts)
     end
     function m.entityExists(ref) return m.entities[ref] ~= nil and not m.hidden[ref] end
     function m.despawnPet(ref) m.entities[ref] = nil end
+    m.coatList = nil                    -- the last list the mod gave setCoats
+    function m.setCoats(list) m.coatList = list end
     function m.playAnimation(ref, anim) m.animations[#m.animations + 1] = { ref = ref, anim = anim } end
     m.lot = {}                          -- household id -> object row ids on its lot
     function m.homeObjects(hid, watched)

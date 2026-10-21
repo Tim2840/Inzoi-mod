@@ -13,6 +13,7 @@ local enrichmentData = require("pawhome.data.enrichment")
 local Engine = require("pawhome.pets.engine")
 local Care = require("pawhome.pets.care")
 local Adoption = require("pawhome.pets.adoption")
+local Coats = require("pawhome.pets.coats")
 local Shelter = require("pawhome.pets.shelter")
 local Needs = require("pawhome.pets.needs")
 local Moods = require("pawhome.pets.moods")
@@ -64,6 +65,7 @@ function App.new(adapter, opts)
         Log.info("no savegame is loaded yet; the mod is paused")
     else
         Log.info("started (" .. how .. "), " .. #state.pets .. " pets")
+        Coats.publish(ctx)
     end
     -- react at once when the game says the save changed; polling in sync() is the fallback
     Api.subscribe("slot_changed", function() app:syncSlot() end)
@@ -101,6 +103,7 @@ function App:syncSlot()
     ctx.events = {}
     applyLocale(ctx)
     self.suspended = false
+    Coats.publish(ctx)
     return true
 end
 
@@ -117,6 +120,7 @@ function App:tick()
     local now = Api.now()
     if now == nil then return {} end
     local notes = Engine.tick(self.ctx, now)
+    Coats.publish(self.ctx)
     self:save()
     return notes
 end
@@ -175,6 +179,8 @@ function App:offers(householdId, refresh)
         out[#out + 1] = {
             id = o.id, name = o.name, fee = o.fee, stage = o.stage,
             stageLabel = I18n.t("stages." .. o.stage), traits = traits,
+            coat = o.coat, coatLabel = o.coat and I18n.t("coats." .. o.coat) or "",
+            coats = Coats.choices(self.ctx),     -- the player may pick another one
         }
     end
     self:save()
@@ -189,20 +195,27 @@ end
 
 local function finishAdoption(self, result)
     result.notifications = Engine.flush(self.ctx)
+    Coats.publish(self.ctx)
     self:save()
     return result
 end
 
-function App:adoptOffer(householdId, zoiId, offerId, name)
+-- coat (optional): data/coats.lua id the player picked; an offer keeps its own when omitted.
+function App:adoptOffer(householdId, zoiId, offerId, name, coat)
     self:sync()
     if self.suspended then return self:noSave() end
-    return finishAdoption(self, Adoption.adoptOffer(self.ctx, householdId, zoiId, offerId, name))
+    return finishAdoption(self, Adoption.adoptOffer(self.ctx, householdId, zoiId, offerId, name, coat))
 end
 
-function App:adoptStray(householdId, zoiId, strayId, name)
+function App:adoptStray(householdId, zoiId, strayId, name, coat)
     self:sync()
     if self.suspended then return self:noSave() end
-    return finishAdoption(self, Adoption.adoptStray(self.ctx, householdId, zoiId, strayId, name))
+    return finishAdoption(self, Adoption.adoptStray(self.ctx, householdId, zoiId, strayId, name, coat))
+end
+
+-- Coats the player can choose from at adoption: { { id, label }, ... }
+function App:coats()
+    return Coats.choices(self.ctx)
 end
 
 function App:redeem(householdId, zoiId, petId)
@@ -210,6 +223,7 @@ function App:redeem(householdId, zoiId, petId)
     if self.suspended then return self:noSave() end
     local result = Shelter.redeem(self.ctx, householdId, zoiId, petId)
     result.notifications = Engine.flush(self.ctx)
+    Coats.publish(self.ctx)
     self:save()
     return result
 end
@@ -289,6 +303,7 @@ local function petView(ctx, pet, zoiId)
         statusLabel = pet.status == "impounded" and I18n.t("ui.impounded") or "",
         redeem = pet.status == "impounded" and Shelter.info(ctx, pet) or nil,
         stage = pet.stage, stageLabel = I18n.t("stages." .. pet.stage),
+        coat = pet.coat, coatLabel = pet.coat and I18n.t("coats." .. pet.coat) or "",
         ageDays = Aging.ageDays(pet), ageLabel = I18n.t("ui.age", { days = Aging.ageDays(pet) }),
         mood = mood, moodLabel = I18n.t("moods." .. mood),
         needs = needs, traits = traits,

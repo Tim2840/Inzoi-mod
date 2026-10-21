@@ -349,6 +349,40 @@ function Platform.b1(opts)
         pcall(inzoi.cli.execute, "toast.show message=" .. quote(text) .. " lifetime=6")
     end
 
+    -- Cat actors (BP_Void_Cat_C, the owner of the B1 cat binding). Verified 20261019.16318.W,
+    -- 2026-10-21 (docs/research/fixed-coat.md): GetEntityId().Value is the B2 entity id;
+    -- K2_GetComponentsByClass(UE.UMeshComponent) gives the body ("StaticMesh") and fur
+    -- ("StaticMeshFur") meshes, whose material 0 is a dynamic material instance with the
+    -- texture parameter "Color Tex"; UE.UObject.Load loads the coat texture; setting the
+    -- parameter changes the coat at once and the game does not set it back.
+    function p.actorEntityId(actor)
+        local id = actor:GetEntityId()
+        if type(id) == "number" then return id end
+        return id and tonumber(id.Value) or nil
+    end
+
+    local COAT_DIR = "/Game/Characters/Void/Void_Cat/Textures/"
+    local textures = {}
+    function p.applyCoat(actor, texture)
+        local tex = textures[texture]
+        if tex == nil then
+            tex = UE.UObject.Load(COAT_DIR .. texture .. "." .. texture)
+            if tex == nil then return false end
+            textures[texture] = tex
+        end
+        local comps = actor:K2_GetComponentsByClass(UE.UMeshComponent)
+        local set = 0
+        for i = 1, comps:Num() do
+            -- only dynamic instances take parameters; the dummy skeletal mesh has no material
+            local ok = pcall(function()
+                local mat = comps:Get(i):GetMaterial(0)
+                mat:SetTextureParameterValue("Color Tex", tex)
+            end)
+            if ok then set = set + 1 end
+        end
+        return set > 0
+    end
+
     function p.log(line)
         p.logLines[#p.logLines + 1] = line
         if #p.logLines > 200 then table.remove(p.logLines, 1) end
