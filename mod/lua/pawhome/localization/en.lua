@@ -88,6 +88,13 @@ return {
         not_impounded = "{name} is not at the shelter.",
         redeem_wait = "{name} can be redeemed in {hours} h.",
     },
+    -- labels in the game's own menus (interaction names); tools/build_modkit.py writes them to
+    -- l10n/<culture>_mod/PawHome.po under the text id "mod_PawHome_<key>"
+    game = {
+        shop_phone = "Paw Home pet shop",
+        shop_pc = "Browse the Paw Home pet shop",
+        adopt_cat = "Adopt this cat (Paw Home)",
+    },
     ui = {
         backup_found = "Found a copy of your pets from day {day}: {names}. This save has none, maybe it was saved while Paw Home was off.",
         backup_restore = "Bring them back",
@@ -131,5 +138,14 @@ return {
         decay = "Need decay speed",
         lifescale = "Pet lifespan",
         max_pets_setting = "Max pets per household",
+        tagline = "Online pet shop",
+        url = "pawhome.zoi/shop",
+        open = "Open Paw Home",
+        close = "Close",
+        money = "Household funds",
+        care = "Care",
+        adopt_this = "The cat you just met",
+        view_pc = "Bigger view (computer)",
+        view_phone = "Phone view",
     },
 }

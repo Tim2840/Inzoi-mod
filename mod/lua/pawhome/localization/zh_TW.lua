@@ -88,6 +88,11 @@ return {
         not_impounded = "{name} 不在收容所。",
         redeem_wait = "{name} 還要 {hours} 小時才能領回。",
     },
+    game = {
+        shop_phone = "毛孩之家寵物店",
+        shop_pc = "逛毛孩之家線上寵物店",
+        adopt_cat = "領養這隻貓（毛孩之家）",
+    },
     ui = {
         backup_found = "找到第 {day} 天的寵物備份：{names}。這個存檔裡沒有寵物資料，可能是在毛孩之家關閉時存的檔。",
         backup_restore = "把牠們找回來",
@@ -131,5 +136,14 @@ return {
         decay = "需求下降速度",
         lifescale = "寵物壽命",
         max_pets_setting = "每戶最多寵物數",
+        tagline = "線上寵物店",
+        url = "pawhome.zoi/shop",
+        open = "打開毛孩之家",
+        close = "關閉",
+        money = "家庭資金",
+        care = "照顧",
+        adopt_this = "剛剛遇到的那隻貓",
+        view_pc = "放大（電腦版）",
+        view_phone = "手機版",
     },
 }

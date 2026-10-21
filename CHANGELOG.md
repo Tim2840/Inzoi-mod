@@ -4,6 +4,9 @@ All notable changes are listed here ([Keep a Changelog](https://keepachangelog.c
 ## [Unreleased]
 ### Added
 - The home cat looks alive without walking: care from the panel plays the matching baked animation, the cat shows a mood-dependent sitting idle (now and then a short reaction such as hissing when angry), never over the game's own Play / Give Snack animations; kittens are shown at 0.6 size, elders at 0.95 (`data/animations.lua`, `data/stages.lua`; verified in game 2026-10-21).
+- "Online pet shop" redesign: one UI in three shells (cat-eared phone, browser-style computer window, round launcher with Mochi the mascot), own SVG icon set (`mod/ui/icons.js`, sheet `mod/ui/icons.html`), vet button, illness toggle, cat-furniture card, backup-restore card. Launcher and phone view verified in game; icons are inline SVG because SVG `data:` URLs do not render there (`docs/research/phone-pc-ui.md`).
+- Shop entries in the game's own menus as runtime data rows (`bridge.js` `SHOP_DATA`): "Paw Home pet shop" in the Zoi's phone group and "Browse the Paw Home pet shop" on computers/laptops; the phone interaction runs in game, menu visibility and labels unverified. Labels come from the localization `game` block, written by `tools/build_modkit.py` to `l10n/<culture>_mod/PawHome.po`.
+- `pawhome:open` channel in the UI bridge so the Lua side can open the shop in the phone or computer shell.
 - Research W1, walking cat (`docs/research/walking-cat.md`, probe in `tools/walk_probe/`): the cat is a VAT mesh with nine baked animations and no walk or run; the walk/run animations are not packaged in the game, so a smoothly walking cat is not possible with game assets. B1 Lua can move, rotate and scale the cat actor and play its baked animations (verified in game 20261019.16318.W, 2026-10-21).
 - Care given with the game's own cat interactions (Give Snack, Play) counts in the engine like the panel's buttons, with the same cooldowns and conditions (verified in game 2026-10-21).
 - Cat furniture: the game's buildable Cat Tower, Cat Scratcher and Cat Wheel on the household's lot slow fun/energy decay; the panel lists them (`data/enrichment.lua`, `docs/research/cat-items.md`).
@@ -24,6 +27,7 @@ All notable changes are listed here ([Keep a Changelog](https://keepachangelog.c
 - CI also runs the tests on Windows.
 
 ### Fixed
+- Pet and offer names were blank in the panel (`h()` wiped the `text` attribute).
 - If the game clock goes backwards (an older game save is loaded, or a debug clock restarts) every stored timer is shifted, so the remaining time of cooldowns, the shelter wait and the rehoming countdown is unchanged.
 - Switching savegame slots no longer reads or writes the wrong slot: the mod now follows `slotId()` and never writes the old state into the new slot (new optional adapter functions `slotId` and `subscribe`). A slot-aware adapter that reports "no save loaded" (`slotId()` = nil, e.g. a loading screen) pauses the mod: nothing is read, written or charged until a save is loaded.
 ### Added

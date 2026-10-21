@@ -5,10 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Paw Home</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* Desktop preview only: a stand-in for the game screen behind the overlay. The DOM below
+       matches the in-game shell (mod/modkit/ui/index.html) so style.css applies to both. */
+    html, body { height: 100%; overflow: hidden; }
+    body { background: linear-gradient(160deg, #9fc7b2 0%, #c9dcc0 45%, #e9d8bd 100%);
+           font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  </style>
 </head>
 <body>
-  <main class="app" id="app" aria-live="polite"></main>
-  <div class="toasts" id="toasts" role="status"></div>
+  <div id="app-root">
+    <div id="title-bar">
+      <span id="title-text"></span>
+      <div id="title-buttons"></div>
+    </div>
+    <div id="content">
+      <main class="app" id="app" aria-live="polite"></main>
+      <div class="toasts" id="toasts" role="status"></div>
+    </div>
+  </div>
+  <script src="icons.js"></script>
   <script src="bridge.js"></script>
   <script src="app.js"></script>
 </body>

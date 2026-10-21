@@ -7,31 +7,16 @@
 <link rel="stylesheet" href="style.css">
 <style>
 /* In-game shell for mod/ui. The game's scaffold rules: html/body stay transparent and
-   overflow hidden, never pointer-events:none on html/body. The panel lives in #app-root,
-   which window.js makes draggable and resizable. */
-html, body { width: 100%; height: 100%; background: transparent !important; overflow: hidden;
-             font-family: var(--inzoi-font-ui); font-size: 15px; }
-#app-root { position: absolute; top: 120px; left: 80px; width: 420px; height: 640px;
-            display: flex; flex-direction: column; overflow: hidden;
-            background: var(--bg); color: var(--text); border-radius: 12px;
-            box-shadow: 0 8px 28px rgba(0,0,0,0.45); }
-#title-bar { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
-             padding: 4px 10px; background: rgba(0,0,0,0.55); color: #fff; cursor: move;
-             user-select: none; -webkit-user-select: none; }
-#title-text { font-size: 14px; font-weight: bold; }
-#title-buttons { display: flex; align-items: center; gap: 6px; }
-#minimize-btn, #close-btn { cursor: pointer; font-size: 13px; font-weight: bold; line-height: 1.4;
-             background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
-             color: #fff; border-radius: 3px; padding: 1px 7px; }
-#minimize-btn { display: none; }
-#content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-#resize-handle { position: absolute; bottom: 0; right: 0; width: 18px; height: 18px; cursor: nwse-resize; }
+   overflow hidden, never pointer-events:none on html/body. #app-root is the window that
+   window.js drags and persists; app.js sizes it for the phone, computer or launcher view. */
+html, body { width: 100%; height: 100%; background: transparent !important; overflow: hidden; font-size: 15px; }
+#app-root { top: 380px; left: 24px; width: 88px; height: 88px; }
 </style>
 </head>
 <body>
 <div id="app-root">
   <div id="title-bar">
-    <span id="title-text">Paw Home</span>
+    <span id="title-text"></span>
     <div id="title-buttons">
       <span id="minimize-btn">_</span>
       <span id="close-btn">X</span>
@@ -46,6 +31,7 @@ html, body { width: 100%; height: 100%; background: transparent !important; over
 <script src="coui://inzoi/cohtml.js"></script>
 <script src="coui://inzoi/mod/inzoi-sdk.js"></script>
 <script src="window.js"></script>
+<script src="icons.js"></script>
 <script src="bridge.js"></script>
 <script src="app.js"></script>
 </body>

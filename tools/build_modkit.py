@@ -6,7 +6,9 @@ Writes <mod_root>/lua/ :
   B2/pawhome/**            the whole engine (mod/lua/pawhome), without the UE4SS adapter
   B1/pawhome/adapters/*    only what the B1 relay needs
   {B2,B1}/pawhome/modkit_config.lua   MOD_ID = <mod_root folder name>
-Existing files under <mod_root>/lua are replaced; nothing outside it is touched.
+and <mod_root>/ui/pawhome/ (page files, icons, uimod_manifest.json over the game's scaffold),
+<mod_root>/l10n/<culture>_mod/PawHome.po (labels for the game's menus) and the NonAssets list.
+Existing files under <mod_root>/lua are replaced; nothing else outside these paths is touched.
 """
 import json
 import pathlib
@@ -31,6 +33,29 @@ def resolve_vars(text, css):
         return values.get(name, fallback or m.group(0)).strip()
 
     return re.sub(r"var\(\s*(--[\w-]+)\s*(?:,\s*([^)]*))?\)", sub, text)
+
+
+# our localization file -> the game's culture folder name (l10n/<culture>_mod/)
+CULTURES = {"en": "en", "zh_TW": "zh-TW"}
+GAME_PREFIX = "mod_PawHome_"
+
+
+def game_strings():
+    """{culture: [(text id, text)]} from the `game = { key = "text", ... }` block of each localization file."""
+    out = {}
+    for name, culture in CULTURES.items():
+        src = (ENGINE / "localization" / (name + ".lua")).read_text(encoding="utf-8")
+        block = re.search(r"\n    game = \{(.*?)\n    \},", src, re.S)
+        if not block:
+            continue
+        pairs = re.findall(r'(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', block.group(1))
+        out[culture] = [(GAME_PREFIX + k, v.replace('\\"', '"').replace("\\\\", "\\")) for k, v in pairs]
+    return out
+
+
+def to_po(entries):
+    esc = lambda s: s.replace("\\", "\\\\").replace('"', '\\"')
+    return "".join('msgctxt "%s"\nmsgid "%s"\nmsgstr "%s"\n\n' % (k, esc(v), esc(v)) for k, v in entries)
 
 
 def main():
@@ -62,7 +87,7 @@ def main():
     # provides window.js and uimod_manifest.json); our page files are copied over it.
     app = root / "ui" / "pawhome"
     if app.is_dir():
-        for name in ("app.js", "bridge.js"):
+        for name in ("app.js", "bridge.js", "icons.js"):
             shutil.copyfile(REPO / "mod" / "ui" / name, app / name)
         # The game's browser ignores CSS custom properties (seen in 20261019.16318.W): the
         # in-game copies get the dark theme's values written in place of var(--name).
@@ -70,13 +95,21 @@ def main():
         page = (REPO / "mod" / "modkit" / "ui" / "index.html").read_text(encoding="utf-8")
         (app / "style.css").write_text(resolve_vars(css, css), encoding="utf-8")
         (app / "index.html").write_text(resolve_vars(page, css), encoding="utf-8")
+        # triggers (launcher view during play + entries in the game's interaction menus)
+        shutil.copyfile(REPO / "mod" / "modkit" / "ui" / "uimod_manifest.json", app / "uimod_manifest.json")
         print(f"wrote UI to {app}")
+    # labels for the game's own menus: localization `game` block -> l10n/<culture>_mod/PawHome.po
+    for culture, entries in game_strings().items():
+        po = root / "l10n" / (culture + "_mod") / "PawHome.po"
+        po.parent.mkdir(parents=True, exist_ok=True)
+        po.write_text(to_po(entries), encoding="utf-8")
+        print(f"wrote {len(entries)} labels to {po.relative_to(root)}")
     # mod_manifest.json lists the mod's loose files ("NonAssets"); keep it in step with what we wrote
     manifest_path = root / "mod_manifest.json"
     if manifest_path.is_file():
         manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
         files = sorted("/" + p.relative_to(root).as_posix()
-                       for sub in ("lua", "ui") if (root / sub).is_dir()
+                       for sub in ("lua", "ui", "l10n") if (root / sub).is_dir()
                        for p in (root / sub).rglob("*") if p.is_file())
         manifest["NonAssets"] = files
         manifest_path.write_text(json.dumps(manifest, indent="\t", ensure_ascii=False), encoding="utf-8")

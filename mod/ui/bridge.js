@@ -5,7 +5,8 @@
 //
 // In-game protocol (all strings):
 //   to_ui  (relay writes, page reads): "seq,channel,payload;..."  (fields percent-encoded)
-//          seq 0 is the relay's epoch. Channels: pawhome:hello, pawhome:save, pawhome:rpc_result.
+//          seq 0 is the relay's epoch. Channels: pawhome:hello, pawhome:save, pawhome:rpc_result,
+//          pawhome:open (data = JSON entry {shell, tab, stray}: show the shop, e.g. after an interaction).
 //          payload = "<session>|<data>"
 //   to_sim (page writes, relay reads): same format. Channels: pawhome:state, pawhome:rpc.
 // The save data lives in wf.state.pawhome (stored inside the game's save file).
@@ -30,7 +31,7 @@ const Bridge = (() => {
     return data;
   }
 
-  if (!inGame) return { call: (m, a = {}) => httpCall(m, a), preview: true };
+  if (!inGame) return { call: (m, a = {}) => httpCall(m, a), preview: true, onOpen: () => {} };
 
   // ---------------------------------------------------------------- in-game transport
 
@@ -109,8 +110,57 @@ const Bridge = (() => {
       AgingConditionFlags: 504, RepeatCount: 1,
       InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_SendAway", Label: "A" }] }] }],
   ];
+  // Shop entries in the game's own menus (docs/research/phone-pc-ui.md). Labels are our text ids
+  // (mod_PawHome_*), shipped as l10n/<culture>_mod/PawHome.po by tools/build_modkit.py.
+  //  - PawHome_ShopPhone: the Zoi's own menu, "Use smartphone" group; she looks at her phone.
+  //  - PawHome_ShopPC: computers and laptops; she sits down and browses.
+  // While the Zoi does one of them, app.js opens the shop in the matching shell.
+  const SHOP_DATA = [
+    ["Interaction", "PawHome_ShopPhone", { ID: "PawHome_ShopPhone", ActionIdList: ["SmartPhone_Check"],
+      InteractionSlotUsage: "None", PostureId: ["Stand", "MovingChair_Sit", "Sit"], BodyParts: ["LeftHand"] }],
+    ["InteractionBag", "PawHome_ShopPhone", { ID: "PawHome_ShopPhone", GroupId: "Group_Using_SmartPhone", PostureGroupId: "StandGroup",
+      AgingConditionFlags: 504, RepeatCount: 1,
+      InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_ShopPhone", Label: "B" }] }],
+      DisplayInfo: { DisplayTextId: "mod_PawHome_shop_phone", Icon: "/Game/UI/Icon/Object/Action_SmartPhone.Action_SmartPhone",
+        DisplayCategoryTextId: "InteractionBag_DisplayInfo_Self_SmartPhone_Insurance_CurrentState_DisplayCategoryTextId" } }],
+    ["Interaction", "PawHome_ShopPC", { ID: "PawHome_ShopPC", ActionIdList: ["Computer_Use_Lookup"], InteractionSlotUsage: "None",
+      EnableSlotTags: ["Customer", "Computer"], SpaceTargetFilterId: "TargetConnectedChair",
+      StartScriptIdList: ["Start_Computer_Search_State"], CancelScriptIdList: ["Finish_Computer_State_Search"],
+      FinishScriptIdList: ["Finish_Computer_State_Search"], PostureId: ["MovingChair_Sit", "PicnicTable_Sit", "Sit"], BodyParts: ["BothHands"] }],
+    ["InteractionBag", "PawHome_ShopPC", { ID: "PawHome_ShopPC", PostureGroupId: "StandGroup", AgingConditionFlags: 504, RepeatCount: 1,
+      InteractionVisibleConditionIds: ["DC_PC_Use_Condition", "TargetNotBusinessType"],
+      InteractionEnableConditionIds: ["DC_PC_Use_Condition", "TargetNotBusinessType"],
+      InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_ShopPC", Label: "C" }] }],
+      DisplayInfo: { DisplayTextId: "mod_PawHome_shop_pc",
+        DisplayCategoryTextId: "InteractionBag_DisplayInfo_Computer_Use_Lookup_DisplayCategoryTextId" } }],
+  ];
+  // PawHome_Adopt: on city cats (DEV_Void_Cat / Level_Void_Cat share this selection set; the
+  // B2 adapter ignores it on our own home cats). The Zoi plays with the cat once; at the start
+  // the adapter sends pawhome:open with the cat, and the shop opens on the adopt tab.
+  SHOP_DATA.push(
+    ["Interaction", "PawHome_Adopt", { ID: "PawHome_Adopt", ActionIdList: ["Object_Void_Cat_Tickle"],
+      InteractionSlotUsage: "Single", PostureId: ["Stand"], BodyParts: ["BothHands"] }],
+    ["InteractionBag", "PawHome_Adopt", { ID: "PawHome_Adopt", PostureGroupId: "StandGroup", AgingConditionFlags: 504, RepeatCount: 1,
+      InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_Adopt", Label: "A" }] }],
+      DisplayInfo: { DisplayTextId: "mod_PawHome_adopt_cat" } }]);
+  const SHOP_MENUS = [   // [selection set row, state group, interaction bag]
+    ["DEV_Void_Cat", "Normal", "PawHome_Adopt"],
+    ["SelfCharacter", "Normal", "PawHome_ShopPhone"],
+    ["Computer01", "Normal", "PawHome_ShopPC"],
+    ["Laptop01", "Normal", "PawHome_ShopPC"],
+  ];
   (async () => {
-    for (const [alias, id, row] of GAME_DATA) {
+    for (const [set, stateGroup, bag] of SHOP_MENUS) {
+      const r = await cli("data.table_get", { alias: "ObjectSelectionSet", row: set }).catch(() => null);
+      if (!r || !r.success || JSON.stringify(r).indexOf('"' + bag + '"') >= 0) continue;   // missing set, or added already
+      SHOP_DATA.push(["menu", set, { query: `ObjectSelectionSet[Id=${set}].SelectionSets[StateGroupId=${stateGroup}].InteractionBagList`, value: bag }]);
+    }
+    for (const [alias, id, row] of GAME_DATA.concat(SHOP_DATA)) {
+      if (alias === "menu") {
+        const r = await cli("data.patch", { method: "Append", query: row.query, value: row.value }).catch((e) => e);
+        if (!r || !r.success) report("menu " + id + " failed: " + JSON.stringify(r));
+        continue;
+      }
       // table_get rejects when the row does not exist yet
       const exists = await cli("data.table_get", { alias, row: id }).then((r) => !!(r && r.success), () => false);
       if (exists) continue;                                     // already added this session
@@ -133,6 +183,7 @@ const Bridge = (() => {
   let answered = null;      // the session we already sent the save data to
   let nextRpc = 1;
   const waiting = new Map(); // rpc id -> { resolve, reject, timer }
+  let openHandler = null;   // app.js: show the shop
 
   window._onStateLoaded = ((prev) => (s) => {
     stateReady = true;
@@ -167,6 +218,10 @@ const Bridge = (() => {
         const t = JSON.parse(data);
         if (t && typeof t.key === "string") store()[t.key] = t.value;
       } catch (err) { /* ignore a damaged entry */ }
+    } else if (e.channel === "pawhome:open") {
+      let entry = {};
+      try { entry = JSON.parse(data || "{}"); } catch (err) { /* open with defaults */ }
+      if (openHandler) openHandler(entry);
     } else if (e.channel === "pawhome:rpc_result") {
       let t;
       try { t = JSON.parse(data); } catch (err) { return; }
@@ -217,5 +272,5 @@ const Bridge = (() => {
     });
   }
 
-  return { call, preview: false, ready: () => !!session && answered === session };
+  return { call, preview: false, ready: () => !!session && answered === session, onOpen: (fn) => { openHandler = fn; } };
 })();

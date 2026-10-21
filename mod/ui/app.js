@@ -1,27 +1,37 @@
-// Paw Home UI. All text comes from the Lua side (view.ui, labels in every pet / offer),
-// so adding a language never touches this file.
+// Paw Home UI: one "online pet shop" shown in three shells that share the same content.
+//  - phone: a pink cat-eared smartphone (opened from the Zoi's phone or the launcher)
+//  - pc:    a browser window (opened from a computer or laptop)
+//  - mini:  a round launcher sticker with Mochi the cat; the window shrinks to it when closed
+// All text comes from the Lua side (view.ui and the labels in every pet / offer), so adding a
+// language never touches this file. Icons are our own drawings (icons.js).
 (() => {
   const ACTION_ICON = {
-    feed: "🍗", play: "🧶", cuddle: "🤗", groom: "🧼",
-    clean_litter: "🧹", praise: "👍", scold: "☝️", get_to_know: "🔍",
+    feed: "food", play: "play", cuddle: "cuddle", groom: "groom",
+    clean_litter: "litter", praise: "praise", scold: "scold", get_to_know: "get_to_know",
   };
-  const MOOD_FACE = {
-    happy: "😸", playful: "😼", energized: "😺", content: "🐱", asleep: "😴",
-    sad: "😿", uncomfortable: "😾", tense: "🙀", angry: "😾",
-  };
-  const STAGE_FACE = { kitten: "🐱", adult: "🐈", elder: "🐈‍⬛" };
-  // The game's UI font has no emoji (they render as empty boxes), so in the game the
-  // decorative icons are left out; every button and status already has a text label.
-  const EMOJI = Bridge.preview;
-  const icon = (glyph) => (EMOJI ? glyph : "");
+  const NEED_ICON = { hunger: "food", energy: "energy", fun: "play", bladder: "litter" };
+  const TABS = [["pets", "cat"], ["adopt", "adopt"], ["settings", "settings"]];
+  const SIZE = { phone: [380, 760], pc: [960, 620], mini: [88, 88] };
 
-  const state = { snap: null, tab: "pets", petId: null, offers: null, strays: null, busy: false };
-  const root = document.getElementById("app");
+  // (no URLSearchParams in the game's browser)
+  const param = (name) => {
+    const m = (location.search || "").match(new RegExp("[?&]" + name + "=([^&]*)"));
+    return m ? decodeURIComponent(m[1]) : null;
+  };
+  const state = {
+    snap: null, tab: "pets", petId: null, offers: null, strays: null, busy: false,
+    shell: null, lastOpen: "phone", focusStray: null,
+  };
+  const root = document.getElementById("app-root");
+  const titleBar = document.getElementById("title-bar");
+  const titleText = document.getElementById("title-text");
+  const titleButtons = document.getElementById("title-buttons");
+  const app = document.getElementById("app");
   const toasts = document.getElementById("toasts");
 
   // ------------------------------------------------------------ helpers
-  // The game's browser (Coherent Gameface) lacks some newer DOM methods (replaceChildren was
-  // missing in game 20261019.16318.W), so only long-standing calls are used here.
+  // The game's browser (Coherent Gameface) lacks some newer DOM methods (replaceChildren,
+  // append, Array.flat were missing in game 20261019.16318.W), so only long-standing calls are used.
   function flatten(list, out = []) {
     for (const c of list) Array.isArray(c) ? flatten(c, out) : out.push(c);
     return out;
@@ -36,6 +46,7 @@
   }
   function h(tag, attrs, ...children) {
     const el = document.createElement(tag);
+    setChildren(el, children);   // before attributes, so a `text` attribute is not wiped
     for (const [k, v] of Object.entries(attrs || {})) {
       if (v === false || v == null) continue;
       if (k === "class") el.className = v;
@@ -43,16 +54,20 @@
       else if (k === "text") el.textContent = v;
       else el.setAttribute(k, v === true ? "" : v);
     }
-    setChildren(el, children);
     return el;
   }
-  const fmt = (s, params) => String(s).replace(/\{(\w+)\}/g, (_, k) => (params && k in params ? params[k] : `{${k}}`));
+  const icon = (name, opts) => Icons.img(name, opts);
+  const fmt = (s, p) => String(s).replace(/\{(\w+)\}/g, (_, k) => (p && k in p ? p[k] : `{${k}}`));
   const ui = () => (state.snap && state.snap.view.ui) || {};
+  const pets = () => (state.snap && !state.snap.view.noSave && state.snap.view.pets) || [];
+  const currentPet = () => pets().find((p) => p.id === state.petId) || pets()[0] || null;
 
-  const MAX_TOASTS = 4;
+  const MAX_TOASTS = 3;
   function toast(text, isError) {
+    if (!text) return;
     for (const t of toasts.children) if (t.textContent === text) return; // no duplicates
-    const el = h("div", { class: "toast" + (isError ? " err" : "") }, text);
+    const el = h("div", { class: "toast" + (isError ? " err" : "") },
+      icon("cat", { mood: isError ? "sad" : "happy" }), h("span", {}, text));
     toasts.appendChild(el);
     while (toasts.children.length > MAX_TOASTS) detach(toasts.firstChild); // keep the newest
     setTimeout(() => detach(el), 3600);
@@ -76,70 +91,200 @@
     }
   }
 
-  // ------------------------------------------------------------ views
+  // ------------------------------------------------------------ shells (window chrome)
+  function viewport() {
+    return [window.innerWidth || document.documentElement.clientWidth || 1920,
+            window.innerHeight || document.documentElement.clientHeight || 1080];
+  }
+  const where = {}; // last position of each shell in this session
+  function defaultPos(shell) {
+    const [W, H] = viewport(), [w, hgt] = SIZE[shell];
+    if (shell === "mini") return [24, Math.round(H * 0.38)];
+    if (shell === "phone") return [Math.max(8, W - w - 140), Math.max(8, Math.round((H - hgt) / 2))];
+    return [Math.max(8, Math.round((W - w) / 2)), Math.max(8, Math.round((H - hgt) / 2))];
+  }
+
+  function setShell(shell) {
+    if (state.shell && root.style.left) where[state.shell] = [parseFloat(root.style.left), parseFloat(root.style.top)];
+    if (shell !== "mini") state.lastOpen = shell;
+    state.shell = shell;
+    root.className = "pw-" + shell;
+    const [w, hgt] = SIZE[shell], [W, H] = viewport();
+    const p = where[shell] || defaultPos(shell);
+    const x = Math.max(0, Math.min(p[0], W - 60)), y = Math.max(0, Math.min(p[1], H - 60));
+    root.style.width = w + "px";
+    root.style.height = hgt + "px";
+    root.style.left = x + "px";
+    root.style.top = y + "px";
+    root._savedW = w;            // window.js persists these
+    root._savedH = hgt;
+    if (typeof root._saveWindowState === "function") root._saveWindowState();
+    render();
+  }
+
+  let closeBtn = null, swapBtn = null, deco = null;
+  function renderChrome() {
+    const u = ui();
+    if (!closeBtn) {
+      // switch between the phone and the bigger computer layout
+      swapBtn = h("button", { class: "pw-x", onclick: () => setShell(state.shell === "pc" ? "phone" : "pc") });
+      closeBtn = h("button", { class: "pw-x", onclick: () => setShell("mini") }, icon("close"));
+      titleButtons.appendChild(swapBtn);
+      titleButtons.appendChild(closeBtn);
+      deco = h("div", { class: "pw-deco" });
+      titleBar.insertBefore(deco, titleBar.firstChild);
+    }
+    closeBtn.setAttribute("title", u.close || "");
+    closeBtn.setAttribute("aria-label", u.close || "");
+    const swapLabel = state.shell === "pc" ? u.view_phone : u.view_pc;
+    swapBtn.setAttribute("title", swapLabel || "");
+    swapBtn.setAttribute("aria-label", swapLabel || "");
+    setChildren(swapBtn, icon(state.shell === "pc" ? "phone" : "computer"));
+    if (state.shell === "phone") {
+      setChildren(deco,
+        h("div", { class: "pw-ears" },
+          icon("ear", { cls: "pw-ear l" }),
+          icon("ear-r", { cls: "pw-ear r" })),
+        h("div", { class: "pw-case-top" }));
+      setChildren(titleText,
+        h("span", { class: "pw-clock" }, (state.snap && state.snap.time) || ""),
+        h("span", { class: "pw-notch" }, h("i")),
+        h("span", { class: "pw-status" }));
+    } else if (state.shell === "pc") {
+      setChildren(deco);
+      setChildren(titleText,
+        h("span", { class: "pw-dots" }, h("i", { style: "background:#ff7a93" }), h("i", { style: "background:#ffc857" }),
+          h("i", { style: "background:#7dcfb6" })),
+        h("span", { class: "pw-tab" }, icon("paw"), (state.snap && state.snap.view.title) || ""),
+        h("span", { class: "pw-url" }, icon("paw"), u.url || ""));
+    } else {
+      setChildren(deco);
+      setChildren(titleText);
+    }
+  }
+
+  // ------------------------------------------------------------ content
+  function coins() {
+    return h("span", { class: "pw-coins", title: ui().money || "" }, icon("coin"), String(state.snap ? state.snap.money : ""));
+  }
+
   function renderShelter(pet, u) {
     const r = pet.redeem;
     return h("div", { class: "shelter" },
+      h("div", { class: "section-title" }, icon("shelter"), h("span", {}, pet.statusLabel)),
       h("div", { class: "sub" }, fmt(u.shelter_days_left, { days: r.daysLeft })),
-      h("div", { class: "fee" }, fmt(u.redeem_fee, { fee: r.fee })),
+      h("div", { class: "fee" }, icon("coin"), fmt(u.redeem_fee, { fee: r.fee })),
       h("button", {
         class: "btn", disabled: !r.ready, style: "margin-top:10px;width:100%",
         onclick: async () => { await call("redeem", { petId: pet.id }); render(); },
       }, r.ready ? u.redeem : fmt(u.redeem_wait, { hours: r.waitHours })));
   }
 
-  function renderPet(pet, view) {
-    const u = view.ui;
+  function renderIllness(pet, u) {
+    const ill = pet.illness;
+    return h("div", { class: "ill" },
+      h("div", { class: "section-title" }, icon("vet"), h("span", {}, ill.name)),
+      h("div", { class: "sub" }, ill.desc),
+      h("button", {
+        class: "btn", style: "margin-top:8px;width:100%",
+        onclick: async () => { await call("vet", { petId: pet.id }); render(); },
+      }, fmt(u.vet, { fee: ill.vetFee })));
+  }
+
+  // cat furniture found on the household's lot ("home comfort")
+  function furnitureCard(view) {
+    const u = view.ui, list = view.furniture || [];
+    return h("section", { class: "card" },
+      h("div", { class: "section-title" }, icon("CatTower01"), h("span", {}, u.furniture)),
+      list.length === 0 ? h("div", { class: "sub" }, u.furniture_none)
+        : list.map((f) => h("div", { class: "furn" },
+            icon(f.id),
+            h("div", {}, h("b", {}, f.name),
+              h("div", { class: "chips" }, (f.effects || []).map((e) => h("span", { class: "chip" }, e)))))));
+  }
+
+  function petCard(pet, u) {
+    const away = pet.status === "impounded";
     return h("section", { class: "card", "aria-label": pet.name },
       h("div", { class: "pet-head" },
-        h("div", { class: "avatar", "aria-hidden": "true" }, icon(pet.status === "impounded" ? "🚐" : MOOD_FACE[pet.mood] || STAGE_FACE[pet.stage])),
+        h("div", { class: "avatar" }, icon(away ? "shelter" : "cat", { mood: pet.mood })),
         h("div", {},
           h("h2", { text: pet.name }),
           h("div", { class: "sub" }, `${pet.stageLabel} · ${pet.ageLabel}`),
-          pet.status === "impounded"
-            ? h("div", { class: "away" }, pet.statusLabel)
-            : h("span", { class: "mood" }, pet.moodLabel))),
-      pet.status === "impounded" ? renderShelter(pet, u) : h("div", { class: "needs" }, pet.needs.map((n) =>
+          away ? h("div", { class: "away" }, pet.statusLabel) : h("span", { class: "mood" }, pet.moodLabel))),
+      !away && pet.illness ? renderIllness(pet, u) : null,
+      away ? renderShelter(pet, u) : h("div", {}, pet.needs.map((n) =>
         h("div", { class: "need", "data-state": n.state },
-          h("span", {}, n.label),
+          icon(NEED_ICON[n.id] || "paw"),
+          h("span", { class: "lbl" }, n.label),
           h("div", { class: "bar", role: "progressbar", "aria-label": n.label, "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": n.value },
             h("i", { style: `width:${n.value}%` })),
           h("span", { class: "val" }, n.value)))),
-      h("div", { class: "bond" },
-        h("div", { class: "bond-row" }, h("span", {}, `${u.bond} · ${pet.bondLabel}`), h("span", { class: "sub" }, pet.bond)),
-        h("div", { class: "bar" }, h("i", { style: `width:${pet.bond}%` }))),
-      h("div", { class: "section-title" }, u.traits),
+      h("div", { class: "bond", title: u.bond },
+        icon("heart"),
+        h("span", { class: "lbl" }, pet.bondLabel),
+        h("div", { class: "bar" }, h("i", { style: `width:${pet.bond}%` })),
+        h("span", { class: "val sub", style: "width:34px;text-align:right" }, pet.bond)));
+  }
+
+  function careCard(pet, view) {
+    const u = view.ui;
+    return h("section", { class: "card" },
+      pet.status === "impounded" ? null : [
+        h("div", { class: "section-title" }, icon("paw"), h("span", { class: "grow" }, u.care), h("span", { class: "sub" }, view.training.label)),
+        h("div", { class: "actions" }, pet.actions.map((a) =>
+          h("button", {
+            class: "act", title: a.desc, disabled: !a.ready,
+            onclick: async () => { await call("perform", { petId: pet.id, action: a.id }); render(); },
+          }, h("span", { class: "tile" },
+            icon(ACTION_ICON[a.id] || "paw"),
+            h("span", { class: "lbl" }, a.label),
+            a.cooldown > 0 ? h("span", { class: "cd" }, fmt(u.cooldown, { min: a.cooldown })) : null))))],
+      h("div", { class: "section-title", style: "margin-top:6px" }, icon("get_to_know"), h("span", {}, u.traits)),
       h("div", { class: "chips" }, pet.traits.map((t) =>
-        h("span", { class: "chip" + (t.known ? "" : " unknown"), title: t.desc || "" }, t.label))),
-      h("div", { class: "section-title" }, view.training.label),
-      pet.status === "impounded" ? null : h("div", { class: "actions" }, pet.actions.map((a) =>
-        h("button", {
-          class: "act", title: a.desc, disabled: !a.ready,
-          onclick: async () => { await call("perform", { petId: pet.id, action: a.id }); render(); },
-        },
-          h("span", { class: "ico", "aria-hidden": "true" }, icon(ACTION_ICON[a.id]) || "•"),
-          h("span", { class: "lbl" }, a.label),
-          a.cooldown > 0 ? h("span", { class: "cd" }, fmt(u.cooldown, { min: a.cooldown })) : null))));
+        h("span", { class: "chip" + (t.known ? "" : " unknown"), title: t.desc || "" }, t.label))));
+  }
+
+  // the savegame has no pets but a copy outside it exists (e.g. saved while the UI mod was off)
+  function backupCard(view) {
+    const b = view.backup;
+    if (!b) return null;
+    return h("section", { class: "card backup" },
+      h("div", { class: "section-title" }, icon("cat", { mood: "happy" }), h("span", {}, b.text)),
+      h("button", {
+        class: "btn", style: "width:100%",
+        onclick: async () => { await call("restoreBackup", {}); state.petId = null; render(); },
+      }, view.ui.backup_restore));
   }
 
   function renderPets(view) {
-    if (view.pets.length === 0) return h("div", { class: "card empty" }, view.ui.no_pets);
-    if (!view.pets.some((p) => p.id === state.petId)) state.petId = view.pets[0].id;
-    const pet = view.pets.find((p) => p.id === state.petId);
+    const u = view.ui;
+    if (view.pets.length === 0) {
+      return h("div", {}, backupCard(view),
+        h("div", { class: "card empty" }, icon("cat", { mood: "sad" }), h("div", {}, u.no_pets),
+          h("button", { class: "btn", style: "margin-top:10px", onclick: () => { state.tab = "adopt"; render(); } }, u.adopt)));
+    }
+    const pet = currentPet();
+    state.petId = pet.id;
     return h("div", {},
+      backupCard(view),
       view.pets.length > 1
-        ? h("div", { class: "chips", style: "margin-bottom:12px" }, view.pets.map((p) =>
-            h("button", { class: "chip pet", "aria-pressed": p.id === state.petId, onclick: () => { state.petId = p.id; render(); } }, p.name)))
+        ? h("div", { class: "chips", style: "margin-bottom:8px" }, view.pets.map((p) =>
+            h("button", { class: "chip pet", "aria-pressed": p.id === pet.id, onclick: () => { state.petId = p.id; render(); } },
+              icon("cat", { mood: p.mood }), p.name)))
         : null,
-      renderPet(pet, view));
+      h("div", { class: "pw-cols" },
+        h("div", { class: "pw-col" }, petCard(pet, u)),
+        h("div", { class: "pw-col" }, careCard(pet, view), furnitureCard(view))));
   }
 
   function renderOffer(o, u) {
     const input = h("input", { type: "text", value: o.name, maxlength: 24, "aria-label": u.name_label });
-    return h("section", { class: "card offer" },
-      h("h3", { text: o.name }),
-      h("div", { class: "sub" }, o.stageLabel),
-      h("div", { class: "chips", style: "margin-top:8px" }, o.traits.map((t) => h("span", { class: "chip", title: t.desc }, t.label))),
+    return h("div", { class: "cell" }, h("section", { class: "card offer" },
+      h("div", { class: "who" },
+        h("div", { class: "avatar" }, icon("cat", { mood: "content" })),
+        h("div", {}, h("h3", { text: o.name }), h("div", { class: "sub" }, o.stageLabel))),
+      h("div", { class: "chips" }, o.traits.map((t) => h("span", { class: "chip", title: t.desc }, t.label))),
       h("div", { class: "row" },
         input,
         h("button", {
@@ -150,59 +295,60 @@
             render();
           },
         }, u.confirm)),
-      h("div", { class: "fee", style: "margin-top:6px" }, o.fee > 0 ? fmt(u.fee, { fee: o.fee }) : u.free));
+      h("div", { class: "fee" }, icon("coin"), o.fee > 0 ? fmt(u.fee, { fee: o.fee }) : u.free)));
   }
 
   function renderStray(s, u) {
     const input = h("input", { type: "text", placeholder: u.name_label, maxlength: 24, "aria-label": u.name_label });
-    return h("section", { class: "card offer" },
-      h("div", { class: "sub" }, `${icon(STAGE_FACE[s.stage] || "🐈")} ${s.stage}`.trim()),
+    const focus = state.focusStray != null && String(state.focusStray) === String(s.id);
+    return h("div", { class: "cell" }, h("section", { class: "card offer" + (focus ? " focus" : ""), "data-stray": s.id },
+      h("div", { class: "who" },
+        h("div", { class: "avatar" }, icon("cat", { mood: focus ? "happy" : "content" })),
+        h("div", {}, h("h3", {}, s.stageLabel || s.stage), focus ? h("div", { class: "sub" }, u.adopt_this) : null)),
       h("div", { class: "row" },
         input,
         h("button", {
           class: "btn",
           onclick: async () => {
             const data = await call("adoptStray", { strayId: s.id, name: input.value });
-            if (data && data.result && data.result.ok) { state.strays = null; state.tab = "pets"; }
+            if (data && data.result && data.result.ok) { state.strays = null; state.focusStray = null; state.tab = "pets"; }
             render();
           },
-        }, u.confirm)));
+        }, u.confirm))));
   }
 
   function renderAdopt(view) {
     const u = view.ui;
     const offers = state.offers || [];
-    const strays = state.strays || [];
-    return h("div", {},
-      h("div", { class: "list-head" },
-        h("h3", {}, u.shelter),
+    const strays = (state.strays || []).slice();
+    // the cat the player picked in the world comes first
+    strays.sort((a, b) => (String(b.id) === String(state.focusStray)) - (String(a.id) === String(state.focusStray)));
+    const strayList = h("div", { class: "offers" }, strays.map((s) => renderStray(s, u)));
+    const offerList = h("div", { class: "offers" }, offers.map((o) => renderOffer(o, u)));
+    const shelter = [
+      h("div", { class: "section-title" }, icon("shelter"), h("span", { class: "grow" }, u.shelter),
         h("button", { class: "btn ghost", onclick: async () => { const d = await call("offers", { refresh: true }); if (d) state.offers = d.offers; render(); } }, u.refresh)),
-      offers.length ? offers.map((o) => renderOffer(o, u)) : h("div", { class: "card empty" }, u.no_offers),
-      h("div", { class: "list-head", style: "margin-top:18px" }, h("h3", {}, u.stray_cats)),
-      strays.length ? strays.map((s) => renderStray(s, u)) : h("div", { class: "card empty" }, u.no_strays));
+      offers.length ? offerList : h("div", { class: "card empty" }, icon("shelter"), u.no_offers)];
+    const street = [
+      h("div", { class: "section-title" }, icon("paw"), h("span", {}, u.stray_cats)),
+      strays.length ? strayList : h("div", { class: "card empty" }, icon("cat", { mood: "sleep" }), u.no_strays)];
+    return h("div", {}, state.focusStray != null ? [street, shelter] : [shelter, street]);
   }
 
   function toggle(label, key, settings) {
-    const input = h("input", { type: "checkbox", checked: !!settings[key], "aria-label": label,
+    const on = !!settings[key];
+    const input = h("input", { type: "checkbox", checked: on, "aria-label": label,
       onchange: async (e) => { await call("setSetting", { key, value: e.target.checked }); render(); } });
-    return h("label", { class: "setting" }, h("span", {}, label), h("span", { class: "switch" }, input, h("span")));
+    return h("label", { class: "setting" }, h("span", {}, label),
+      h("span", { class: "switch" + (on ? " on" : "") }, input, h("span", { class: "track" }), h("span", { class: "knob" })));
   }
 
-  function slider(label, key, min, max, step, settings) {
-    const out = h("span", { class: "sub" }, `×${settings[key]}`);
+  function slider(label, key, min, max, step, settings, prefix) {
+    const out = h("span", { class: "sub" }, prefix + settings[key]);
     const input = h("input", { type: "range", class: "range", min, max, step, value: settings[key], "aria-label": label,
-      oninput: (e) => { out.textContent = `×${e.target.value}`; },
+      oninput: (e) => { out.textContent = prefix + e.target.value; },
       onchange: async (e) => { await call("setSetting", { key, value: Number(e.target.value) }); render(); } });
-    return h("div", { class: "setting" }, h("span", {}, label), h("span", { style: "display:flex;gap:8px;align-items:center" }, input, out));
-  }
-
-  // Whole-number setting shown as a plain count (not a "×" multiplier).
-  function countSlider(label, key, min, max, settings) {
-    const out = h("span", { class: "sub" }, String(settings[key]));
-    const input = h("input", { type: "range", class: "range", min, max, step: 1, value: settings[key], "aria-label": label,
-      oninput: (e) => { out.textContent = e.target.value; },
-      onchange: async (e) => { await call("setSetting", { key, value: Number(e.target.value) }); render(); } });
-    return h("div", { class: "setting" }, h("span", {}, label), h("span", { style: "display:flex;gap:8px;align-items:center" }, input, out));
+    return h("div", { class: "setting" }, h("span", {}, label), h("span", { class: "slider-val" }, input, out));
   }
 
   function renderSettings(view) {
@@ -217,20 +363,55 @@
       toggle(u.aging, "agingEnabled", s),
       toggle(u.misbehavior, "misbehaviorEnabled", s),
       toggle(u.animal_control, "animalControl", s),
-      slider(u.decay, "needDecayScale", 0.25, 2, 0.25, s),
-      slider(u.lifescale, "lifeScale", 0.5, 4, 0.5, s),
-      countSlider(u.max_pets_setting, "maxPetsPerHousehold", 1, 4, s));
+      toggle(u.illness, "illnessEnabled", s),
+      slider(u.decay, "needDecayScale", 0.25, 2, 0.25, s, "×"),
+      slider(u.lifescale, "lifeScale", 0.5, 4, 0.5, s, "×"),
+      slider(u.max_pets_setting, "maxPetsPerHousehold", 1, 4, 1, s, ""));
   }
 
   function renderDevBar() {
     if (!Bridge.preview) return null;
     const adv = (label, minutes) => h("button", { class: "btn ghost", onclick: async () => { await call("advance", { minutes }); render(); } }, label);
+    const shell = (name) => h("button", { class: "btn ghost", onclick: () => setShell(name) }, name);
     return h("div", { class: "devbar" },
-      h("span", {}, "Preview tools · 預覽工具"),
+      h("span", { style: "width:100%" }, "Preview tools · 預覽工具"),
       adv("+1h", 60), adv("+6h", 360), adv("+1d", 1440), adv("+3d", 4320),
-      h("button", { class: "btn ghost", onclick: async () => { state.offers = state.strays = null; state.petId = null; await call("reset", { locale: state.snap.view.locale }); render(); } }, "Reset"));
+      h("button", { class: "btn ghost", onclick: async () => { state.offers = state.strays = null; state.petId = null; await call("reset", { locale: state.snap.view.locale }); render(); } }, "Reset"),
+      shell("phone"), shell("pc"), shell("mini"),
+      h("button", { class: "btn ghost", onclick: async () => { await call("sicken", { id: "fleas" }); render(); } }, "sick"),
+      h("button", { class: "btn ghost", onclick: async () => { await call("fakeBackup", {}); state.petId = null; render(); } }, "backup"),
+      ["CatScratcher01", "CatTower01", "CatWheel01"].map((id) =>
+        h("button", { class: "btn ghost", onclick: async () => { await call("toggleFurniture", { id }); render(); } }, id.replace("Cat", "").replace("01", ""))),
+      h("button", { class: "btn ghost", onclick: () => openEntry({ shell: "phone", tab: "adopt", stray: "s2" }) }, "cat menu"));
   }
 
+  function body(view) {
+    const u = view.ui;
+    if (view.noSave && state.tab !== "settings") return h("div", { class: "card empty" }, icon("cat", { mood: "sleep" }), u.no_save);
+    return state.tab === "pets" ? renderPets(view) : state.tab === "adopt" ? renderAdopt(view) : renderSettings(view);
+  }
+
+  function tabButtons(u) {
+    return TABS.map(([id, ic]) => h("button", {
+      class: "tab", role: "tab", "aria-selected": state.tab === id,
+      onclick: async () => { state.tab = id; await render(); },
+    }, icon(ic, { mood: id === "pets" && currentPet() ? currentPet().mood : null }), h("span", {}, u[id])));
+  }
+
+  function launcher() {
+    const pet = currentPet();
+    const alert = pets().some((p) => p.status === "impounded" || p.illness || p.needs.some((n) => n.state === "critical"));
+    return h("button", { class: "pw-launch", title: ui().open || "", "aria-label": ui().open || "", onclick: () => setShell(state.lastOpen) },
+      icon("cat", { mood: pet ? pet.mood : "content" }),
+      h("span", { class: "pw-badge" + (alert ? " alert" : "") }, icon("paw")));
+  }
+
+  function waiting() {
+    // the mod has not answered yet: no text is available before the first view
+    return state.shell === "mini" ? launcher() : h("div", { class: "empty", style: "flex:1;justify-content:center" }, icon("cat", { mood: "sleep" }));
+  }
+
+  // ------------------------------------------------------------ render
   async function loadTab() {
     if (state.tab === "adopt" && (state.offers === null || state.strays === null)) {
       const o = await call("offers", {});
@@ -240,35 +421,127 @@
     }
   }
 
+  let rendering = false, again = false;
   async function render() {
+    if (rendering) { again = true; return; }
+    rendering = true;
+    try { await draw(); } finally {
+      rendering = false;
+      if (again) { again = false; render(); }
+    }
+  }
+
+  async function draw() {
     // In the game the mod answers only after the save data has been handed over.
     if (!state.snap && !Bridge.preview && Bridge.ready && !Bridge.ready()) {
-      setChildren(root, h("p", { class: "empty" }, "…"));
+      renderChrome();
+      setChildren(app, waiting());
       setTimeout(render, 1000);
       return;
     }
     if (!state.snap) {
       const first = await call("view", {});
-      if (!first) return setChildren(root, h("p", { class: "empty" }, "Cannot reach the mod."));
+      if (!first) { renderChrome(); setChildren(app, waiting()); setTimeout(render, 3000); return; }
     }
-    await loadTab();
+    if (state.shell !== "mini") await loadTab();
     const view = state.snap.view, u = view.ui;
     document.documentElement.lang = view.locale === "zh-TW" ? "zh-Hant" : "en";
     document.title = view.title;
-    const tab = (id, label) => h("button", {
-      class: "tab", role: "tab", "aria-selected": state.tab === id,
-      onclick: () => { state.tab = id; render(); },
-    }, label);
-    const body = view.noSave && state.tab !== "settings" ? h("div", { class: "card empty" }, u.no_save)
-      : state.tab === "pets" ? renderPets(view) : state.tab === "adopt" ? renderAdopt(view) : renderSettings(view);
-    setChildren(root, 
-      h("header", { class: "top" },
-        h("h1", {}, (EMOJI ? "🐾 " : "") + view.title),
-        h("div", { class: "meta" }, `$${state.snap.money}`, h("br"), Bridge.preview ? `Day ${state.snap.day} · ${state.snap.time}` : "")),
-      h("nav", { class: "tabs", role: "tablist" }, tab("pets", u.pets), tab("adopt", u.adopt), tab("settings", u.settings)),
-      body,
-      renderDevBar());
+    renderChrome();
+    const old = app.querySelector(".pw-body");
+    const keep = old && old.getAttribute("data-tab") === state.tab ? old.scrollTop : 0;
+    let scroller = null;
+    if (state.shell === "mini") {
+      setChildren(app, launcher());
+    } else if (state.shell === "phone") {
+      scroller = h("div", { class: "pw-body", "data-tab": state.tab }, body(view), renderDevBar());
+      setChildren(app,
+        h("header", { class: "pw-head" },
+          icon("cat", { cls: "pw-mascot", mood: currentPet() ? currentPet().mood : "happy" }),
+          h("div", { class: "pw-brand" }, h("b", {}, view.title), h("span", {}, u.tagline)),
+          coins()),
+        scroller,
+        h("nav", { class: "pw-tabs", role: "tablist" }, tabButtons(u)));
+    } else {
+      scroller = h("div", { class: "pw-body", "data-tab": state.tab }, body(view), renderDevBar());
+      setChildren(app,
+        h("aside", { class: "pw-side" },
+          h("div", { class: "pw-logo" }, icon("cat", { mood: "happy" }),
+            h("div", { class: "pw-brand" }, h("b", {}, view.title), h("span", {}, u.tagline))),
+          h("nav", { class: "pw-nav", role: "tablist" }, tabButtons(u)),
+          coins()),
+        h("div", { class: "pw-main" },
+          h("div", { class: "pw-title" }, h("h1", {}, u[state.tab])),
+          scroller));
+    }
+    // the picked city cat is sorted to the top of the adopt tab, so a new tab starts at the top
+    if (scroller) scroller.scrollTop = keep;
   }
 
-  render();
+  // ------------------------------------------------------------ entry points
+  // An entry opens a shell on a tab; `stray` is the city cat the player picked in the world.
+  function openEntry(e) {
+    if (e.tab) state.tab = e.tab;
+    if (e.stray != null) { state.focusStray = e.stray; state.strays = null; }
+    setShell(e.shell || state.lastOpen);
+  }
+  // the interaction-menu triggers in uimod_manifest.json (mod/modkit/ui), keyed by trigger id
+  const TRIGGERS = {
+    pawhome_phone: { shell: "phone" },
+    pawhome_pc: { shell: "pc" },
+    pawhome_cat: { shell: "phone", tab: "adopt" },
+  };
+  if (window.inzoi && window.inzoi.trigger) {
+    window.inzoi.trigger.onActivated((t) => {
+      const id = t && (t.triggerId || t.trigger_id || t.id);
+      const e = TRIGGERS[id];
+      if (!e) return;
+      const target = t.target_entity_id || t.targetEntityId || t.entity_id || null;
+      openEntry({ shell: e.shell, tab: e.tab, stray: e.tab === "adopt" && target != null ? "cat" + target : null });
+    });
+  }
+  // The Lua side opens the shop with "pawhome:open" (a JSON entry such as {"shell":"pc"}),
+  // e.g. when the Zoi starts our phone or computer interaction (bridge.js SHOP_DATA).
+  if (Bridge.onOpen) Bridge.onOpen((e) => openEntry(e || {}));
+
+  // Keep the launcher's mood and alert badge (and open needs bars) current. Skipped while the
+  // player types a name, so a refresh never wipes an input.
+  const REFRESH_MS = 20000;
+  setInterval(async () => {
+    const typing = document.activeElement && /INPUT|SELECT/.test(document.activeElement.tagName);
+    if (!state.snap || state.busy || typing || Bridge.preview) return;
+    if (await call("view", {})) render();
+  }, REFRESH_MS);
+
+
+  // The game's browser does not pass the page font on to form controls (font-family: inherit
+  // has no effect there), so copy the body's font to them.
+  try {
+    const ff = window.getComputedStyle(document.body).fontFamily;
+    if (ff) {
+      const st = document.createElement("style");
+      st.textContent = "button, input, select, option { font-family: " + ff + "; }";
+      document.head.appendChild(st);
+    }
+  } catch (e) { /* keep the default */ }
+
+  // start: in the game as the launcher once window.js has restored its saved window state
+  const startShell = Bridge.preview ? (SIZE[param("shell")] ? param("shell") : "phone") : "mini";
+  function start(tries) {
+    if (document.body && document.body.style.visibility === "hidden" && tries > 0) {
+      setTimeout(() => start(tries - 1), 150);
+      return;
+    }
+    setShell(startShell);
+  }
+  start(30);
+  // desktop preview: keep the window on screen when the browser is resized (window.js does this in the game)
+  if (Bridge.preview) {
+    window.addEventListener("resize", () => {
+      const s = state.shell;
+      setShell(s);
+      where[s] = null;
+      setShell(s);
+    });
+  }
 })();

@@ -66,8 +66,11 @@ function R.start(opts)
     R.handlers = {
         ["time.hour_changed"] = function() onHour() end,
         ["interaction.finished"] = onInteraction,
-        -- a game interaction on one of our cats: keep our animations off it meanwhile
-        ["interaction.started"] = function(ev) if R.adapter and type(ev) == "table" then R.adapter.onInteractionStarted(ev) end end,
+        -- our shop entries open the panel; a game interaction on one of our cats keeps our
+        -- animations off it meanwhile
+        ["interaction.started"] = function(ev)
+            if R.adapter and type(ev) == "table" then pcall(R.adapter.onInteractionStarted, ev) end
+        end,
         ["interaction.canceled"] = function(ev) if R.adapter and type(ev) == "table" then R.adapter.onInteractionEnded(ev) end end,
         ["interaction.failed"] = function(ev) if R.adapter and type(ev) == "table" then R.adapter.onInteractionEnded(ev) end end,
     }

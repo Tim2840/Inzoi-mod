@@ -71,7 +71,7 @@ function Relay.new(platform, opts)
             platform.toast(payload)
         elseif kind == "hello" then
             post(channel, tostring(payload) .. "|")
-        elseif kind == "save" or kind == "rpc_result" then
+        elseif kind == "save" or kind == "rpc_result" or kind == "open" then
             local session, _, data = r.assembler.add(payload)
             if data ~= nil then post(channel, session .. "|" .. data) end
         elseif kind == "backup" then

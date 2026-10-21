@@ -3,6 +3,7 @@
 local Mock = require("pawhome.adapters.mock")
 local App = require("pawhome.app")
 local Util = require("pawhome.core.util")
+local I18n = require("pawhome.core.i18n")
 
 local P = { mock = nil, app = nil, HOUSEHOLD = 1, ZOI = 101 }
 
@@ -44,7 +45,8 @@ end
 function handlers.strays()
     local out = {}
     for i, s in ipairs(P.app:strays(P.HOUSEHOLD)) do
-        out[i] = { id = s.id, stage = s.stage or "adult" }
+        local stage = s.stage or "adult"
+        out[i] = { id = s.id, stage = stage, stageLabel = I18n.t("stages." .. stage) }
     end
     return snapshot({ strays = out })
 end
@@ -75,6 +77,44 @@ function handlers.advance(a)
         done = done + dt
     end
     return snapshot({ notifications = notes })
+end
+
+function handlers.vet(a)
+    return snapshot({ result = P.app:vet(P.HOUSEHOLD, P.ZOI, a.petId) })
+end
+
+-- preview only: put a piece of cat furniture on the lot, or take it away
+function handlers.toggleFurniture(a)
+    local lot = P.mock.lot[P.HOUSEHOLD] or {}
+    P.mock.lot[P.HOUSEHOLD] = lot
+    for i, id in ipairs(lot) do
+        if id == a.id then table.remove(lot, i); return snapshot() end
+    end
+    lot[#lot + 1] = a.id
+    return snapshot()
+end
+
+-- preview only: make every pet at home ill
+function handlers.sicken(a)
+    local Registry = require("pawhome.pets.registry")
+    for _, pet in ipairs(Registry.list(P.app.ctx, P.HOUSEHOLD)) do
+        pet.illness = { id = a.id or "fleas", since = P.mock.clock, goodHours = 0 }
+    end
+    return snapshot()
+end
+
+function handlers.restoreBackup()
+    return snapshot({ result = P.app:restoreBackup() })
+end
+
+-- preview only: pretend the savegame lost its pets but a copy outside it survived
+function handlers.fakeBackup()
+    local cache = {}
+    for key, value in pairs(P.mock.store) do cache[key] = value end
+    P.mock.backupOffer = { day = math.floor(P.mock.clock / Util.MINUTES_PER_DAY), cache = cache }
+    P.mock.store = {}
+    P.app:reload()
+    return snapshot()
 end
 
 function handlers.reset(a)
