@@ -57,4 +57,18 @@ B1 綁 `ObjectTemplate`（兩個貓範本）、`Component`（`B1AnimToTexCompone
 | 4.3 | 讀檔初期拿到的 actor 參考會失效（位置、縮放回傳 0）；重新載入 B1（`luamod.reload b1`）後綁定再觸發，拿到有效 actor。**實作時要在每次使用前檢查、失效就等下一次 on_begin** | 已驗證（現象）；原因未驗證 | 同上 |
 | 4.4 | `BP_Void_Cat` 的元件：`DefaultSceneRoot`、`MeshRootComponent`、`B1AnimPlayerComponent`、**`B1AnimToTex`（UB1AnimToTexComponent）＋`SkeletalMeshComponent_B1AnimToTex`（UB1DummySkeletalMeshComponent）**、**`StaticMesh`、`StaticMeshFur`（StaticMeshComponent）**、`B1GameObjectUROComponent` 等 → **貓是 VAT 靜態網格（外加一層毛的殼），不是骨架網格**，確定 | 已驗證 | `comps 109546` |
 | 4.5 | B1 綁定 → `inzoi.message.send_to_sim(貓的實體ID, …)` 到得了 **B2 的貓綁定** `on_lua_message`；B2 用 `send_to_client(同一ID, …)` 回到 **B1 的貓綁定**。B2 讀到同一隻貓的模擬座標與 B1 actor 座標一致（155203.7, −90459.8, 375.5）、所在地 `Gangnam_Residence_Free07` | 已驗證 | `b2 109546 info` |
-| 4.6 | 在 B1 以 `PlayAnimSequence("ANIM_Void_Cat_Walk_F", 0)` 呼叫不報錯，但 `Animation` 屬性仍是 nil；當時遊戲處於暫停（`time_scale 0`），畫面無變化，**這一條不能下結論** | 未驗證 | — |
+| 4.6 | （第一輪）在暫停中呼叫 `PlayAnimSequence("ANIM_Void_Cat_Walk_F")` 沒有結論 → 第二輪改用下面的方法 | — | — |
+
+### 第二輪（2026-10-21 上午，遊戲 `20261019.16318.W`，朴恩珠存檔，不存檔；`environment.time_speed 1` 解除暫停、`autonomy.set_enable false` 讓 Zoi 不亂跑）
+
+| # | 結果 | 狀態 | 依據 |
+|---|---|---|---|
+| 4.7 | **VAT 動畫名稱＝Montage 裡的 AnimSequence 名稱**：原版「玩」互動時，貓的 `UB1AnimToTexComponent.Animation` 變成 `ANIM_Void_Cat_Welcoming`（對應 `ANIM_Void_Cat_Welcoming_Interaction_Montage`） | 已驗證 | `watch` 日誌 |
+| 4.8 | B1 直接呼叫 `PlayAnimSequence(名稱, 0)`：名稱存在時 `Animation` 立刻換成該段（不分大小寫，`ANIM_VoidCat_Being_Patted` 回 `…_patted`），名稱不存在時**什麼都不做**（保留原動畫，不報錯、不破圖）。逐一試過：**有** `ANIM_VoidCat_Eat`、`ANIM_Void_Cat_Welcoming`、`ANIM_VoidCat_Sit_Idle_01`、`ANIM_VoidCat_Sit_Idle_02`、`ANIM_Void_Cat_Hissing`、`ANIM_Void_Cat_Scared`、`ANIM_VoidCat_Being_Patted`、`ANIM_VoidCat_Give_Gift`、`ANIM_VoidCat_Take_Food`；**沒有** `ANIM_Void_Cat_Walk_F`、`ANIM_Void_Cat_Run_F`（以及 `_Montage`、`ANIM_Void_Cat_Walk`、`ANIM_VoidCat_Walk_F` 等變體）、`ANIM_VoidCat_Lying_Idle`、`ANIM_VoidCat_Stand_Idle`、`ANIM_VoidCat_Stand_Idle_Base` | 已驗證 | `names` 指令日誌；Eat 的截圖姿勢改變 |
+| 4.9 | 資料路線同樣播不出走路：新增 `AnimGameObject` 列 `PawWalk_CatWalk`（指向走路 Montage，`data.patch` 接受）＋互動 `PawWalk_WalkTest`（`PlayVATAnim Target`），Zoi 播完自己的動作，**貓的 `Animation` 沒有變**（仍是前一段）。→ **走路與跑步沒有烘進 `BP_Void_Cat` 的 VAT 貼圖**；所有城市貓與召喚貓都用同一個 `BP_Void_Cat`（`Level_Void_Cat`、`DEV_Void_Cat_CahayaTemple` 的資產也是它） | 已驗證 | `watch` 日誌；`Object` 列 |
+| 4.10 | **B1 平滑移動 actor 可行**：`K2_SetActorLocation(位置, false, nil, true)` 有效（其他參數形式沒試到，第一種就成功）、`K2_SetActorRotation(rot, true)` 有效。每幀內插 4 秒移 200 cm，截圖中途位置在起點與終點之間、轉向正確；走完把位置與朝向用訊息交給 B2 `SetLocationAndRotationOnlySimul`，B2 回報新座標 | 已驗證 | 截圖 m0／m1／m2；日誌 |
+| 4.11 | 移動後**畫面不會被拉回**：10 秒後 B1、B2 座標都還是新位置。Zoi 離開住家、B1 actor 被卸載再生成時，貓出現在**新位置**（生成時的相對座標從 (1252.4, 213.8) 變成 (1174.2, 397.8)，差 200 cm）→ 新位置以 B2 為準，存檔也會存 B2 座標（存檔本身未測，規矩不存檔） | 已驗證（重生）；存檔後未驗證 | 日誌 |
+| 4.12 | 移動後原版互動照常：貓移到房間空地後，Zoi 會走到**新位置**、貓播 `ANIM_Void_Cat_Welcoming`。但貓被移到貼牆處（互動點在牆裡）時，互動**靜默失敗**（排進去後直接消失）→ 落點要留互動空間 | 已驗證 | 截圖 t4；`interaction.get_current` |
+| 4.13 | 沒有走路動畫時，移動的樣子就是「坐姿滑行」（截圖 m1：貓維持坐姿、朝向移動方向）——**正是 PO 不要的滑步** | 已驗證 | 截圖 m1 |
+| 4.14 | **縮放（S2）**：B2 `FB2GameObject:SetScale(0.6)` 成功（`GetScale` 回 0.6）但**畫面不變**；B1 `SetActorScale3D(0.6)` 畫面立刻變小，VAT 動畫（`Hissing`）照常播放，截圖看不出破圖（毛的殼一起縮）。B2 縮放在 actor 重生或讀檔時會不會套用：未驗證（離開住家的測試因遊戲被關掉沒做完） | 畫面縮放已驗證；持久化未驗證 | 截圖 sc1／sc2／sc3 |
+| 4.15 | `entity.set_scale` 只對角色（說明：縮放骨架網格、膠囊、走速） | 未驗證（文件） | `cli_help` |
