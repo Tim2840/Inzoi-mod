@@ -2,11 +2,15 @@
 -- and the game adapter use, and turns pet data into plain view tables for the UI.
 local Api = require("pawhome.core.api")
 local Storage = require("pawhome.core.storage")
+local Serialize = require("pawhome.core.serialize")
 local I18n = require("pawhome.core.i18n")
 local Log = require("pawhome.core.log")
 local Rng = require("pawhome.core.rng")
 local Util = require("pawhome.core.util")
 local Registry = require("pawhome.pets.registry")
+local Enrichment = require("pawhome.pets.enrichment")
+local Illness = require("pawhome.pets.illness")
+local enrichmentData = require("pawhome.data.enrichment")
 local Engine = require("pawhome.pets.engine")
 local Care = require("pawhome.pets.care")
 local Adoption = require("pawhome.pets.adoption")
@@ -74,6 +78,23 @@ end
 --
 -- The game runs Lua on one thread and a public call never yields, so the slot cannot change
 -- between the sync at the start of a call and the save at its end.
+-- Reads the savegame data again (after a slot change or a restored backup).
+function App:reload()
+    local state, how = Storage.load()
+    if not state then
+        Log.error("cannot load the slot (" .. tostring(how) .. "); the mod is paused for it")
+        self.suspended = true
+        return false
+    end
+    local ctx = self.ctx
+    ctx.state, ctx.cfg = state, state.settings
+    ctx.rng = Rng.new(state.rng or self.seed)   -- never carry the previous save's random state over
+    ctx.events = {}
+    applyLocale(ctx)
+    self.suspended = false
+    return true
+end
+
 function App:syncSlot()
     if not self.slotAware then return false end
     local slot = Api.slotId()
@@ -85,19 +106,8 @@ function App:syncSlot()
         self.suspended = true
         return true
     end
-    local state, how = Storage.load()
-    if not state then
-        -- e.g. the new slot was written by a newer version: touch nothing until the slot changes again
-        Log.error("cannot load the new slot (" .. tostring(how) .. "); the mod is paused for it")
-        self.suspended = true
-        return true
-    end
-    local ctx = self.ctx
-    ctx.state, ctx.cfg = state, state.settings
-    ctx.rng = Rng.new(state.rng or self.seed)   -- never carry the previous save's random state over
-    ctx.events = {}
-    applyLocale(ctx)
-    self.suspended = false
+    -- a slot written by a newer version stays paused until the slot changes again
+    self:reload()
     return true
 end
 
@@ -136,6 +146,27 @@ function App:perform(petId, zoiId, actionId)
     result.notifications = notes
     self:save()
     return result
+end
+
+-- Applies care given through the game's own interactions on our cats. Cooldowns and
+-- conditions still apply: feeding a full cat again gives nothing. Returns the results.
+function App:applyCare()
+    self:sync()
+    if self.suspended then return {} end
+    local results = {}
+    for _, pet in ipairs(Registry.home(self.ctx, nil)) do
+        for _, ev in ipairs(Api.takeCare(pet.entity)) do
+            local r = Care.perform(self.ctx, pet.id, ev.zoi, ev.kind)
+            r.source = "game"
+            r.action = r.action or ev.kind
+            results[#results + 1] = r
+        end
+    end
+    if #results > 0 then
+        Engine.flush(self.ctx)
+        self:save()
+    end
+    return results
 end
 
 function App:offers(householdId, refresh)
@@ -185,6 +216,15 @@ function App:redeem(householdId, zoiId, petId)
     self:sync()
     if self.suspended then return self:noSave() end
     local result = Shelter.redeem(self.ctx, householdId, zoiId, petId)
+    result.notifications = Engine.flush(self.ctx)
+    self:save()
+    return result
+end
+
+function App:vet(householdId, zoiId, petId)
+    self:sync()
+    if self.suspended then return self:noSave() end
+    local result = Illness.vet(self.ctx, householdId, petId)
     result.notifications = Engine.flush(self.ctx)
     self:save()
     return result
@@ -261,7 +301,52 @@ local function petView(ctx, pet, zoiId)
         needs = needs, traits = traits,
         bond = math.floor(bond + 0.5), bondLevel = Bond.level(bond), bondLabel = I18n.t("bond." .. Bond.level(bond)),
         actions = acts,
+        illness = Illness.view(ctx, pet),
     }
+end
+
+-- A backup worth offering: only while this savegame has no pets and the backup has some.
+function App:backupInfo()
+    if self.suspended or #self.ctx.state.pets > 0 then return nil end
+    local b = Api.backup()
+    local raw = b and type(b.cache) == "table" and b.cache[Storage.KEY]
+    local old = raw and Serialize.decode(raw)
+    if type(old) ~= "table" or type(old.pets) ~= "table" then return nil end
+    local names = {}
+    for _, pet in ipairs(old.pets) do
+        if pet.status == "home" or pet.status == "impounded" then names[#names + 1] = tostring(pet.name) end
+    end
+    if #names == 0 then return nil end
+    local day = tonumber(b.day) or 0
+    local list = table.concat(names, ", ")
+    return { day = day, names = names, text = I18n.t("ui.backup_found", { day = day, names = list }) }
+end
+
+function App:restoreBackup()
+    self:sync()
+    if self.suspended then return self:noSave() end
+    if not self:backupInfo() or not Api.restoreBackup() then
+        return { ok = false, reason = "no_backup", message = I18n.t("fail.no_backup") }
+    end
+    self:reload()
+    return { ok = true, message = I18n.t("msg.backup_restored"), notifications = {} }
+end
+
+-- Cat furniture on the lot and what each piece does, for the panel.
+local function furnitureView(householdId)
+    local out = {}
+    for _, id in ipairs(Enrichment.pieces(householdId)) do
+        local effects = {}
+        for _, need in ipairs(needsData.order) do
+            local r = enrichmentData.items[id][need]
+            if r then
+                effects[#effects + 1] = I18n.t("furniture.effect",
+                    { need = I18n.t("needs." .. need), pct = math.floor(r * 100 + 0.5) })
+            end
+        end
+        out[#out + 1] = { id = id, name = I18n.t("furniture." .. id), effects = effects }
+    end
+    return out
 end
 
 function App:view(householdId, zoiId)
@@ -287,6 +372,8 @@ function App:view(householdId, zoiId)
         pets = pets,
         noSave = self.suspended,
         training = { level = level, label = I18n.t("ui.training", { level = level }) },
+        furniture = (householdId ~= nil and not self.suspended) and furnitureView(householdId) or {},
+        backup = self:backupInfo(),
         settings = Util.copy(ctx.cfg),
     }
 end

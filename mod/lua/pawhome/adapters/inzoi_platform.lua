@@ -124,6 +124,22 @@ function Platform.b2(opts)
         return out
     end
 
+    -- Object row ids on the home lot that are in `watched` (cat furniture). Same lookup as
+    -- homeCats (verified there); UNVERIFIED for build-mode furniture.
+    function p.homeObjects(watched)
+        local home, want, out = p.homeSite(), {}, {}
+        if not home then return out end
+        for _, id in ipairs(watched or {}) do want[id] = true end
+        eachEntity(inzoi.EB2EntityType.GameObject, function(item)
+            local ok, id, site = pcall(function()
+                return tostring(item:GetObjectTableId()), tostring(item:GetLocatedSiteDtId())
+            end)
+            if ok and want[id] and site == home then out[#out + 1] = id end
+            return false
+        end)
+        return out
+    end
+
     -- UNVERIFIED: FB2Actor:GetHouseholdEntityId, FB2EntityManager:FindHousehold, Currency component.
     local function wallet(hid)
         local em = inzoi.getB2Manager("FB2EntityManager")

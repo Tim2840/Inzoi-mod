@@ -43,8 +43,9 @@ UI ──wf.state──▶ 遊戲存檔（UIMD 區塊）
 | `charge` | `SetCurrency(FB2City.GetCurrencyId(), 餘額-金額, ExpenseDefault, owner, false, owner)`；以前後餘額確認 | ✅ 已驗證（256→106，存檔後仍是 106）。`TrySubtractCurrency` 回 true 但不扣錢 |
 | `spawnPet` | 待定代號；Zoi 在家時以 `FB2InteractionComponent:AddInteractionQueueByParam(…, User, false, false, "PawHome", true, false)` 排入 `PawHome_WelcomeCat`（結果 37＝Success）；互動結束後以 `GetAllEntities(GameObject)` 找家裡的新 `DEV_Void_Cat` 綁定 | ✅ 已驗證，綁定跨存檔保留、讀檔後不重複召喚 |
 | `entityExists` | 綁定或家裡搜尋得知的貓 | ✅ |
-| `despawnPet` | 排入 `PawHome_SendAway`（結束腳本 `DespawnGameObject Target`） | 移除腳本已驗證；經 adapter 排入未在遊戲內跑過 |
+| `despawnPet` | 排入 `PawHome_SendAway`（結束腳本 `DespawnGameObject Target`） | ✅ 互動已驗證：2026-10-21 排入後約 10 秒貓實體消失。Lua 排入佇列的路徑與召喚共用（已驗證） |
 | `listStrays` | 城市貓綁定＋`interaction.finished` | 綁定與事件已驗證 |
+| `takeCare` | 原版「給零食」（`Object_Void_Cat_Dev`→feed）、「玩」（`Object_Void_Cat_Tickle`→play）結束時記錄，引擎立刻以面板按鈕相同的規則套用 | ✅ 已驗證（2026-10-21）：給零食→`not_hungry`（照規則拒絕），玩→寵物 1 成功 |
 | `bringStray` | 不支援（`caps.moveStray = false`） | 實測做不到 |
 | `addBuff` / `playAnimation` | 暫不支援 | — |
 
@@ -61,7 +62,9 @@ UI ──wf.state──▶ 遊戲存檔（UIMD 區塊）
 - `Interaction`／`InteractionBag`：`PawHome_WelcomeCat`（沿用原版 `Self_Pose_CatHeart` 動作）、`PawHome_SendAway`（沿用 `Object_Void_Cat_Tickle` 動作）。只填必要欄位，其他用預設值（已驗證可行）。不加進任何選單，只由模組排進佇列。
 - 待做：`PawHome_Adopt`（城市貓選單的領養入口）。
 - `ObjectSelectionSet_Dev[Id=DEV_Void_Cat]…InteractionBagList` 加 `PawHome_Adopt`（Witchcraft 已證明可行）。
-- 照顧動作直接沿用原版 `Object_Void_Cat_Dev`（餵零食）、`Object_Void_Cat_Tickle`（玩），由 `interaction.finished` 事件計入。
+- 照顧動作直接沿用原版 `Object_Void_Cat_Dev`（餵零食）、`Object_Void_Cat_Tickle`（玩），由 `interaction.finished` 事件計入（已驗證）。
+- 選單文字：資料補丁加的互動只能引用遊戲字串表的文字 ID，新文字要用 ModKit 語言工作區打包；所以選單入口優先研究 UI 模組的 `interaction_menu` 觸發（自訂標籤），見 `docs/research/phone-pc-ui.md`。
+- 讀檔後遊戲可能停在暫停（ESC 選單）狀態；B2 要等時間流動才開始握手。
 
 ## 6. 測試策略
 

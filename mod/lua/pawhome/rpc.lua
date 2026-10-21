@@ -45,6 +45,14 @@ function handlers.adoptStray(app, who, a)
     return snapshot(app, who, { result = app:adoptStray(who.household, who.zoi, a.strayId, a.name) })
 end
 
+function handlers.restoreBackup(app, who)
+    return snapshot(app, who, { result = app:restoreBackup() })
+end
+
+function handlers.vet(app, who, a)
+    return snapshot(app, who, { result = app:vet(who.household, who.zoi, a.petId) })
+end
+
 function handlers.redeem(app, who, a)
     return snapshot(app, who, { result = app:redeem(who.household, who.zoi, a.petId) })
 end

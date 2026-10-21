@@ -13,5 +13,7 @@ return {
     strayFee = 0,
     shelterOfferCount = 3,
     misbehaviorEnabled = true,    -- scratching furniture, knocking things over
+    illnessEnabled = true,        -- neglected pets can fall ill (never fatal); the vet cures them
+    vetFee = 120,
     debug = false,
 }

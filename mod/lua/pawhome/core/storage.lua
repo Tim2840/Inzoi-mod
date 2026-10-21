@@ -6,7 +6,7 @@ local Util = require("pawhome.core.util")
 local Log = require("pawhome.core.log")
 local defaults = require("pawhome.data.settings")
 
-local Storage = { KEY = "pawhome.save", VERSION = 2, BACKUP_GENERATIONS = 3 }
+local Storage = { KEY = "pawhome.save", VERSION = 3, BACKUP_GENERATIONS = 3 }
 
 function Storage.default()
     return {
@@ -40,6 +40,12 @@ migrations[1] = function(state)
             pet.entity = nil
         end
     end
+    return state
+end
+
+-- v2 -> v3: pets can be ill (pet.illness, nil when healthy). Nothing to convert; the new
+-- settings illnessEnabled and vetFee are filled in from the defaults on load.
+migrations[2] = function(state)
     return state
 end
 
