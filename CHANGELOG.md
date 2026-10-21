@@ -3,6 +3,11 @@ All notable changes are listed here ([Keep a Changelog](https://keepachangelog.c
 
 ## [Unreleased]
 ### Added
+- "Online pet shop" redesign: one UI in three shells (cat-eared phone, browser-style computer window, round launcher with Mochi the mascot), own SVG icon set (`mod/ui/icons.js`, sheet `mod/ui/icons.html`), vet button, illness toggle, cat-furniture card, backup-restore card. Launcher and phone view verified in game; icons are inline SVG because SVG `data:` URLs do not render there (`docs/research/phone-pc-ui.md`).
+- Shop entries in the game's own menus as runtime data rows (`bridge.js` `SHOP_DATA`): "Paw Home pet shop" in the Zoi's phone group and "Browse the Paw Home pet shop" on computers/laptops; the phone interaction runs in game, menu visibility and labels unverified. Labels come from the localization `game` block, written by `tools/build_modkit.py` to `l10n/<culture>_mod/PawHome.po`.
+- `pawhome:open` channel in the UI bridge so the Lua side can open the shop in the phone or computer shell.
+### Fixed
+- Pet and offer names were blank in the panel (`h()` wiped the `text` attribute).
 - Care given with the game's own cat interactions (Give Snack, Play) counts in the engine like the panel's buttons, with the same cooldowns and conditions (verified in game 2026-10-21).
 - Cat furniture: the game's buildable Cat Tower, Cat Scratcher and Cat Wheel on the household's lot slow fun/energy decay; the panel lists them (`data/enrichment.lua`, `docs/research/cat-items.md`).
 - Illness and the vet: upset tummy, cat cold and fleas; illness speeds up some need decay and shows as the "Unwell" mood; recovery with good care or a paid vet visit; never fatal; can be switched off. Save format v3.
