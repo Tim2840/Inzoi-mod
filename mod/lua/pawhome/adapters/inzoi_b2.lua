@@ -5,7 +5,7 @@ local Platform = require("pawhome.adapters.inzoi_platform")
 local App = require("pawhome.app")
 local Rpc = require("pawhome.rpc")
 
-local DEFAULT_OPTS = { spawn = true, animate = false, scale = true }   -- EXPERIMENT 2026-10-22
+local DEFAULT_OPTS = { spawn = true, animate = true, scale = true, idleLoop = false }
 local R = { platform = nil, adapter = nil, app = nil, handlers = {}, opts = DEFAULT_OPTS, failed = nil }
 
 -- Lines also go to the B1 relay's log (pawhome:diag), the only place a running B2 can report to.
@@ -20,30 +20,48 @@ end
 
 local function onHour()
     if R.app then
-        local ok, err = pcall(function() R.app:tick(); R.app:autoLitter(R.platform.possessed()) end)
+        local ok, err = pcall(function() R.app:tick(); R.app:autoLitter(R.platform.possessed()); R.app:autoBowl(R.platform.possessed()) end)
         if not ok then log("tick failed: " .. tostring(err)) end
+    end
+end
+
+-- The result of something the player did from an object's menu: shown as a game toast.
+local function say(res)
+    if type(res) == "table" and res.message and R.adapter then
+        pcall(R.adapter.notify, nil, res.ok and "info" or "warn", res.message)
     end
 end
 
 local function onInteraction(p)
     if not (R.adapter and type(p) == "table") then return end
     R.adapter.onInteractionFinished(p)
-    if R.app and p.interaction_bag_id == ModKit.PLACE_LITTER then
+    local bag, zoi = p.interaction_bag_id, p.entity_id or R.platform.possessed()
+    if type(bag) == "string" and bag:sub(1, 8) == "PawHome_" and bag:sub(1, 12) ~= "PawHome_Vat_" then
+        log("interaction finished: " .. bag .. " target " .. tostring(p.target_entity_id))
+    end
+    if R.app and bag == ModKit.PLACE_LITTER then
         pcall(function() R.app:autoLitter(R.platform.possessed()) end)
-    elseif R.app and p.interaction_bag_id == ModKit.REFILL_LITTER then
-        pcall(function() R.app:refillLitter(R.platform.household(), p.entity_id or R.platform.possessed()) end)
-    elseif R.app and p.interaction_bag_id == ModKit.USE_LITTER then
+    elseif R.app and bag == ModKit.REFILL_LITTER then
+        pcall(function() say(R.app:refillLitter(R.platform.household(), zoi)) end)
+    elseif R.app and bag == ModKit.CLEAN_LITTER then
+        pcall(function() say(R.app:cleanLitterBox(R.platform.household(), zoi)) end)
+    elseif R.app and bag == ModKit.FILL_BOWL then
+        pcall(function() say(R.app:fillBowl(R.platform.household())) end)
+        pcall(function() R.app:autoBowl(zoi) end)
+    elseif R.app and bag == ModKit.FEED_BOWL then
+        pcall(function() say(R.app:feedFromBowl(R.platform.household(), zoi)) end)
+    elseif R.app and bag == ModKit.USE_LITTER then
         pcall(function()
             local Registry = require("pawhome.pets.registry")
             for _, pet in ipairs(Registry.home(R.app.ctx, nil)) do
-                R.app:useLitter(pet.id, p.entity_id or R.platform.possessed())
+                R.app:useLitter(pet.id, zoi)
             end
         end)
-    elseif R.app and p.interaction_bag_id == ModKit.CALL_CAT then
+    elseif R.app and bag == ModKit.CALL_CAT then
         pcall(function()
             local Registry = require("pawhome.pets.registry")
             for _, pet in ipairs(Registry.home(R.app.ctx, nil)) do
-                R.app:callPet(pet.id, p.entity_id or R.platform.possessed())
+                R.app:callPet(pet.id, zoi)
             end
         end)
     end
@@ -78,7 +96,7 @@ function R.start(opts)
         local d, h, m = R.platform.time()
         math.randomseed(d * 1440 + h * 60 + m)
     end)
-    R.adapter = ModKit.new(R.platform, { spawn = opts.spawn, animate = opts.animate, scale = opts.scale })
+    R.adapter = ModKit.new(R.platform, { spawn = opts.spawn, animate = opts.animate, scale = opts.scale, idleLoop = opts.idleLoop })
     local app, err = App.new(R.adapter, { seed = math.random(1, 2^30) })
     if not app then log("engine failed to start: " .. tostring(err)) return end
     R.app = app

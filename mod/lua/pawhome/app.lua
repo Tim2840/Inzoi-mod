@@ -12,6 +12,8 @@ local Enrichment = require("pawhome.pets.enrichment")
 local Illness = require("pawhome.pets.illness")
 local Wants = require("pawhome.pets.wants")
 local Litter = require("pawhome.pets.litter")
+local Bowl = require("pawhome.pets.bowl")
+local bowlData = require("pawhome.data.bowl")
 local Keepsakes = require("pawhome.pets.keepsakes")
 local enrichmentData = require("pawhome.data.enrichment")
 local litterData = require("pawhome.data.litter")
@@ -219,6 +221,7 @@ function App:placeLitterBox(householdId)
     return { ok = true, message = I18n.t("msg.litter_placed"), notifications = {} }
 end
 
+-- The box's own menu: "Add cat litter". Nothing is used up; the box is full again.
 function App:refillLitter(householdId, zoiId)
     self:sync()
     if self.suspended then return self:noSave() end
@@ -226,13 +229,112 @@ function App:refillLitter(householdId, zoiId)
     if not Litter.present(self.ctx, householdId) then
         return { ok = false, reason = "no_litter_box", message = I18n.t("fail.no_litter_box"), notifications = {} }
     end
-    if not Litter.bagPresent(self.ctx, householdId) then
-        return { ok = false, reason = "no_litter_bag", message = I18n.t("fail.no_litter_bag"), notifications = {} }
+    local state = Litter.boxState(self.ctx, householdId)
+    if state == "clean" then
+        return { ok = false, reason = "litter_full", message = I18n.t("fail.litter_full"), notifications = {} }
     end
     Litter.refill(self.ctx, householdId)
     self:autoLitter(zoiId)
     self:save()
     return { ok = true, message = I18n.t("msg.litter_refilled"), notifications = {} }
+end
+
+-- The box's own menu: "Clean litter box". A dirty box is cleaned (one use of the fill is spent).
+function App:cleanLitterBox(householdId, zoiId)
+    self:sync()
+    if self.suspended then return self:noSave() end
+    Litter.forget(self.ctx)
+    if not Litter.present(self.ctx, householdId) then
+        return { ok = false, reason = "no_litter_box", message = I18n.t("fail.no_litter_box"), notifications = {} }
+    end
+    local state = Litter.boxState(self.ctx, householdId)
+    if state == "empty" then
+        return { ok = false, reason = "litter_empty_box", message = I18n.t("fail.litter_box_empty"), notifications = {} }
+    end
+    if state ~= "dirty" then
+        return { ok = false, reason = "litter_not_dirty", message = I18n.t("fail.litter_not_dirty"), notifications = {} }
+    end
+    local pets = Registry.home(self.ctx, householdId)
+    if #pets > 0 then
+        local r = Care.perform(self.ctx, pets[1].id, zoiId, "clean_litter", { fromGame = true })
+        if not r.ok then return r end
+    else
+        Litter.clean(self.ctx, householdId)
+    end
+    Engine.looks(self.ctx)
+    Engine.flush(self.ctx)
+    self:save()
+    local after = Litter.boxState(self.ctx, householdId)
+    return { ok = true, message = I18n.t(after == "empty" and "msg.litter_cleaned_empty" or "msg.litter_cleaned"), notifications = {} }
+end
+
+-- The bowl's own menu: "Fill the food bowl".
+function App:fillBowl(householdId)
+    self:sync()
+    if self.suspended then return self:noSave() end
+    Bowl.forget(self.ctx)
+    if not Bowl.present(self.ctx, householdId) then
+        return { ok = false, reason = "no_bowl", message = I18n.t("fail.no_bowl"), notifications = {} }
+    end
+    if Bowl.meals(self.ctx, householdId) >= bowlData.meals then
+        return { ok = false, reason = "bowl_full", message = I18n.t("fail.bowl_full"), notifications = {} }
+    end
+    Bowl.fill(self.ctx, householdId)
+    self:save()
+    return { ok = true, message = I18n.t("msg.bowl_filled", { meals = bowlData.meals }), notifications = {} }
+end
+
+-- A cat eats from the bowl: it is put in front of the bowl, eats (the game's eat clip) and is fed like
+-- the game's own feeding. `petId` nil = the hungriest cat of the household at home.
+function App:feedFromBowl(householdId, zoiId, petId)
+    self:sync()
+    if self.suspended then return self:noSave() end
+    Bowl.forget(self.ctx)
+    if not Bowl.present(self.ctx, householdId) then
+        return { ok = false, reason = "no_bowl", message = I18n.t("fail.no_bowl"), notifications = {} }
+    end
+    if Bowl.meals(self.ctx, householdId) <= 0 then
+        return { ok = false, reason = "bowl_empty", message = I18n.t("fail.bowl_empty"), notifications = {} }
+    end
+    local pet
+    if petId then pet = Registry.get(self.ctx, petId) end
+    if not pet then
+        for _, p in ipairs(Registry.home(self.ctx, householdId)) do
+            if not pet or p.needs.hunger < pet.needs.hunger then pet = p end
+        end
+    end
+    if not pet or pet.status ~= "home" then
+        return { ok = false, reason = "no_pet", message = I18n.t("fail.no_pet"), notifications = {} }
+    end
+    local zoi = zoiId or (Api.householdMembers(householdId)[1]) or 0
+    -- the cat comes to the bowl first (Care plays its eat clip where the cat is), unless it would not eat
+    if not Care.refusal(pet, "feed") then Api.movePetToObject(pet.entity, bowlData.object, bowlData.frontCm) end
+    local r = Care.perform(self.ctx, pet.id, zoi, "feed")
+    if not r.ok then return r end
+    pet.bowlAt = self.ctx.now
+    Bowl.take(self.ctx, householdId)
+    Engine.looks(self.ctx)
+    Engine.flush(self.ctx)
+    self:save()
+    r.message = I18n.t("msg.bowl_ate", { name = pet.name, meals = Bowl.meals(self.ctx, householdId) })
+    return r
+end
+
+-- A hungry cat goes to a filled bowl by itself (once per autoGapMinutes).
+function App:autoBowl(zoiId)
+    self:sync()
+    if self.suspended then return {} end
+    Bowl.forget(self.ctx)
+    local results = {}
+    for _, pet in ipairs(Registry.home(self.ctx, nil)) do
+        local due = pet.bowlAt == nil or (self.ctx.now - pet.bowlAt) >= bowlData.autoGapMinutes
+        if due and pet.needs.hunger <= bowlData.autoBelow and Bowl.present(self.ctx, pet.household)
+            and Bowl.meals(self.ctx, pet.household) > 0 then
+            local r = self:feedFromBowl(pet.household, zoiId, pet.id)
+            if r.ok then results[#results + 1] = r end
+        end
+    end
+    return results
 end
 
 function App:useLitter(petId, zoiId)
@@ -436,6 +538,8 @@ local function petView(ctx, pet, zoiId)
         illness = Illness.view(ctx, pet),
         want = want,
         litterBox = hasBox,
+        bowl = { present = Bowl.present(ctx, pet.household), meals = Bowl.meals(ctx, pet.household), max = bowlData.meals,
+                 label = I18n.t("ui.bowl_meals", { meals = Bowl.meals(ctx, pet.household), max = bowlData.meals }) },
         litterStatus = {
             present = hasBox,
             bagPresent = hasBag,

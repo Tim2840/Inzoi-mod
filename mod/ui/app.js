@@ -289,16 +289,18 @@
       class: "btn ghost", style: "margin-top:6px;width:100%",
       onclick: async () => { await call("callPet", { petId: pet.id }); render(); },
     }, u.call_cat);
+    const bowl = pet.bowl || { present: false };
+    const bowlLine = h("div", { class: "sub", style: "margin-top:6px" }, bowl.present ? bowl.label : u.bowl_hint);
     if (!ls.present) {
       return h("div", { class: "card tip" },
         h("div", { class: "sub" }, u.tip),
         callBtn,
+        bowlLine,
         h("div", { class: "sub", style: "margin-top:6px" }, u.litter_hint));
     }
     let actionBtn = null;
     let extraHint = null;
     if (ls.state === "empty") {
-      if (!ls.bagPresent) extraHint = h("div", { class: "sub", style: "margin-top:4px" }, u.litter_bag_hint);
       actionBtn = h("button", {
         class: "btn", style: "margin-top:6px;width:100%",
         onclick: async () => { await call("refillLitter", {}); render(); },
@@ -317,6 +319,7 @@
     return h("div", { class: "card tip" },
       h("div", { class: "sub" }, u.tip),
       callBtn,
+      bowlLine,
       h("div", { class: "sub", style: "margin-top:6px;font-weight:bold" }, ls.stateLabel),
       extraHint,
       actionBtn);

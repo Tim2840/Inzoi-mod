@@ -193,9 +193,9 @@ function Api.playAnimation(ref, animationId)
 end
 
 -- Optional. Teleports the pet to an object on its household's lot (e.g. PawHome_LitterBox).
-function Api.movePetToObject(ref, objectId)
+function Api.movePetToObject(ref, objectId, frontCm)
     if ref == nil then return false end
-    local ok, v = call("movePetToObject", ref, objectId)
+    local ok, v = call("movePetToObject", ref, objectId, frontCm)
     return ok and v == true
 end
 

@@ -109,7 +109,7 @@ local function boot(opts)
     opts = opts or {}
     local w = world(opts)
     local adapter = ModKit.new(w.b2, { session = opts.session or "S1", spawn = opts.spawn,
-        animate = opts.animate, scale = opts.scale, random = opts.random })
+        animate = opts.animate, scale = opts.scale, idleLoop = opts.idleLoop, random = opts.random })
     local app = assert(App.new(adapter, { seed = 7 }))
     adapter.rpc = function(method, args)
         return Rpc.handle(app, { household = w.household, zoi = w.zoi }, method, args)
@@ -634,7 +634,7 @@ T.test("looks: the size is sent again whenever the cat's actor reappears", funct
 end)
 
 T.test("looks: care from the panel plays its clip through the game and returns to the mood's idle", function()
-    local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
+    local s, pet = adoptedCat({ spawn = true, animate = true, idleLoop = true, random = calm })
     pet.needs.hunger = 30
     local r = s.app:perform(pet.id, 501, "feed")
     T.truthy(r.ok, r.message)
@@ -671,8 +671,21 @@ T.test("looks: pressing buttons quickly plays every reaction at once", function(
     T.eq(c[#c], "welcoming")
 end)
 
-T.test("looks: nothing is played on a cat while a game interaction runs on it", function()
+T.test("looks: without idle loops (the default) only reactions play and the cat is left to its own idle", function()
     local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
+    s.adapter.petLook(pet.entity, { mood = "content", stage = "adult", scale = 1 })
+    s.adapter.onCatMessage(109546, "cat_begin")
+    for _ = 1, 60 do s.w.minute = s.w.minute + 1; s.adapter.tick(5) end
+    T.eq(#clips(s), 0, "no idle clip is queued")
+    T.truthy(s.adapter.playAnimation(pet.entity, "pet_cuddle"))
+    local c = clips(s)
+    T.eq(c[#c], "patted")
+    for _ = 1, 40 do s.adapter.tick(1) end
+    T.eq(#clips(s), #c, "and nothing follows it")
+end)
+
+T.test("looks: nothing is played on a cat while a game interaction runs on it", function()
+    local s, pet = adoptedCat({ spawn = true, animate = true, idleLoop = true, random = calm })
     s.adapter.petLook(pet.entity, { mood = "content", stage = "adult", scale = 1 })
     local ev = { entity_id = 501, target_entity_id = 109546, interaction_bag_id = "Object_Void_Cat_Tickle" }
     s.adapter.onInteractionStarted(ev)
@@ -695,7 +708,7 @@ T.test("looks: our own clip interactions are not mistaken for the game playing o
 end)
 
 T.test("looks: a loop is started again when it has played through, only while the Zoi has nothing else to do", function()
-    local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
+    local s, pet = adoptedCat({ spawn = true, animate = true, idleLoop = true, random = calm })
     s.adapter.petLook(pet.entity, { mood = "content", stage = "adult", scale = 1 })
     s.adapter.onCatMessage(109546, "cat_begin")
     for _ = 1, 3 do s.adapter.tick(1) end
@@ -714,7 +727,7 @@ T.test("looks: a loop is started again when it has played through, only while th
 end)
 
 T.test("looks: the idle follows the mood and only the mood's loop is restarted", function()
-    local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
+    local s, pet = adoptedCat({ spawn = true, animate = true, idleLoop = true, random = calm })
     s.adapter.petLook(pet.entity, { mood = "angry", stage = "adult", scale = 1 })
     for _ = 1, 40 do s.w.minute = s.w.minute + 1; s.adapter.tick(10) end
     local base = Anim.moods.angry.base
@@ -912,11 +925,8 @@ T.test("modkit: litter box refill, cat teleport-to-litter-box, and call-cat-over
     T.eq(pet.needs.bladder, 100)
     T.truthy(movedTo and movedTo.eid == 109546 and movedTo.obj == "PawHome_LitterBox")
     T.eq(s.app:view(77, 501).pets[1].litterStatus.state, "dirty")
-    local ev = { entity_id = 501, target_entity_id = 109546, interaction_bag_id = "PawHome_CleanLitter" }
-    s.adapter.onInteractionStarted(ev)
-    s.adapter.onInteractionFinished(ev)
-    local res = s.app:applyCare()
-    T.eq(#res, 1); T.truthy(res[1].ok)
+    -- cleaning is done from the litter box's own menu (the interaction targets the box, not the cat)
+    T.truthy(s.app:cleanLitterBox(77, 501).ok)
     T.eq(s.app:view(77, 501).pets[1].litterStatus.state, "clean")
     T.truthy(s.app:callPet(pet.id, 501).ok)
     T.truthy(movedToZoi and movedToZoi.eid == 109546 and movedToZoi.zoi == 501)

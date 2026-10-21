@@ -49,6 +49,9 @@ local ModKit = {
     PLACE_LITTER = "PawHome_PlaceLitterBox",
     REFILL_LITTER = "PawHome_RefillLitter",
     USE_LITTER = "PawHome_UseLitter",
+    CLEAN_LITTER = "PawHome_CleanLitter",   -- on the litter box's own menu
+    FILL_BOWL = "PawHome_FillBowl",         -- on the food bowl's own menu
+    FEED_BOWL = "PawHome_FeedFromBowl",
     CALL_CAT = "PawHome_CallCatHere",
     VAT_PREFIX = "PawHome_Vat_",   -- one interaction per cat clip (mod/ui/bridge.js CAT_CLIPS)
     GIFT_PREFIX = "PawHome_Gift_",
@@ -58,7 +61,6 @@ local ModKit = {
         Object_Void_Cat_Dev = "feed", Giving_Snack_To_Cat = "feed", Giving_Catnip_Candy_To_Cat = "feed",
         Object_Void_Cat_Tickle = "play", Playing_Toy_With_Cat = "play",
         Petting_Cat = "cuddle",
-        PawHome_CleanLitter = "clean_litter",
     },
     -- our entry interactions (rows added by mod/ui/bridge.js) -> where the shop opens
     OPEN = {
@@ -71,7 +73,8 @@ function ModKit.new(platform, opts)
     opts = opts or {}
     local a = {
         caps = { spawn = opts.spawn == true, moveStray = false, buffs = false,
-                 animate = opts.animate == true, scale = opts.scale == true },
+                 animate = opts.animate == true, scale = opts.scale == true,
+                 idleLoop = opts.idleLoop == true },
         random = opts.random or math.random,
         platform = platform,
         session = opts.session or tostring(math.random(100000, 999999)),
@@ -356,15 +359,19 @@ function ModKit.new(platform, opts)
     local function sendAnim(eid, key, backKey, force)
         local seq = Anim.sequences[key]
         if not seq then return false end
+        -- Idle loops are off by default: the PO's game shows the original cat moving by itself (it sat and
+        -- groomed natively without any mod); a clip started by us only gets in its way. Reactions
+        -- (one-shots) still play.
+        if seq.loop and not a.caps.idleLoop then return false end
         if not playClip(eid, key) then return false end
         local back = backKey and Anim.sequences[backKey]
         local st = shownOf(eid)
         if seq.loop then
             st.base, st.restartAt, st.returnAt, st.backKey = key, a.clock + (seq.cycle or 15), nil, nil
         else
-            if back then st.base = backKey end
+            if back and a.caps.idleLoop then st.base = backKey end
             st.restartAt = nil
-            st.returnAt, st.backKey = back and (a.clock + (seq.seconds or 5)) or nil, back and backKey or nil
+            st.returnAt, st.backKey = back and a.caps.idleLoop and (a.clock + (seq.seconds or 5)) or nil, back and a.caps.idleLoop and backKey or nil
         end
         -- a game minute is about 2 real seconds at normal speed
         if seq.seconds then st.busyUntil = a.now() + math.ceil(seq.seconds / 2) + 1 end
@@ -416,10 +423,10 @@ function ModKit.new(platform, opts)
     end
 
     -- Teleports the cat to an object on its home lot (e.g. PawHome_LitterBox) on both B2 and B1.
-    function a.movePetToObject(ref, objectId)
+    function a.movePetToObject(ref, objectId, frontCm)
         local eid = catOf(ref)
         if eid == nil or not platform.moveCatToObject then return false end
-        local ok, x, y, z, yaw = pcall(platform.moveCatToObject, eid, objectId)
+        local ok, x, y, z, yaw = pcall(platform.moveCatToObject, eid, objectId, frontCm)
         if not ok or type(x) ~= "number" or type(y) ~= "number" or type(z) ~= "number" then return false end
         platform.send(eid, Wire.channel("teleport"),
             string.format("%.1f|%.1f|%.1f|%.1f", x, y, z, tonumber(yaw) or 0))

@@ -259,20 +259,18 @@ T.test("litter: with a box the need runs, can be wanted, and the box can be clea
     T.eq(pet.needs.bladder, 100)
 end)
 
-T.test("litter: build-mode litter box starts empty, refills with litter bag, dirties on use, and empties after cleaning", function()
+T.test("litter: build-mode litter box starts empty, refills from its own menu, dirties on use, and empties after cleaning", function()
     local app, mock, pet = newCat()
     mock.lot[1] = { "PawHome_LitterBox" }
     local ls = app:view(1, 101).pets[1].litterStatus
     T.truthy(ls.present)
-    T.falsy(ls.bagPresent)
     T.eq(ls.state, "empty")
     pet.needs.bladder = 25
-    -- empty box cannot be used yet, and refilling requires a PawHome_LitterBag on the lot
+    -- an empty box cannot be used yet; cleaning an empty box says so
     T.eq(#app:autoLitter(101), 0)
     T.eq(app:useLitter(pet.id, 101).reason, "litter_empty")
-    T.eq(app:refillLitter(1, 101).reason, "no_litter_bag")
-    -- buy PawHome_LitterBag in Build Mode and refill: autoLitter immediately lets the cat use it!
-    mock.lot[1] = { "PawHome_LitterBox", "PawHome_LitterBag" }
+    T.eq(app:cleanLitterBox(1, 101).reason, "litter_empty_box")
+    -- "Add cat litter" on the box's menu: autoLitter immediately lets the cat use it!
     T.truthy(app:refillLitter(1, 101).ok)
     T.eq(pet.needs.bladder, 100)
     T.eq(#mock.teleports, 1)
@@ -281,13 +279,15 @@ T.test("litter: build-mode litter box starts empty, refills with litter bag, dir
     T.eq(app:view(1, 101).pets[1].litterStatus.state, "dirty")
     T.eq(app:useLitter(pet.id, 101).reason, "litter_dirty")
     -- cleaning 1st use leaves 1 use remaining ("clean")
-    T.truthy(app:perform(pet.id, 101, "clean_litter").ok)
+    T.truthy(app:cleanLitterBox(1, 101).ok, "clean from the box's menu")
     T.eq(app:view(1, 101).pets[1].litterStatus.state, "clean")
+    T.eq(app:cleanLitterBox(1, 101).reason, "litter_not_dirty")
+    T.eq(app:refillLitter(1, 101).reason, "litter_full")
     -- 2nd use makes it dirty again, and cleaning the 2nd use exhausts the litter back to "empty"
     pet.needs.bladder = 30
     T.truthy(app:useLitter(pet.id, 101).ok)
     T.eq(app:view(1, 101).pets[1].litterStatus.state, "dirty")
-    T.truthy(app:perform(pet.id, 101, "clean_litter").ok)
+    T.truthy(app:cleanLitterBox(1, 101).ok)
     T.eq(app:view(1, 101).pets[1].litterStatus.state, "empty")
     -- calling the cat over teleports it to the Zoi
     T.truthy(app:callPet(pet.id, 101).ok)
@@ -313,7 +313,7 @@ T.test("storage: a v4 save loads as v5 with an empty album and keeps its pets", 
     mock.store[Storage.KEY] = Serialize.encode({ version = 4, nextPetId = 2, settings = {},
         pets = { { id = 1, name = "Old", status = "home", bond = {}, flags = {}, coat = "calico" } } })
     local state, how = Storage.load()
-    T.eq(how, "loaded"); T.eq(state.version, Storage.VERSION); T.eq(Storage.VERSION, 5)
+    T.eq(how, "loaded"); T.eq(state.version, Storage.VERSION); T.eq(Storage.VERSION, 6)
     T.eq(type(state.album), "table")
     T.eq(state.pets[1].coat, "calico")
     T.eq(state.pets[1].want, nil)
@@ -331,6 +331,43 @@ T.test("clips: bridge.js builds a game clip interaction for every cat animation"
         local line = js:match('%["' .. key .. '", "[^"]*", [^,]*, ([%d.]+)%]')
         T.truthy(line and math.abs(tonumber(line) - len) < 0.05, key .. " length in bridge.js matches data/animations.lua")
     end
+end)
+
+-- ------------------------------------------------------------------ the food bowl
+
+T.test("bowl: fill it from its menu, the cat eats from it, and a hungry cat goes by itself", function()
+    local app, mock, pet = newCat()
+    pet.needs.hunger = 30
+    T.eq(app:fillBowl(1).reason, "no_bowl")
+    T.eq(app:feedFromBowl(1, 101).reason, "no_bowl")
+    mock.lot[1] = { "PawHome_FoodBowl" }
+    T.eq(app:feedFromBowl(1, 101).reason, "bowl_empty")
+    T.truthy(app:fillBowl(1).ok)
+    T.eq(app:fillBowl(1).reason, "bowl_full")
+    T.eq(app:view(1, 101).pets[1].bowl.meals, 4)
+    -- "feed the cat from the bowl": it is put in front of the bowl and eats
+    local r = app:feedFromBowl(1, 101)
+    T.truthy(r.ok, r.message)
+    T.truthy(pet.needs.hunger > 30, "hunger went up")
+    T.eq(app:view(1, 101).pets[1].bowl.meals, 3)
+    local tp = mock.teleports[#mock.teleports]
+    T.eq(tp.object, "PawHome_FoodBowl")
+    T.eq(tp.front, require("pawhome.data.bowl").frontCm)
+    T.eq(mock.animations[#mock.animations].anim, "pet_eat")
+    -- a full cat does not eat, and is not moved
+    pet.needs.hunger = 99
+    local n = #mock.teleports
+    T.eq(app:feedFromBowl(1, 101).reason, "not_hungry")
+    T.eq(#mock.teleports, n)
+    -- by itself: only when hungry enough, once per gap, only with food in the bowl
+    pet.bowlAt = nil
+    pet.needs.hunger = 60
+    T.eq(#app:autoBowl(101), 0, "not hungry enough")
+    pet.needs.hunger = 20
+    T.eq(#app:autoBowl(101), 1)
+    T.eq(app:view(1, 101).pets[1].bowl.meals, 2)
+    pet.needs.hunger = 20
+    T.eq(#app:autoBowl(101), 0, "not again right away")
 end)
 
 return true

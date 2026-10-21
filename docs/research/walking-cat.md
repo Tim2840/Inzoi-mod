@@ -143,3 +143,12 @@ PO 的問題：Age of Magic（AOM）模組召喚的貓好像會動，我們能�
 | 8.2 | 因此 `animate` 預設改為 **false**（實驗）：不再送任何動畫給貓，貓用原版自己的待機動作。要驗證：用這個版本召喚一隻**新的**貓（舊的貓已經被我們碰過，狀態可能卡住），看它會不會自己舔毛 | 待 PO 驗證 | `inzoi_b2.lua` DEFAULT_OPTS |
 | 8.3 | 叫貓過來：貓放在 Zoi 前面 1 公尺、偏側 35 度，並且避開附近家具（Zoi 坐在餐桌時，正前方是桌子底下，貓看起來像消失）；Zoi 的位置與朝向寫入日誌 | 離線測試過；遊戲內只看到「貓在日誌裡的位置正確」，最終畫面未確認 | `Platform.pickSpot` |
 | 8.4 | PO：摸貓時 Zoi 對著空氣摸。可能原因：我們用兩種方法搬貓（模擬位置 `SetLocationAndRotationOnlySimul`＋畫面位置 `K2_SetActorLocation`），兩邊不一致時，遊戲的互動走到模擬位置、畫面上的貓卻在別處。**未驗證** | 假設 | 見下一步 |
+
+## 第 9 節：物件自己的選單（飼料碗、貓砂盆）（2026-10-22 晚）
+
+| # | 發現 | 狀態 | 依據 |
+|---|---|---|---|
+| 9.1 | 用 `ObjectTemplate`（複製 `Decoration01_Template`、換 `ObjectSelectionSetId`）＋自己的 `ObjectSelectionSet` ＋ `Object` 列，可以做出只有自己選單的物件；建造模式放得下（`PawHome_FoodBowl`，沿用原版碗模型）；放下後 `entity.get_object_info` 回報 `object_data_table_id = PawHome_FoodBowl`（所以偵測不需要替身模型）；`interaction.list_available` 看得到我們的兩個選項 | 已驗證 | 實測 entity 16270 |
+| 9.2 | `data.patch` 的欄位名要完全照 `data.table_get` 的名字去掉大小寫差異：多數欄位首字大寫（`Asset`、`ObjectSelectionSetId`），布林欄位保留小寫 `b`（`bDisableTakeOutOfInventory`），`Action` 裡的 `duration` 是小寫 | 已驗證 | 補丁錯誤訊息 |
+| 9.3 | **未解決**：用 `interaction.execute`（MCP）對這個碗執行選項，Zoi 不會做事，也沒有 `interaction.finished` 事件；同一個互動對貓執行就正常（走過去、播放、結束、事件到達）。試過 `Single`／`None` 槽位、`MoveRotate`、`EnableSlotTags=["None"]`、只有等待的動作；碗的 `FB2SlotComponent` 有 `InteractionSlot01～03`（02 鎖住）。原因不明，原版遊戲日誌不在預期位置，看不到拒絕理由 | 未解決 | 實測 |
+| 9.4 | 引擎端邏輯已寫好並有離線測試：`App:fillBowl`、`App:feedFromBowl`（貓瞬移到碗前、播吃的動作、套用餵食）、`App:autoBowl`（餓了且碗有飼料就自己去吃）、`App:cleanLitterBox`、`App:refillLitter`（不再需要貓砂包）；存檔 v6 | 離線測試過；遊戲內未完成 | 離線測試 |

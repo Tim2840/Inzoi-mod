@@ -112,7 +112,7 @@ const Bridge = (() => {
       AgingConditionFlags: 504, RepeatCount: 1,
       InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_SendAway", Label: "A" }] }] }],
     ["Object", "PawHome_LitterBox", { ID: "PawHome_LitterBox", StateVariationId: "Normal",
-      ObjectTemplateId: "Decoration01_Template", ObjectCategory: "None", FilterCategory: "Pet",
+      ObjectTemplateId: "PawHome_LitterBox_Template", ObjectCategory: "None", FilterCategory: "Pet",
       Asset: "/Game/Blueprint/GameObject/Furniture/BP_Bustub01_v01.BP_Bustub01_v01", DevOnly: false,
       Icon: "/Game/UI/Icon/Object/Bustub01_v01.Bustub01_v01", Price: 35,
       DisplayNameTextId: "mod_PawHome_obj_litter_box", DescriptionTextId: "mod_PawHome_obj_litter_box_desc" }],
@@ -160,6 +160,42 @@ const Bridge = (() => {
         InteractionSlotUsage: "None", NoneTargetPlayable: true, PostureId: ["Stand"], BodyParts: ["BothHands"] }],
       ["InteractionBag", id, { ID: id, GroupId: "Group_Self_Expression", PostureGroupId: "StandGroup", AgingConditionFlags: 504,
         RepeatCount: 1, InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: id, Label: "A" }] }] }]);
+  }
+  // Objects with their own menus (verified in game 2026-10-22: a copy of Decoration01_Template with its own
+  // ObjectSelectionSet gives only these objects the interactions, and a placed object reports its own
+  // row id, so the mod finds it on the lot). Menu interactions end up in mod/lua/pawhome/adapters/inzoi_b2.lua.
+  //  - litter box: Add Cat Litter / Clean Litter Box
+  //  - food bowl: Fill the Food Bowl / Let the Cat Eat from the Bowl
+  const OWN_MENU_OBJECTS = [   // [object id, bags]
+    ["PawHome_LitterBox", ["PawHome_RefillLitter", "PawHome_CleanLitter"]],
+    ["PawHome_FoodBowl", ["PawHome_FillBowl", "PawHome_FeedFromBowl"]],
+  ];
+  for (const [obj, bags] of OWN_MENU_OBJECTS) {
+    GAME_DATA.unshift(
+      ["ObjectTemplate", obj + "_Template", { ID: obj + "_Template",
+        Asset: "/Game/Blueprint/GameObject/Templates/BP_Decoration01_Template.BP_Decoration01_Template",
+        ObjectSelectionSetId: obj, ObjectWeatheringGroupId: "DefaultWeathering", IsWettable: true, CustomizeType: "MaterialOnly",
+        IsCarriable: false, PlacementFlags: 1, FollowSlotRotation: false, IsDerived: false, ObjectTags: [],
+        CarryHandStyle: "Invalid", PlacementGuideTextId: "", OwnershipCategory: "None", bDisableTakeOutOfInventory: false,
+        bCanInteractInInventory: false, IgnoreSlotToEntityCheck: false, InventroyInteractionBagId: "None",
+        AvailableSocialClusterType: [], WeatherAutonomyBehavior: "AvoidBadWeather", WeatherScripts: [],
+        bForceChildFollowSlotRotation: false, OnAttachChildStateGroupId: "None", OnAttachChildStateId: "None" }],
+      ["ObjectSelectionSet", obj, { ID: obj, IsDisplayObjectString: true, bShowInteractionOnGroupClick: false,
+        SelectionSets: [{ StateGroupId: "Normal", SelectionType: "Normal", InteractionBagList: bags }] }]);
+  }
+  GAME_DATA.push(
+    ["Object", "PawHome_FoodBowl", { ID: "PawHome_FoodBowl", StateVariationId: "Normal",
+      ObjectTemplateId: "PawHome_FoodBowl_Template", ObjectCategory: "None", FilterCategory: "Pet",
+      Asset: "/Game/Blueprint/GameObject/Furniture/BP_FoodBowl01.BP_FoodBowl01", DevOnly: false,
+      Icon: "/Game/UI/Icon/Object/FoodBowl01.FoodBowl01", Price: 25,
+      DisplayNameTextId: "mod_PawHome_obj_food_bowl", DescriptionTextId: "mod_PawHome_obj_food_bowl_desc" }]);
+  for (const [bag, label] of [["PawHome_FillBowl", "fill_bowl"], ["PawHome_FeedFromBowl", "feed_from_bowl"]]) {
+    GAME_DATA.push(
+      ["Interaction", bag, { ID: bag, ActionIdList: ["Object_Void_Cat_Tickle"], InteractionSlotUsage: "Single",
+        PostureId: ["Stand"], BodyParts: ["BothHands"] }],
+      ["InteractionBag", bag, { ID: bag, PostureGroupId: "StandGroup", AgingConditionFlags: 504, RepeatCount: 1,
+        InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: bag, Label: "A" }] }],
+        DisplayInfo: { DisplayTextId: "mod_PawHome_" + label } }]);
   }
   // The cat's clips. The cat only really animates when the game's own PlayVATAnim action runs on it
   // (the direct B1 call shows a clip's first frame and then stays frozen; verified 2026-10-22), so
@@ -228,9 +264,7 @@ const Bridge = (() => {
     ["DEV_Void_Cat", "Normal", "Petting_Cat"],
     ["DEV_Void_Cat", "Normal", "Giving_Snack_To_Cat"],
     ["DEV_Void_Cat", "Normal", "Giving_Catnip_Candy_To_Cat"],
-    ["DEV_Void_Cat", "Normal", "PawHome_RefillLitter"],
     ["DEV_Void_Cat", "Normal", "PawHome_UseLitter"],
-    ["DEV_Void_Cat", "Normal", "PawHome_CleanLitter"],
     ["DEV_Void_Cat", "Normal", "PawHome_CallCatHere"],
     ["DEV_Void_Cat", "Normal", "PawHome_Adopt"],
     ["SelfCharacter", "Normal", "PawHome_CallCatHere"],

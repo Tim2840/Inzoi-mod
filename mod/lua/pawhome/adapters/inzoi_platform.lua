@@ -182,24 +182,11 @@ function Platform.b2(opts)
         local home, want, out = p.homeSite(), {}, {}
         if not home then return out end
         for _, id in ipairs(watched or {}) do want[id] = true end
-        if want.PawHome_LitterBox then want.Bustub01_v01 = true end
-        if want.PawHome_LitterBag then
-            want.Farm_Fertilizer01 = true
-            want.E01_CatSandSpray01 = true
-        end
         eachEntity(inzoi.EB2EntityType.GameObject, function(item)
             local ok, id, site = pcall(function()
                 return tostring(item:GetObjectTableId()), tostring(item:GetLocatedSiteDtId())
             end)
-            if ok and want[id] and site == home then
-                if id == "Bustub01_v01" then
-                    out[#out + 1] = "PawHome_LitterBox"
-                elseif id == "Farm_Fertilizer01" or id == "E01_CatSandSpray01" then
-                    out[#out + 1] = "PawHome_LitterBag"
-                else
-                    out[#out + 1] = id
-                end
-            end
+            if ok and want[id] and site == home then out[#out + 1] = id end
             return false
         end)
         return out
@@ -207,11 +194,10 @@ function Platform.b2(opts)
 
     -- Finds an object of `objectId` (or its base-game tub row Bustub01_v01 for PawHome_LitterBox)
     -- on the home lot, moves the B2 cat entity there, and returns x, y, z, yaw for the B1 actor.
-    function p.moveCatToObject(eid, objectId)
+    function p.moveCatToObject(eid, objectId, frontCm)
         local home = p.homeSite()
         if not home then return nil end
         local want = { [tostring(objectId)] = true }
-        if objectId == "PawHome_LitterBox" then want.Bustub01_v01 = true end
         local targetObj = eachEntity(inzoi.EB2EntityType.GameObject, function(item)
             local ok, id, site = pcall(function()
                 return tostring(item:GetObjectTableId()), tostring(item:GetLocatedSiteDtId())
@@ -224,6 +210,13 @@ function Platform.b2(opts)
         local okRot, rot = pcall(function() return targetObj:GetRotation() end)
         local yaw = (okRot and rot and tonumber(rot.Yaw)) or 0
         local x, y, z = tonumber(loc.X) or 0, tonumber(loc.Y) or 0, (tonumber(loc.Z) or 0) + 3
+        -- in front of the object (its facing), not on top of it
+        local front = tonumber(frontCm) or 0
+        if front ~= 0 then
+            x = x + math.cos(math.rad(yaw)) * front
+            y = y + math.sin(math.rad(yaw)) * front
+            z = (tonumber(loc.Z) or 0)
+        end
         local cat = p.cats[eid]
         if not cat then p.homeCats(); cat = p.cats[eid] end
         if cat then
