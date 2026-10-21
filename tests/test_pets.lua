@@ -45,6 +45,39 @@ T.test("needs: hunger drops about 4/hour awake for an average adult", function()
     T.near(pet.needs.fun, 100 - 2.2 * 6, 0.5)
 end)
 
+T.test("furniture: a scratcher and a tower slow fun and energy decay at home", function()
+    local app, mock = H.new()
+    local pet = H.adopt(app, 1, {}, "adult")
+    mock.lot[1] = { "CatScratcher01", "CatTower01_v01", "Sofa01" }
+    H.setNeeds(pet, 100)
+    H.advance(app, mock, 6 * 60)
+    T.near(pet.needs.fun, 100 - 2.2 * 6 * (1 - 0.35), 0.5)
+    T.near(pet.needs.energy, 100 - 2.5 * 6 * (1 - 0.15), 0.5)
+    T.near(pet.needs.hunger, 100 - 4.0 * 6, 0.5)                -- no furniture for food
+end)
+
+T.test("furniture: duplicates count once and the cut is capped", function()
+    local app, mock = H.new()
+    local pet = H.adopt(app, 1, {}, "adult")
+    mock.lot[1] = { "CatScratcher01", "CatScratcher01", "CatTower01", "CatTower01_v01", "CatWheel01" }
+    H.setNeeds(pet, 100)
+    H.advance(app, mock, 6 * 60)
+    T.near(pet.needs.fun, 100 - 2.2 * 6 * 0.5, 0.5)             -- 0.6 capped at 0.5
+end)
+
+T.test("furniture: listed in the view with its effects, in both languages", function()
+    local app, mock = H.new()
+    H.adopt(app, 1, {}, "adult")
+    mock.lot[1] = { "CatWheel01" }
+    local v = app:view(1, 101)
+    T.eq(#v.furniture, 1); T.eq(v.furniture[1].id, "CatWheel01")
+    T.eq(v.furniture[1].name, "Cat Wheel")
+    T.eq(v.furniture[1].effects[1], "Fun drops 25% slower")
+    T.truthy(v.ui.furniture_none ~= nil)
+    mock.lot[1] = {}
+    T.eq(#app:view(1, 101).furniture, 0)
+end)
+
 T.test("needs: glutton gets hungry faster than a pet with no traits", function()
     local app, mock = H.new()
     local plain = H.adopt(app, 1, {}, "adult")
@@ -176,6 +209,36 @@ T.test("care: kittens bond faster than adults", function()
     k.bond = {}; ad.bond = {}
     app:perform(k.id, 101, "cuddle"); app:perform(ad.id, 101, "cuddle")
     T.gt(k.bond["101"], ad.bond["101"])
+end)
+
+T.test("care: feeding and play given in the game count like the panel's buttons", function()
+    local app, mock = H.new()
+    local pet = H.adopt(app, 1, {}, "adult")
+    pet.needs.hunger = 30; pet.needs.fun = 20
+    local Bond = require("pawhome.pets.bond")
+    local bondBefore = Bond.get(pet, 202)
+    mock.giveCare(pet.entity, "feed", 202)
+    mock.giveCare(pet.entity, "play", 202)
+    local res = app:applyCare()
+    T.eq(#res, 2)
+    T.truthy(res[1].ok, res[1].message); T.truthy(res[2].ok, res[2].message)
+    T.eq(res[1].source, "game")
+    T.near(pet.needs.hunger, 85 - 4, 0.01)           -- play costs a little hunger
+    T.truthy(pet.needs.fun > 20)
+    T.truthy(Bond.get(pet, 202) > bondBefore)       -- the Zoi who gave the care bonds
+    T.eq(#app:applyCare(), 0)                         -- each event counts once
+    -- the same action again inside the cooldown gives nothing
+    mock.giveCare(pet.entity, "feed", 202)
+    local again = app:applyCare()
+    T.falsy(again[1].ok); T.eq(again[1].reason, "cooldown"); T.eq(again[1].action, "feed")
+end)
+
+T.test("care: game care is ignored while no savegame is loaded", function()
+    local app, mock = H.new()
+    local pet = H.adopt(app, 1, {}, "adult")
+    app.suspended = true
+    mock.giveCare(pet.entity, "feed", 202)
+    T.eq(#app:applyCare(), 0)
 end)
 
 T.test("care: one litter box serves every pet in the home", function()
@@ -680,6 +743,7 @@ local function careBot(app, mock, pet)
     if pet.needs.fun < 55 then app:perform(pet.id, 101, "play") end
     if pet.needs.bladder < 55 then app:perform(pet.id, 101, "clean_litter") end
     if pet.needs.fun < 75 then app:perform(pet.id, 101, "cuddle") end
+    if pet.illness then app:vet(1, 101, pet.id) end
 end
 
 T.test("simulation: 30 days of normal care keeps a cat healthy and happy", function()
@@ -733,6 +797,74 @@ T.test("settings: one pet per household by default; the settings page allows at 
     T.truthy(app:setSetting("maxPetsPerHousehold", 8))
     T.eq(app.ctx.cfg.maxPetsPerHousehold, 4, "clamped to the maximum of 4")
     T.truthy(app:adoptOffer(1, 101, app:offers(1)[1].id, "Second").ok, "allowed once raised")
+end)
+
+---------------------------------------------------------------- illness and the vet
+
+-- Starves the pet (hunger stays at 0) until it falls ill, at most `hours`.
+local function starveUntilIll(app, mock, pet, hours)
+    for _ = 1, hours do
+        pet.needs.hunger = 0
+        H.advance(app, mock, 60)
+        if pet.illness then return true end
+    end
+    return false
+end
+
+T.test("illness: a starving cat falls ill, is told about, and feels unwell", function()
+    local app, mock = H.new({ seed = 7 })
+    app:setSetting("animalControl", false)
+    local pet = H.adopt(app, 1, {}, "adult")
+    T.truthy(starveUntilIll(app, mock, pet, 24 * 10), "should fall ill within ten days of starving")
+    T.eq(pet.illness.id, "upset_tummy")
+    T.eq(Moods.compute(pet, false), "sick")
+    local v = app:view(1, 101).pets[1]
+    T.eq(v.illness.name, "Upset Tummy"); T.eq(v.illness.vetFee, 120); T.falsy(v.illness.vetOnly)
+end)
+
+T.test("illness: makes the listed needs drop faster", function()
+    local app, mock = H.new()
+    local pet = H.adopt(app, 1, {}, "adult")
+    pet.illness = { id = "cold", since = mock.clock, goodHours = 0 }
+    H.setNeeds(pet, 100)
+    H.advance(app, mock, 6 * 60)
+    T.near(pet.needs.energy, 100 - 2.5 * 6 * 1.5, 0.5)
+    T.near(pet.needs.hunger, 100 - 4.0 * 6, 0.5)
+end)
+
+T.test("illness: good care cures a cold in time, fleas need the vet", function()
+    local app, mock = H.new()
+    local pet = H.adopt(app, 1, {}, "adult")
+    pet.illness = { id = "cold", since = mock.clock, goodHours = 0 }
+    for _ = 1, 70 do H.setNeeds(pet, 90); H.advance(app, mock, 60) end
+    T.eq(pet.illness, nil, "recovered after 60 good hours")
+    pet.illness = { id = "fleas", since = mock.clock, goodHours = 0 }
+    for _ = 1, 24 * 5 do H.setNeeds(pet, 90); H.advance(app, mock, 60) end
+    T.eq(pet.illness.id, "fleas")
+    T.truthy(app:view(1, 101).pets[1].illness.vetOnly)
+end)
+
+T.test("illness: the vet cures for a fee and refuses healthy pets or empty wallets", function()
+    local app, mock = H.new()
+    local pet = H.adopt(app, 1, {}, "adult")
+    local before = mock.money[1]
+    local r = app:vet(1, 101, pet.id)
+    T.falsy(r.ok); T.eq(r.reason, "not_sick")
+    pet.illness = { id = "fleas", since = mock.clock, goodHours = 0 }
+    mock.money[1] = 50
+    r = app:vet(1, 101, pet.id)
+    T.falsy(r.ok); T.eq(r.reason, "no_funds"); T.eq(pet.illness.id, "fleas")
+    mock.money[1] = before
+    r = app:vet(1, 101, pet.id)
+    T.truthy(r.ok, r.message); T.eq(pet.illness, nil); T.eq(mock.money[1], before - 120)
+end)
+
+T.test("illness: switched off in settings, nobody falls ill", function()
+    local app, mock = H.new({ seed = 7 })
+    app:setSetting("animalControl", false)
+    T.truthy(app:setSetting("illnessEnabled", false))
+    local pet = H.adopt(app, 1, {}, "adult")
+    T.falsy(starveUntilIll(app, mock, pet, 24 * 10))
 end)
 
 return true

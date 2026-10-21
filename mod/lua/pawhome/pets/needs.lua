@@ -66,6 +66,7 @@ function N.step(ctx, pet, minutes, sleeping)
         else
             local rate = def.decayPerHour * ctx.cfg.needDecayScale
                 * Traits.keyed(pet, "decay", id) * stageMul(pet, id)
+                * (ctx.decayMul and ctx.decayMul(ctx, pet, id) or 1)
             if sleeping then rate = rate * def.sleepMul end
             v = v - rate * hours
         end

@@ -1,0 +1,13 @@
+{
+  "bindings": {
+    "B2": [
+      { "type": "Manager", "key": "Time", "script": "PawHomeBind.Clock" },
+      { "type": "Zoi", "key": "ResidenceFamily", "script": "PawHomeBind.ZoiLink" },
+      { "type": "ObjectTemplate", "key": "DEV_AnimalObjectVoidCatTemplate", "script": "PawHomeBind.Cat" },
+      { "type": "ObjectTemplate", "key": "DEV_E01_AnimalObjectVoidCatTemplate", "script": "PawHomeBind.Cat" }
+    ],
+    "B1": [
+      { "type": "Zoi", "key": "ResidenceFamily", "script": "PawHomeBind.ZoiLink" }
+    ]
+  }
+}
