@@ -79,6 +79,10 @@ function Mock.new(opts)
         m.money[hid] = m.money[hid] - amount
         return true
     end
+    function m.credit(hid, amount)
+        m.money[hid] = (m.money[hid] or 0) + amount
+        return true
+    end
     function m.addBuff(zoi, buff, minutes)
         m.buffs[#m.buffs + 1] = { zoi = zoi, buff = buff, minutes = minutes, at = m.clock }
     end

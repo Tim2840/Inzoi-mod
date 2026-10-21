@@ -38,6 +38,7 @@ end)
 
 T.test("needs: hunger drops about 4/hour awake for an average adult", function()
     local app, mock = H.new()
+    app:setSetting("misbehaviorEnabled", false)
     local pet = H.adopt(app, 1, {}, "adult")
     H.setNeeds(pet, 100)
     H.advance(app, mock, 6 * 60) -- 08:00 -> 14:00
@@ -47,6 +48,7 @@ end)
 
 T.test("furniture: a scratcher and a tower slow fun and energy decay at home", function()
     local app, mock = H.new()
+    app:setSetting("misbehaviorEnabled", false)
     local pet = H.adopt(app, 1, {}, "adult")
     mock.lot[1] = { "CatScratcher01", "CatTower01_v01", "Sofa01" }
     H.setNeeds(pet, 100)
@@ -58,6 +60,7 @@ end)
 
 T.test("furniture: duplicates count once and the cut is capped", function()
     local app, mock = H.new()
+    app:setSetting("misbehaviorEnabled", false)
     local pet = H.adopt(app, 1, {}, "adult")
     mock.lot[1] = { "CatScratcher01", "CatScratcher01", "CatTower01", "CatTower01_v01", "CatWheel01" }
     H.setNeeds(pet, 100)
@@ -161,15 +164,18 @@ end)
 
 ---------------------------------------------------------------- care
 
-T.test("care: feeding raises hunger, is refused when full, and has a cooldown", function()
+T.test("care: feeding raises hunger and is refused when full; there is no cooldown", function()
     local app, mock = H.new()
     local pet = H.adopt(app, 1, {}, "adult")
+    pet.want = nil; pet.wantNext = math.huge
     pet.needs.hunger = 30
     local r = app:perform(pet.id, 101, "feed")
     T.truthy(r.ok, r.message)
     T.near(pet.needs.hunger, 85, 0.01)
+    pet.needs.hunger = 30
     local again = app:perform(pet.id, 101, "feed")
-    T.falsy(again.ok); T.eq(again.reason, "cooldown")
+    T.truthy(again.ok, "pressing again right away is allowed")
+    T.truthy(pet.needs.hunger < 85, "but it is worth less (" .. pet.needs.hunger .. ")")
     H.advance(app, mock, 130)
     pet.needs.hunger = 95
     local full = app:perform(pet.id, 101, "feed")
@@ -227,10 +233,11 @@ T.test("care: feeding and play given in the game count like the panel's buttons"
     T.truthy(pet.needs.fun > 20)
     T.truthy(Bond.get(pet, 202) > bondBefore)       -- the Zoi who gave the care bonds
     T.eq(#app:applyCare(), 0)                         -- each event counts once
-    -- the same action again inside the cooldown gives nothing
+    -- a full cat refuses to eat
+    pet.needs.hunger = 95
     mock.giveCare(pet.entity, "feed", 202)
     local again = app:applyCare()
-    T.falsy(again[1].ok); T.eq(again[1].reason, "cooldown"); T.eq(again[1].action, "feed")
+    T.falsy(again[1].ok); T.eq(again[1].reason, "not_hungry"); T.eq(again[1].action, "feed")
 end)
 
 T.test("care: game care is ignored while no savegame is loaded", function()
@@ -248,8 +255,6 @@ T.test("care: one litter box serves every pet in the home", function()
     a.needs.bladder = 10; b.needs.bladder = 10
     T.truthy(app:perform(a.id, 101, "clean_litter").ok)
     T.eq(a.needs.bladder, 100); T.eq(b.needs.bladder, 100)
-    -- and the cooldown applies to the whole home
-    T.falsy(app:perform(b.id, 101, "clean_litter").ok)
 end)
 
 T.test("care: getting to know a stray reveals traits one by one, then stops", function()

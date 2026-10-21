@@ -8,19 +8,17 @@ local function goBack(app, mock, minutes)
     return app:tick()
 end
 
-T.test("clock: an action cooldown keeps its remaining time when the clock goes back", function()
+T.test("clock: wants and recent care keep their remaining time when the clock goes back", function()
     local app, mock = H.new()
     mock.clock = 10000; app:tick()
     local pet = H.adopt(app, 1, {}, "adult")
-    pet.needs.hunger = 20
-    T.truthy(app:perform(pet.id, 101, "feed").ok)
-    local remaining = pet.cooldowns.feed - mock.clock
-    T.eq(remaining, 120)
+    pet.want = { id = "play", since = mock.clock, untilAt = mock.clock + 100 }
+    pet.wantNext = mock.clock + 50
+    pet.recent = { feed = { n = 2, t = mock.clock } }
     goBack(app, mock, 6000)
-    T.eq(pet.cooldowns.feed - mock.clock, remaining, "still 120 minutes left, not 6120")
-    H.advance(app, mock, 121)
-    pet.needs.hunger = 20
-    T.truthy(app:perform(pet.id, 101, "feed").ok, "usable again after the real remaining time")
+    T.eq(pet.want.untilAt - mock.clock, 100, "still 100 minutes left, not 6100")
+    T.eq(pet.wantNext - mock.clock, 50)
+    T.eq(pet.recent.feed.t, mock.clock)
 end)
 
 T.test("clock: the shelter wait and the rehoming countdown are not distorted", function()
@@ -66,7 +64,7 @@ T.test("clock: a normal forward tick does not shift anything", function()
     local app, mock = H.new()
     mock.clock = 5000; app:tick()
     local pet = H.adopt(app, 1)
-    pet.cooldowns.feed = mock.clock + 100
+    pet.recent = { feed = { n = 1, t = mock.clock } }
     H.advance(app, mock, 60)
-    T.eq(pet.cooldowns.feed, 5000 + 100)
+    T.eq(pet.recent.feed.t, 5000)
 end)

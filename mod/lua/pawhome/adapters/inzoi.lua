@@ -8,6 +8,7 @@
 --   platform.householdMembers(hid)       -> { zoi ids }
 --   platform.funds(hid)                  -> number
 --   platform.charge(hid, amount)         -> true when the money was taken
+--   platform.credit(hid, amount)         -> true when the money was given
 --   platform.send(entityId, channel, payload)        B2 -> B1 message (inzoi.message.send_to_client)
 --   platform.enqueue(zoiId, targetId, interactionBagId) -> true when queued
 --   platform.atHome(zoiId)               -> true when the Zoi is on the household's lot
@@ -173,6 +174,7 @@ function ModKit.new(platform, opts)
     function a.householdMembers(hid) return platform.householdMembers(hid) or {} end
     function a.funds(hid) return platform.funds(hid) or 0 end
     function a.charge(hid, amount) return platform.charge(hid, amount) == true end
+    function a.credit(hid, amount) return platform.credit ~= nil and platform.credit(hid, amount) == true end
     function a.homeObjects(hid, watched)
         if not platform.homeObjects then return {} end
         return platform.homeObjects(watched) or {}

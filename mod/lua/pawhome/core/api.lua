@@ -114,6 +114,13 @@ function Api.charge(householdId, amount)
     return ok and v == true
 end
 
+-- Gives money to the household (a keepsake's coins). Returns true when it was given.
+function Api.credit(householdId, amount)
+    if amount <= 0 then return true end
+    local ok, v = call("credit", householdId, amount)
+    return ok and v == true
+end
+
 function Api.addBuff(zoiId, buffId, durationMinutes)
     return (call("addBuff", zoiId, buffId, durationMinutes))
 end
