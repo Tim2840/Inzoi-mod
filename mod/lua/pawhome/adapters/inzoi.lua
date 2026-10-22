@@ -46,6 +46,7 @@ local ModKit = {
     BACKUP_EVERY_SECONDS = 30,   -- at most one backup copy to the relay per 30 real seconds
     WELCOME = "PawHome_WelcomeCat",
     SEND_AWAY = "PawHome_SendAway",
+    VANISH = "PawHome_Vanish",     -- the called cat disappears where it was (a new one is summoned in front of the Zoi)
     PLACE_LITTER = "PawHome_PlaceLitterBox",
     REFILL_LITTER = "PawHome_RefillLitter",
     USE_LITTER = "PawHome_UseLitter",
@@ -433,11 +434,27 @@ function ModKit.new(platform, opts)
         return true
     end
 
-    -- Teleports the cat 90 cm in front of the specified Zoi (or the controlled Zoi) on both B2 and B1.
+    -- Calls the cat to the Zoi. At home the cat is summoned anew in front of her by the game itself
+    -- (the summon interaction we already use for adoption) and the old one vanishes: moving the cat by
+    -- hand put its body and its game position apart, so the Zoi petted the air (PO, 2026-10-22). Away
+    -- from home (no summon there) the cat is moved by hand as before.
     function a.movePetToZoi(ref, zoiId)
         local eid = catOf(ref)
-        if eid == nil or not platform.moveCatToZoi then return false end
-        local ok, x, y, z, yaw = pcall(platform.moveCatToZoi, eid, zoiId or target())
+        if eid == nil then return false end
+        local zoi = zoiId or target()
+        if a.caps.spawn and zoi ~= nil and platform.atHome(zoi) and type(ref) == "string" then
+            if platform.enqueue(zoi, eid, ModKit.VANISH) then
+                a.refs[ref] = nil
+                persistRefs()
+                a.cats[eid], a.shown[eid], a.busy[eid] = nil, nil, nil
+                a.pending[#a.pending + 1] = { ref = ref, at = a.now(), queued = false }
+                log("calling " .. ref .. ": cat " .. tostring(eid) .. " vanishes, a new one is summoned")
+                a.serviceQueue()
+                return true
+            end
+        end
+        if not platform.moveCatToZoi then return false end
+        local ok, x, y, z, yaw = pcall(platform.moveCatToZoi, eid, zoi)
         if not ok or type(x) ~= "number" or type(y) ~= "number" or type(z) ~= "number" then return false end
         platform.send(eid, Wire.channel("teleport"),
             string.format("%.1f|%.1f|%.1f|%.1f", x, y, z, tonumber(yaw) or 0))

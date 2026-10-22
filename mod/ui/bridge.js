@@ -105,6 +105,15 @@ const Bridge = (() => {
     ["InteractionBag", "PawHome_WelcomeCat", { ID: "PawHome_WelcomeCat", GroupId: "Group_Self_Expression",
       PostureGroupId: "StandGroup", AgingConditionFlags: 504, RepeatCount: 1,
       InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_WelcomeCat", Label: "A" }] }] }],
+    // PawHome_Vanish: calling the cat (adapters/inzoi.lua movePetToZoi). One game action, the cat's startled clip
+    // without waiting, so the Zoi does nothing and does not walk; at the end the cat is removed and the mod
+    // summons a new one in front of her with PawHome_WelcomeCat.
+    ["Interaction", "PawHome_Vanish", { ID: "PawHome_Vanish", ActionIdList: ["PawHome_Vat_scared"],
+      FinishScriptIdList: ["PawHome_DespawnTarget"], InteractionSlotUsage: "None", NoneTargetPlayable: true,
+      PostureId: ["Stand"], BodyParts: ["BothHands"] }],
+    ["InteractionBag", "PawHome_Vanish", { ID: "PawHome_Vanish", PostureGroupId: "StandGroup",
+      AgingConditionFlags: 504, RepeatCount: 1,
+      InteractionSequence: [{ Probability: 1, InteractionInfos: [{ InteractionId: "PawHome_Vanish", Label: "A" }] }] }],
     ["Interaction", "PawHome_SendAway", { ID: "PawHome_SendAway", ActionIdList: ["Object_Void_Cat_Tickle"],
       FinishScriptIdList: ["PawHome_DespawnTarget"], InteractionSlotUsage: "Single",
       PostureId: ["Stand"], BodyParts: ["BothHands"] }],

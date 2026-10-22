@@ -928,12 +928,33 @@ T.test("modkit: litter box refill, cat teleport-to-litter-box, and call-cat-over
     -- cleaning is done from the litter box's own menu (the interaction targets the box, not the cat)
     T.truthy(s.app:cleanLitterBox(77, 501).ok)
     T.eq(s.app:view(77, 501).pets[1].litterStatus.state, "clean")
+    -- away from home the cat is moved by hand
+    s.w.home = false
     T.truthy(s.app:callPet(pet.id, 501).ok)
     T.truthy(movedToZoi and movedToZoi.eid == 109546 and movedToZoi.zoi == 501)
     local teleports = sent(s, "teleport")
     T.eq(#teleports, 3)
     T.eq(teleports[1], "210.0|400.0|12.0|270.0")
     T.eq(teleports[3], "120.5|-340.0|15.0|90.0")
+end)
+
+T.test("modkit: at home, calling the cat summons it anew in front of the Zoi and the old one vanishes", function()
+    local s, pet = adoptedCat({ spawn = true, animate = true, random = calm })
+    local ref = pet.entity
+    T.eq(s.adapter.resolve and s.adapter.resolve(ref) or 109546, 109546)
+    local queued = #s.w.queued
+    T.truthy(s.app:callPet(pet.id, 501).ok)
+    local q1, q2 = s.w.queued[queued + 1], s.w.queued[queued + 2]
+    T.truthy(q1 and q1.bag == "PawHome_Vanish" and q1.target == 109546, "the old cat vanishes")
+    T.truthy(q2 and q2.bag == "PawHome_WelcomeCat", "a new one is summoned")
+    T.eq(#sent(s, "teleport"), 0, "no moving by hand")
+    -- the pet stays present while it is on its way, and becomes the new cat when it appears
+    T.truthy(s.adapter.entityExists(ref))
+    s.adapter.onCatBegin(109999, { home = true })
+    T.eq(pet.entity, ref, "the pet keeps its reference")
+    T.truthy(s.adapter.entityExists(ref))
+    T.truthy(s.adapter.playAnimation(ref, "pet_cuddle"), "and its looks follow the new cat")
+    T.eq(s.w.queued[#s.w.queued].target, 109999)
 end)
 
 T.test("cat B1: teleport message moves the cat actor and reapplies after a stale start", function()
