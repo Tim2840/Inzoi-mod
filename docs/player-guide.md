@@ -18,7 +18,9 @@
 - **需求**：飢餓、精力（睡覺時自動恢復）、玩樂、貓砂。心情由需求決定。
 - **直接點貓**，用遊戲的互動選單：溫柔撫摸、給零食、給貓零食、給貓薄荷糖、玩。Zoi 和貓會播放互動動畫，沒有冷卻時間，但同一個動作連續做效果會遞減。
 - 面板顯示心情、需求、親密度，以及貓的**小要求**（對話泡泡）。滿足牠的要求會有「開心時刻」，效果加倍，貓有機會**送你一個小禮物**（真的遊戲物品，會進背包），並收進面板的**收藏圖鑑**。
-- 貓砂需要家裡有**貓砂盆**才會用到（貓砂盆物件還在製作中）。
+- **飼料碗**（建造模式「寵物」分類）：點碗選「裝滿飼料碗」，貓餓了會自己過來吃，也可以選「讓貓咪吃碗裡的飼料」。
+- **貓砂盆**（建造模式「寵物」分類）：點盒子選「加入貓砂」、髒了選「清理貓砂盆」；貓砂盆的模型目前是暫用的。結果會用遊戲提示訊息顯示。
+- 在家裡叫貓過來（Zoi 自己的選單或面板）時，貓會在 Zoi 面前重新出現。
 - 貓會依心情換不同的坐姿。**貓不會走動**：遊戲本身沒有貓的走路動畫。
 - 幼貓體型較小，長大後變成成貓；老了會變老貓，**最後會安詳離世**（設定頁可以關掉老化）。
 - 家裡擺**貓跳台、貓抓板、貓滾輪**（建造模式 →「寵物」分類），貓的玩樂和精力下降會變慢，面板會列出效果。
@@ -33,7 +35,7 @@
 
 ### 測試中
 - 手機、對城市貓的互動選單入口，以及我們自己加的互動項目：選單項目能加入，但顯示的文字還在確認。
-- 小禮物自動給出的流程、面板拖曳、貓砂盆。
+- 小禮物自動給出的流程、面板拖曳、飼料碗與貓砂盆的選單文字（目前可能顯示代號）。
 
 ### 限制
 - 目前只有貓；每戶預設 1 隻，設定頁可調到 4 隻。
@@ -54,7 +56,9 @@
 - **Needs:** hunger, energy (recovers while asleep), fun and litter. Mood follows the needs.
 - **Click the cat** and use the game's own interaction menu: Pet Gently, Give Snack, Give Treat, Give Catnip Candy, Play. The Zoi and the cat play a paired animation. There are no cooldowns, but doing the same thing over and over helps less each time.
 - The panel shows mood, needs, bond and the cat's **wants** (thought bubble). Meeting a want is a **happy moment**: bigger gains, and the cat may **bring you a small gift** (a real game item, it goes in your bag) that is added to the panel's **keepsake album**.
-- The litter need only matters when the house has a **litter box** (the box object is still being made).
+- **Food bowl** (Build mode, Pet category): click it and pick "Fill the Food Bowl"; hungry cats come to eat by themselves, or pick "Let the Cat Eat from the Bowl".
+- **Litter box** (Build mode, Pet category): "Add Cat Litter", and "Clean Litter Box" when it is dirty; the box model is a stand-in for now. Results show as game toasts.
+- Calling the cat at home (the Zoi's own menu or the panel) makes it appear again in front of the Zoi.
 - Depending on its mood the cat sits in different poses. **Cats do not walk around:** the game has no walking animation for them.
 - Kittens are smaller and grow into adults, then elders, and **eventually pass away peacefully** (aging can be switched off in settings).
 - Put a **cat tower, scratcher or wheel** in the house (Build mode → Pet category): fun and energy drop more slowly. The panel lists the effect.
@@ -69,7 +73,7 @@
 
 ### Still in testing
 - The phone and "adopt this cat" entries and our own interactions in the game's menus: the entries can be added, their displayed text is still being checked.
-- Gifts given automatically, dragging the panel, the litter box.
+- Gifts given automatically, dragging the panel, the bowl and litter box menu labels (may show ids for now).
 
 ### Limits
 - Cats only; one per household by default, up to four in settings.
